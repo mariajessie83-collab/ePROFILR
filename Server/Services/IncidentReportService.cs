@@ -724,9 +724,9 @@ namespace Server.Services
                            sir.EvidencePhotoBase64, 0 as IsSentToGuidance, NULL as DateSentToGuidance, '' as GuidanceCounselorName, '' as ReferredBy,
                            COALESCE(vt.ViolationCategory, 'Incident Report') as LevelOfOffense,
                            '' as GradeLevel
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     LEFT JOIN schools s ON TRIM(UPPER(sir.SchoolName)) = TRIM(UPPER(s.SchoolName))
-                    LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                    LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     WHERE (sir.IsActive = 1 OR sir.IsActive IS NULL)
                     ";
 
@@ -954,7 +954,7 @@ namespace Server.Services
                 var tempReferenceNumber = $"IR-{DateTime.UtcNow:yyyyMMdd}-TEMP";
 
                 var query = @"
-                    INSERT INTO SimplifiedIncidentReports (
+                    INSERT INTO simplifiedincidentreports (
                         ViolationID, FullName, ComplainantContactNumber, RespondentName, AdviserName, VictimName, IncidentType,
                         Description, EvidencePhoto, EvidencePhotoBase64, ReferenceNumber,
                         Status, SchoolName, Division, DateReported, IsActive
