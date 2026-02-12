@@ -14,7 +14,6 @@ WORKDIR /src
 COPY ["Server/Server.csproj", "Server/"]
 COPY ["Gsystem/Gsystem.csproj", "Gsystem/"]
 COPY ["SharedProject/SharedProject.projitems", "SharedProject/"]
-COPY ["SharedProject/SharedProject.projitems.user", "SharedProject/"]
 
 # Restore Server (which should also restore dependencies)
 RUN dotnet restore "Server/Server.csproj"
