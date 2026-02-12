@@ -179,13 +179,13 @@ namespace Server.Services
                     var studentQuery = @"
                         SELECT st.StudentName, st.Section, st.GradeLevel,
                                CASE 
-                                   WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                                   WHEN EXISTS (SELECT 1 FROM information_schema.columns 
                                                WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'SchoolName')
                                    THEN st.SchoolName
                                    ELSE NULL
                                END as SchoolName,
                                CASE 
-                                   WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                                   WHEN EXISTS (SELECT 1 FROM information_schema.columns 
                                                WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'SchoolID')
                                    THEN st.SchoolID
                                    ELSE NULL
