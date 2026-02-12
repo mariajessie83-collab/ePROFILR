@@ -1,5 +1,6 @@
 @using Blazored.LocalStorage
 @using System.Text.Json
+@using System.Text.Json.Serialization
 @using System.Net.Http.Headers
 @using SharedProject
 @inject HttpClient Http
@@ -10,7 +11,7 @@
 @if (IsOpen)
 {
     <div class="login-modal-overlay" @onclick="Close">
-        <div class="login-modal-container" @onclick:stopPropagation="true">
+        <div class="login-modal-container @(isRegisterMode ? "register-mode" : "")" @onclick:stopPropagation="true">
             <!-- Glassmorphic Background Elements -->
             <div class="glass-bg"></div>
             
@@ -35,7 +36,7 @@
             <div class="modal-content-wrapper">
                 <div class="login-form-view">
                     <div class="modal-header">
-                        <h2 class="auth-title">Official Access</h2>
+                        <h2 class="auth-title">@(isRegisterMode ? "Create Account" : (isAdminMode ? "Admin Access" : "Official Access"))</h2>
                         <div class="logo-wrapper">
                             <img src="q12png.png" alt="Portal Logo" class="auth-logo" />
                         </div>
@@ -50,38 +51,273 @@
                         </div>
                     }
 
-                    <form @onsubmit="HandleLogin">
-                        <div class="form-group">
-                            <label><i class="fas fa-user"></i> Username</label>
-                            <input type="text" class="form-control" @bind="loginRequest.Username" placeholder="Enter Username" required />
+                    @if (showSnackbar)
+                    {
+                        <div class="snackbar @snackbarType" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: @(snackbarType == "success" ? "#4CAF50" : "#f44336"); color: white; padding: 12px 24px; border-radius: 8px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-weight: 500; font-size: 14px; text-align: center; width: 90%;">
+                            @snackbarMessage
                         </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-lock"></i> Password</label>
-                            <div class="password-wrapper">
-                                <input type="@(showPassword ? "text" : "password")" class="form-control" @bind="loginRequest.Password" placeholder="Enter Password" required />
-                                <button type="button" class="password-toggle" @onclick="() => showPassword = !showPassword">
-                                    <i class="fas @(showPassword ? "fa-eye-slash" : "fa-eye")"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-footer-links">
-                            <a href="/login/teacher?register=true" class="register-link" @onclick="Close">Need an account? Register here</a>
-                        </div>
+                    }
 
-                        <button type="submit" class="btn-login" disabled="@isLoading">
-                            @if (isLoading)
-                            {
-                                <div class="loader-ring"></div>
-                                <span>@loadingLabel</span>
-                            }
-                            else
-                            {
-                                <span>Login</span>
-                                <i class="fas fa-arrow-right"></i>
-                            }
-                        </button>
-                    </form>
+                    @if (isRegisterMode)
+                    {
+                        <!-- Registration Form -->
+                        <EditForm Model="registrationRequest" OnValidSubmit="HandleRegisterClick">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="form-scroll-container">
+                                    <div class="form-group full-width">
+                                        <label><i class="fas fa-user-circle"></i> Full Name * <span class="input-helper">(Last Name, First Name, Middle Initial)</span></label>
+                                        <InputText class="form-control" placeholder="DELA CRUZ, JUAN A." @bind-Value="registrationRequest.TeacherName" style="text-transform: uppercase;" />
+                                        <ValidationMessage For="@(() => registrationRequest.TeacherName)" />
+                                    </div>
+                                
+                                <div class="form-group">
+                                    <label><i class="fas fa-envelope"></i> Email Address *</label>
+                                    <InputText type="email" class="form-control" placeholder="Enter your email" @bind-Value="registrationRequest.Email" />
+                                    <ValidationMessage For="@(() => registrationRequest.Email)" />
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label><i class="fas fa-user"></i> Username *</label>
+                                    <InputText class="form-control" placeholder="Choose a username" @bind-Value="registrationRequest.Username" />
+                                    <ValidationMessage For="@(() => registrationRequest.Username)" />
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label><i class="fas fa-phone"></i> Phone Number <span class="input-helper">(11 digits)</span></label>
+                                    <InputText type="tel" class="form-control" placeholder="09XXXXXXXXX" @bind-Value="phoneNumber" maxlength="11" />
+                                    @if (!string.IsNullOrEmpty(phoneError))
+                                    {
+                                        <div style="color: #fca5a5; font-size: 12px; margin-top: 4px;">@phoneError</div>
+                                    }
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-venus-mars"></i> Gender</label>
+                                    <InputSelect class="form-control" @bind-Value="registrationRequest.Gender">
+                                        <option value="">Select Gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </InputSelect>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label><i class="fas fa-lock"></i> Password *</label>
+                                    <div class="password-wrapper">
+                                        <InputText type="@(showRegPassword ? "text" : "password")" class="form-control" placeholder="Create password" @bind-Value="registrationRequest.Password" />
+                                        <button type="button" class="password-toggle" @onclick="() => showRegPassword = !showRegPassword">
+                                            <i class="fas @(showRegPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="@(() => registrationRequest.Password)" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-lock"></i> Confirm Password *</label>
+                                    <div class="password-wrapper">
+                                        <InputText type="@(showConfirmPassword ? "text" : "password")" class="form-control" placeholder="Confirm password" @bind-Value="confirmPassword" />
+                                        <button type="button" class="password-toggle" @onclick="() => showConfirmPassword = !showConfirmPassword">
+                                            <i class="fas @(showConfirmPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(passwordError))
+                                    {
+                                        <div style="color: #fca5a5; font-size: 12px; margin-top: 4px;">@passwordError</div>
+                                    }
+                                </div>
+                                
+                                <div class="form-group full-width">
+                                    <label><i class="fas fa-briefcase"></i> Position *</label>
+                                    <InputSelect class="form-control" Value="@registrationRequest.Position" ValueChanged="@((string s) => OnPositionChanged(s))" ValueExpression="@(() => registrationRequest.Position)">
+                                        <option value="">Select Position</option>
+                                        <option value="Adviser">Adviser</option>
+                                        <option value="Subject Teacher">Subject Teacher</option>
+                                        <option value="IT Coordinator">IT Coordinator</option>
+                                        <option value="Librarian">Librarian</option>
+                                        <option value="Registrar">Registrar</option>
+                                        <option value="POD">Prefect of Discipline</option>
+                                        <option value="Guidance Counselor">Guidance Counselor</option>
+                                        <option value="Principal">Principal</option>
+                                        <option value="Vice Principal">Vice Principal</option>
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => registrationRequest.Position)" />
+                                </div>
+
+                                @if (ShowAdviserFields)
+                                {
+                                    <div class="form-group">
+                                        <label>Grade Handle *</label>
+                                        <InputSelect class="form-control" Value="@registrationRequest.GradeLevel" ValueChanged="@((string s) => OnGradeLevelChanged(s))" ValueExpression="@(() => registrationRequest.GradeLevel)">
+                                            <option value="">Select Grade Level</option>
+                                            <option value="Grade 7">Grade 7</option>
+                                            <option value="Grade 8">Grade 8</option>
+                                            <option value="Grade 9">Grade 9</option>
+                                            <option value="Grade 10">Grade 10</option>
+                                            <option value="Grade 11">Grade 11</option>
+                                            <option value="Grade 12">Grade 12</option>
+                                        </InputSelect>
+                                        <ValidationMessage For="@(() => registrationRequest.GradeLevel)" />
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Section *</label>
+                                        <InputText class="form-control" placeholder="Enter section" @bind-Value="registrationRequest.Section" style="text-transform: uppercase;" />
+                                        <ValidationMessage For="@(() => registrationRequest.Section)" />
+                                    </div>
+
+                                    @if (ShowStrandField)
+                                    {
+                                        <div class="form-group full-width">
+                                            <label>Strand *</label>
+                                            <InputSelect class="form-control" @bind-Value="registrationRequest.Strand">
+                                                <option value="">Select Strand</option>
+                                                <optgroup label="Academic Strands">
+                                                    <option value="GAS">GAS</option>
+                                                    <option value="HUMSS">HUMSS</option>
+                                                    <option value="STEM">STEM</option>
+                                                </optgroup>
+                                                <optgroup label="TVL Strands">
+                                                    <option value="TVL">TVL</option>
+                                                    <option value="TVL-IT">TVL-IT</option>
+                                                    <option value="TVL-HE">TVL-HE</option>
+                                                    <option value="TVL-IA">TVL-IA</option>
+                                                    <option value="TVL-ICT">TVL-ICT</option>
+                                                    <option value="TVL-AGRI">TVL-AGRI</option>
+                                                    <option value="TVL-FISH">TVL-FISH</option>
+                                                    <option value="TVL-TOURISM">TVL-TOURISM</option>
+                                                    <option value="TVL-COOKERY">TVL-COOKERY</option>
+                                                    <option value="TVL-BREAD">TVL-BREAD</option>
+                                                    <option value="TVL-FOOD">TVL-FOOD</option>
+                                                    <option value="TVL-HOUSE">TVL-HOUSE</option>
+                                                    <option value="TVL-FRONT">TVL-FRONT</option>
+                                                    <option value="TVL-TRAVEL">TVL-TRAVEL</option>
+                                                    <option value="TVL-EVENTS">TVL-EVENTS</option>
+                                                    <option value="TVL-ATTRACTION">TVL-ATTRACTION</option>
+                                                    <option value="TVL-RECREATION">TVL-RECREATION</option>
+                                                </optgroup>
+                                            </InputSelect>
+                                            <ValidationMessage For="@(() => registrationRequest.Strand)" />
+                                        </div>
+                                    }
+                                }
+                                
+                                <div class="form-group">
+                                    <label><i class="fas fa-map-marker-alt"></i> Region *</label>
+                                    <InputSelect class="form-control" Value="@selectedRegion" ValueChanged="@((string s) => OnRegionChanged(s))" ValueExpression="@(() => selectedRegion)">
+                                        <option value="">Select Region</option>
+                                        @foreach (var region in regions)
+                                        {
+                                            <option value="@region.Region">@region.Region</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-map-marked-alt"></i> Division *</label>
+                                    <InputSelect class="form-control" Value="@selectedDivision" ValueChanged="@((string s) => OnDivisionChanged(s))" ValueExpression="@(() => selectedDivision)" disabled="@(string.IsNullOrEmpty(selectedRegion))">
+                                        <option value="">Select Division</option>
+                                        @foreach (var division in divisions)
+                                        {
+                                            <option value="@division.Division">@division.Division</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-map"></i> District *</label>
+                                    <InputSelect class="form-control" Value="@selectedDistrict" ValueChanged="@((string s) => OnDistrictChanged(s))" ValueExpression="@(() => selectedDistrict)" disabled="@(string.IsNullOrEmpty(selectedDivision))">
+                                        <option value="">Select District</option>
+                                        @foreach (var district in districts)
+                                        {
+                                            <option value="@district.District">@district.District</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><i class="fas fa-school"></i> School *</label>
+                                    <InputSelect class="form-control" Value="@selectedSchool" ValueChanged="@((string s) => OnSchoolChanged(s))" ValueExpression="@(() => selectedSchool)" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
+                                        <option value="">Select School</option>
+                                        @for (int i = 0; i < schools.Count; i++)
+                                        {
+                                            <option value="@i">@schools[i].SchoolName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                
+                                <div class="form-group checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" @bind="agreeTerms" />
+                                        <span class="checkmark"></span>
+                                        I agree to the <a href="#" style="color: #60a5fa;">terms and conditions</a> *
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn-login" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <div class="loader-ring"></div>
+                                    <span>@loadingLabel</span>
+                                }
+                                else
+                                {
+                                    <span>Register</span>
+                                    <i class="fas fa-user-plus"></i>
+                                }
+                            </button>
+                            
+                            <div class="form-footer-links">
+                                <a href="javascript:void(0)" class="register-link" @onclick="ToggleLoginMode">Already have an account? Login here</a>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <!-- Login Form -->
+                        <form @onsubmit="HandleLogin">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Username</label>
+                                <input type="text" class="form-control" @bind="loginRequest.Username" placeholder="Enter Username" required />
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-lock"></i> Password</label>
+                                <div class="password-wrapper">
+                                    <input type="@(showPassword ? "text" : "password")" class="form-control" @bind="loginRequest.Password" placeholder="Enter Password" required />
+                                    <button type="button" class="password-toggle" @onclick="() => showPassword = !showPassword">
+                                        <i class="fas @(showPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-footer-links">
+                                @if (!isAdminMode)
+                                {
+                                    <a href="javascript:void(0)" class="register-link" @onclick="ToggleRegisterMode">Need an account? Register here</a>
+                                }
+                            </div>
+
+                            <button type="submit" class="btn-login" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <div class="loader-ring"></div>
+                                    <span>@loadingLabel</span>
+                                }
+                                else
+                                {
+                                    <span>Login</span>
+                                    <i class="fas fa-arrow-right"></i>
+                                }
+                            </button>
+                        </form>
+
+                        <div class="mode-toggle-container">
+                            <button type="button" class="mode-toggle-btn" @onclick="ToggleAdminMode">
+                                @(isAdminMode ? "Log in as Teacher/Official" : "Log in as Admin")
+                            </button>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -104,11 +340,12 @@
         animation: fadeIn 0.4s ease-out;
     }
 
+
     .login-modal-container {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.15); /* Slightly more opaque background */
         backdrop-filter: blur(25px) saturate(180%);
         -webkit-backdrop-filter: blur(25px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3); /* Stronger border */
         border-radius: 32px;
         width: 100%;
         max-width: 460px;
@@ -116,10 +353,67 @@
         position: relative;
         overflow: hidden;
         box-shadow: 
-            0 25px 50px -12px rgba(0, 0, 0, 0.25),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            0 25px 50px -12px rgba(0, 0, 0, 0.35),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.15);
         animation: modalEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        color: #f8fafc;
+        color: #ffffff;
+        max-height: 90vh; /* Allow scrolling content */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .login-modal-container.register-mode {
+        max-width: 800px; /* Increase width for 2 columns */
+    }
+    
+    .modal-content-wrapper {
+        overflow-y: auto;
+        padding-right: 8px; /* Space for scrollbar */
+        max-height: calc(90vh - 96px); /* Adjust based on padding */
+    }
+    
+    /* Custom Scrollbar - More Visible */
+    .modal-content-wrapper::-webkit-scrollbar {
+        width: 8px;
+    }
+    .modal-content-wrapper::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1); /* Darker track */
+        border-radius: 4px;
+    }
+    .modal-content-wrapper::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.4); /* Brighter thumb */
+        border-radius: 4px;
+        border: 1px solid rgba(0,0,0,0.1);
+    }
+    .modal-content-wrapper::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.6);
+    }
+    
+    /* 2-Column Grid Layout */
+    .form-scroll-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Two equal columns */
+        gap: 20px; /* Increased gap */
+        padding: 5px; /* Prevent clipping */
+    }
+
+    /* Full width for single-column form (Login) or specific items */
+    .form-group.full-width {
+        grid-column: span 2;
+    }
+
+    /* Fallback for mobile or small screens */
+    @@media (max-width: 640px) {
+        .form-scroll-container {
+            grid-template-columns: 1fr;
+        }
+        .form-group.full-width {
+            grid-column: span 1;
+        }
+        .login-modal-container.register-mode {
+            max-width: 100%;
+            padding: 24px;
+        }
     }
 
     .glass-bg {
@@ -128,7 +422,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.08));
         z-index: -1;
     }
 
@@ -167,8 +461,8 @@
         position: absolute;
         top: 24px;
         right: 24px;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.15); /* Increased visibility */
+        border: 1px solid rgba(255, 255, 255, 0.2);
         width: 36px;
         height: 36px;
         border-radius: 50%;
@@ -180,12 +474,14 @@
         justify-content: center;
         transition: all 0.3s;
         z-index: 10;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     .modal-close-btn:hover {
-        background: rgba(239, 68, 68, 0.2);
-        color: #ef4444;
-        border-color: rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.3);
+        color: #ffffff;
+        border-color: rgba(239, 68, 68, 0.4);
+        transform: rotate(90deg);
     }
 
     .modal-header {
@@ -202,7 +498,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.25));
+        filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.3)); /* Stronger shadow */
         transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
@@ -224,69 +520,84 @@
         margin: 0;
         letter-spacing: -0.01em;
         line-height: 1.2;
-        background: linear-gradient(to bottom, #ffffff, #e2e8f0);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2); /* Added text shadow for readability */
+        text-align: center;
     }
 
     .header-divider {
         width: 40px;
         height: 3px;
-        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        background: linear-gradient(90deg, transparent, #60a5fa, transparent); /* Brighter blue */
         margin: 10px 0;
         border-radius: 2px;
-        opacity: 0.6;
-    }
-
-    .auth-subtitle {
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 14px;
-        font-weight: 500;
-        margin: 0;
-        max-width: 250px;
-        line-height: 1.5;
-        text-align: center;
+        opacity: 0.8;
     }
 
     .form-group {
-        margin-bottom: 24px;
+        margin-bottom: 0; /* Reset margins when using grid gap */
+        position: relative;
     }
 
     .form-group label {
         display: block;
         font-size: 13px;
-        font-weight: 600;
-        color: rgba(255, 255, 255, 0.8);
+        font-weight: 700; /* Bolder label */
+        color: rgba(255, 255, 255, 0.95); /* Close to full white */
         margin-bottom: 8px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.4); /* Text shadow for contrast against background */
     }
 
     .form-group label i {
         margin-right: 6px;
-        opacity: 0.7;
+        opacity: 0.9;
+        color: #93c5fd; /* Light blue icons */
     }
 
     .form-control {
         width: 100%;
         padding: 14px 18px;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.12); /* Slightly lighter background */
+        border: 1px solid rgba(255, 255, 255, 0.25); /* More visible border */
         border-radius: 16px;
         font-size: 16px;
         color: #ffffff;
+        font-weight: 500; /* Slightly bolder text */
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    select.form-control {
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+        background-repeat: no-repeat;
+        background-position: right 15px top 50%;
+        background-size: 12px auto;
+        padding-right: 40px;
+    }
+    
+    select.form-control option {
+        background-color: #1e293b; /* Dark slate */
+        color: white;
+        padding: 10px;
+    }
+    
+    select.form-control optgroup {
+        background-color: #1e293b;
+        color: #94a3b8;
+        font-style: italic;
     }
 
     .form-control::placeholder {
-        color: rgba(255, 255, 255, 0.3);
+        color: rgba(255, 255, 255, 0.65); /* Much brighter placeholder */
     }
 
     .form-control:focus {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: #3b82f6;
+        background: rgba(255, 255, 255, 0.2);
+        border-color: #60a5fa;
         outline: none;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
     }
 
     .password-wrapper {
@@ -300,7 +611,7 @@
         transform: translateY(-50%);
         background: none;
         border: none;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.7); /* More visible toggle */
         cursor: pointer;
         padding: 8px;
         font-size: 16px;
@@ -310,7 +621,7 @@
 
     .password-toggle:hover {
         color: #ffffff;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.2);
     }
 
     .btn-login {
@@ -324,12 +635,14 @@
         font-weight: 700;
         cursor: pointer;
         transition: all 0.3s;
-        margin-top: 8px;
+        margin-top: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 12px;
         box-shadow: 0 10px 20px -10px rgba(59, 130, 246, 0.5);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        letter-spacing: 0.5px;
     }
 
     .btn-login:hover:not(:disabled) {
@@ -337,18 +650,48 @@
         box-shadow: 0 15px 30px -12px rgba(59, 130, 246, 0.6);
         filter: brightness(1.1);
     }
-
-    .btn-login:active:not(:disabled) {
-        transform: translateY(0);
+    
+    /* Disabled Input Styling - High Contrast */
+    .form-control:disabled,
+    select.form-control:disabled {
+        background-color: #000000 !important; /* Pure black background */
+        color: #ffffff !important; /* Pure white text */
+        opacity: 0.7; /* Slight opacity */
+        border-color: rgba(255, 255, 255, 0.3);
+        cursor: not-allowed;
+    }
+    
+    .input-helper {
+        display: block;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        font-style: italic;
+        margin-top: 4px;
+        font-weight: 400;
+        text-transform: none;
     }
 
-    .btn-login i {
-        font-size: 14px;
-        transition: transform 0.3s;
+    .checkbox-group {
+        margin-top: 10px;
+        grid-column: span 2; /* Checkbox spans full width */
     }
-
-    .btn-login:hover i {
-        transform: translateX(4px);
+    
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px; /* Larger font */
+        cursor: pointer;
+        text-transform: none !important;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    
+    .checkbox-label input {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #3b82f6;
     }
 
     .btn-login:disabled {
@@ -361,32 +704,71 @@
         border-radius: 16px;
         margin-bottom: 24px;
         font-size: 14px;
-        font-weight: 500;
+        font-weight: 600;
         display: flex;
         align-items: center;
         gap: 12px;
-        background: rgba(239, 68, 68, 0.15);
+        background: rgba(239, 68, 68, 0.2); /* More visible error bg */
         color: #fca5a5;
-        border: 1px solid rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     .register-link {
         display: block;
         text-align: center;
-        color: #60a5fa;
+        color: #93c5fd; /* Brighter link color */
         text-decoration: none;
         font-size: 14px;
         font-weight: 600;
         transition: all 0.2s;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
 
     .register-link:hover {
-        color: #93c5fd;
+        color: #ffffff;
         text-decoration: underline;
+        text-shadow: 0 0 8px rgba(147, 197, 253, 0.6); /* Glow effect */
     }
 
     .form-footer-links {
         margin-bottom: 20px;
+        margin-top: 16px;
+        text-align: center;
+    }
+
+    .mode-toggle-container {
+        margin-top: 24px;
+        text-align: center;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        padding-top: 16px;
+    }
+
+    .mode-toggle-btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: rgba(255, 255, 255, 0.85);
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .mode-toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-1px);
+    }
+    
+    .validation-message {
+        color: #fca5a5;
+        font-size: 12px;
+        margin-top: 4px;
+        font-weight: 500;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.5);
     }
 
     .loader-ring {
@@ -433,15 +815,112 @@
     [Parameter] public EventCallback OnLoginSuccess { get; set; }
 
     private LoginRequest loginRequest = new();
+    private TeacherRegistrationRequest registrationRequest = new();
     private bool isLoading = false;
     private string errorMessage = string.Empty;
     private bool showPassword = false;
+    private bool showRegPassword = false;
+    private bool showConfirmPassword = false;
     private string loadingLabel = "Logging in...";
+    private bool isAdminMode = false;
+    private bool isRegisterMode = false;
+
+    // Registration variables
+    private string phoneNumber = string.Empty;
+    private string confirmPassword = string.Empty;
+    private bool agreeTerms = false;
+    private string phoneError = string.Empty;
+    private string passwordError = string.Empty;
+    
+    // Snackbar variables
+    private bool showSnackbar = false;
+    private string snackbarMessage = string.Empty;
+    private string snackbarType = "success";
+
+    private bool ShowAdviserFields => registrationRequest.Position == "Adviser";
+    private bool ShowStrandField => ShowAdviserFields && (registrationRequest.GradeLevel == "Grade 11" || registrationRequest.GradeLevel == "Grade 12");
+
+    // Dropdown data
+    private List<School> regions = new();
+    private List<School> divisions = new();
+    private List<School> districts = new();
+    private List<School> schools = new();
+    private string selectedRegion = string.Empty;
+    private string selectedDivision = string.Empty;
+    private string selectedDistrict = string.Empty;
+    private string selectedSchool = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRegions();
+    }
 
     private async Task Close()
     {
         IsOpen = false;
         await IsOpenChanged.InvokeAsync(false);
+        // Reset state on close
+        isRegisterMode = false;
+        ResetRegistrationForm();
+        errorMessage = string.Empty;
+    }
+
+    private void ToggleAdminMode()
+    {
+        isAdminMode = !isAdminMode;
+        errorMessage = string.Empty;
+        loginRequest = new LoginRequest();
+    }
+    
+    private void ToggleRegisterMode()
+    {
+        isRegisterMode = true;
+        isAdminMode = false; // Cannot be admin in register mode
+        errorMessage = string.Empty;
+        ResetRegistrationForm();
+    }
+    
+    private void ToggleLoginMode()
+    {
+        isRegisterMode = false;
+        errorMessage = string.Empty;
+    }
+    
+    private void ResetRegistrationForm()
+    {
+        registrationRequest = new TeacherRegistrationRequest();
+        phoneNumber = string.Empty;
+        confirmPassword = string.Empty;
+        agreeTerms = false;
+        phoneError = string.Empty;
+        passwordError = string.Empty;
+        selectedRegion = string.Empty;
+        selectedDivision = string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        divisions.Clear();
+        districts.Clear();
+        schools.Clear();
+    }
+
+    private void OnPositionChanged(string value)
+    {
+        registrationRequest.Position = value ?? string.Empty;
+        if (!ShowAdviserFields)
+        {
+            registrationRequest.GradeLevel = string.Empty;
+            registrationRequest.Section = string.Empty;
+            registrationRequest.Strand = string.Empty;
+        }
+    }
+
+    private void OnGradeLevelChanged(string value)
+    {
+        registrationRequest.GradeLevel = value ?? string.Empty;
+        if (!ShowStrandField)
+        {
+            registrationRequest.Strand = string.Empty;
+        }
     }
 
     private async Task HandleLogin()
@@ -464,20 +943,36 @@
                 var data = result.GetProperty("data");
                 var role = data.GetProperty("userRole").GetString();
 
-                // Validation: Only Teachers and Officials (Guidance, POD) are handled here
-                // Students should still be able to login if they have credentials, 
-                // but the UI won't explicitly offer it. 
-                // However, the user said "wala nang students direct teacher and officials".
-                // I will block student logins here to be safe.
-                if (role == "student")
+                if (isAdminMode)
                 {
-                    errorMessage = "Access denied. Please use the student portal.";
-                    isLoading = false;
-                    return;
+                    if (role == "admin" || role == "schoolhead" || role == "division")
+                    {
+                        await HandleAdminLoginSuccess(data, role);
+                    }
+                    else
+                    {
+                        errorMessage = "Access denied. Not an admin account.";
+                    }
                 }
+                else
+                {
+                    if (role == "student")
+                    {
+                        errorMessage = "Access denied. Please use the student portal.";
+                        isLoading = false;
+                        return;
+                    }
 
-                loadingLabel = "Setting up session...";
-                await HandleTeacherLoginSuccess(data, role);
+                    if (role == "admin" || role == "schoolhead" || role == "division")
+                    {
+                         errorMessage = "Please switch to 'Admin Access' to login.";
+                         isLoading = false;
+                         return;
+                    }
+                    
+                    loadingLabel = "Setting up session...";
+                    await HandleTeacherLoginSuccess(data, role);
+                }
             }
             else
             {
@@ -486,7 +981,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"An error occurred during login: {ex.Message}";
+            errorMessage = $"An error occurred: {ex.Message}";
         }
         finally
         {
@@ -494,62 +989,314 @@
         }
     }
 
-    private async Task HandleTeacherLoginSuccess(JsonElement data, string role)
+    private async Task HandleRegisterClick()
     {
-        // Admin, SchoolHead, Division are handled separately as requested ("wag mo na isali")
-        if (role == "admin" || role == "schoolhead" || role == "division")
+        if (isLoading) return;
+        
+        if (!agreeTerms)
         {
-            errorMessage = $"Redirecting to {role} portal...";
-            await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
-            await Task.Delay(500);
-            NavigationManager.NavigateTo("/login/admin", true);
+            ShowSnackbar("Please agree to the terms and conditions", "error");
             return;
         }
 
-        var userPositionRaw = data.GetProperty("position").GetString();
-        var normalizedPosition = userPositionRaw?.Trim() ?? string.Empty;
+        if (registrationRequest.Password != confirmPassword)
+        {
+            passwordError = "Passwords do not match";
+            return;
+        }
+        passwordError = string.Empty;
 
-        // Store basic teacher data
+        if (!string.IsNullOrEmpty(phoneNumber) && !IsValidPhilippinePhoneNumber(phoneNumber))
+        {
+            phoneError = "Phone number must be 11 digits starting with 09";
+            return;
+        }
+        phoneError = string.Empty;
+        registrationRequest.PhoneNumber = phoneNumber;
+
+        // Validation for required fields
+        if (string.IsNullOrEmpty(registrationRequest.TeacherName) ||
+            string.IsNullOrEmpty(registrationRequest.Email) ||
+            string.IsNullOrEmpty(registrationRequest.Username) ||
+            string.IsNullOrEmpty(registrationRequest.Password) ||
+            string.IsNullOrEmpty(registrationRequest.Position) ||
+            string.IsNullOrEmpty(selectedRegion) ||
+            string.IsNullOrEmpty(selectedDivision) ||
+            string.IsNullOrEmpty(selectedDistrict) ||
+            string.IsNullOrEmpty(selectedSchool))
+        {
+            ShowSnackbar("Please fill out all required fields", "error");
+            return;
+        }
+        
+        if (ShowAdviserFields)
+        {
+             if (string.IsNullOrEmpty(registrationRequest.GradeLevel) || string.IsNullOrEmpty(registrationRequest.Section))
+             {
+                 ShowSnackbar("Grade Level and Section are required for Advisers", "error");
+                 return;
+             }
+             if (ShowStrandField && string.IsNullOrEmpty(registrationRequest.Strand))
+             {
+                 ShowSnackbar("Strand is required for Senior High School", "error");
+                 return;
+             }
+        }
+
+        isLoading = true;
+        _ = StartLoadingAnimation();
+
+        try
+        {
+            var json = JsonSerializer.Serialize(registrationRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+            
+            var response = await Http.PostAsync("/api/Auth/register/teacher", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<int>>(responseContent);
+                if (apiResponse != null && apiResponse.Success)
+                {
+                    ShowSnackbar("Registration successful! You can now login.", "success");
+                    await Task.Delay(2000);
+                    ToggleLoginMode();
+                }
+                else
+                {
+                    ShowSnackbar(apiResponse?.Message ?? "Registration failed", "error");
+                }
+            }
+            else
+            {
+                ShowSnackbar($"Registration failed: {response.StatusCode}", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowSnackbar($"Error: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private void ShowSnackbar(string message, string type)
+    {
+        snackbarMessage = message;
+        snackbarType = type;
+        showSnackbar = true;
+        StateHasChanged();
+        
+        Task.Run(async () => {
+            await Task.Delay(4000);
+            showSnackbar = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+    
+    private bool IsValidPhilippinePhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrEmpty(phoneNumber)) return true;
+        var digits = System.Text.RegularExpressions.Regex.Replace(phoneNumber, "[^0-9]", "");
+        return digits.Length == 11 && digits.StartsWith("09");
+    }
+
+    private async Task StartLoadingAnimation()
+    {
+        var messages = isRegisterMode 
+            ? new[] { "Validating...", "Creating account...", "Finalizing..." }
+            : new[] { "Authenticating...", "Verifying credentials...", "Loading profile..." };
+            
+        int index = 0;
+        while (isLoading)
+        {
+            loadingLabel = messages[index % messages.Length];
+            StateHasChanged();
+            await Task.Delay(800);
+            index++;
+        }
+    }
+
+    private async Task HandleAdminLoginSuccess(JsonElement data, string role)
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", "admin_token_" + DateTime.Now.Ticks);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", role);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", data.GetProperty("username").GetString());
+        
+        if (data.TryGetProperty("adminAccountID", out var aid)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "adminAccountID", aid.GetInt32().ToString());
+        if (data.TryGetProperty("fullName", out var fn)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "fullName", fn.GetString());
+        
+        // Save school info if present
+        if (data.TryGetProperty("schoolName", out var sn)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "schoolName", sn.GetString());
+        if (data.TryGetProperty("division", out var div)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "division", div.GetString());
+
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", role);
+        await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+        
+        var targetRoute = role switch
+        {
+            "schoolhead" => "/schoolhead-dashboard",
+            "division" => "/division-dashboard",
+            _ => "/admin-dashboard"
+        };
+
+        NavigationManager.NavigateTo(targetRoute, forceLoad: false);
+        _ = Task.Run(async () => { await Task.Delay(2000); await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating"); });
+    }
+
+    private async Task HandleTeacherLoginSuccess(JsonElement data, string role)
+    {
+        var position = data.GetProperty("position").GetString()?.Trim() ?? "";
+        
         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", "teacher_token_" + DateTime.Now.Ticks);
         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", role);
         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", data.GetProperty("username").GetString());
-        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userPosition", normalizedPosition);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userPosition", position);
         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherName", data.GetProperty("teacherName").GetString());
         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", "teacher");
         await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "hasActiveSession", "true");
 
-        // Store location details
         if (data.TryGetProperty("schoolName", out var sn)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "schoolName", sn.GetString());
-        if (data.TryGetProperty("region", out var r)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "region", r.GetString());
-        if (data.TryGetProperty("division", out var d)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "division", d.GetString());
-        if (data.TryGetProperty("district", out var dist)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "district", dist.GetString());
-
-        // Store TeacherID
         if (data.TryGetProperty("teacherID", out var tid)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", tid.GetInt32().ToString());
-        else if (data.TryGetProperty("TeacherID", out var tid2)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", tid2.GetInt32().ToString());
         else if (data.TryGetProperty("userID", out var uid)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", uid.GetInt32().ToString());
 
         await OnLoginSuccess.InvokeAsync();
-
-        // Set navigation flag to prevent SimpleLayout from clearing localStorage
         await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
-        // Small delay to ensure sessionStorage is written
         await Task.Delay(150);
 
-        // Redirect based on position - use forceLoad: false to keep SPA context
-        if (normalizedPosition.Equals("POD", StringComparison.OrdinalIgnoreCase))
-            NavigationManager.NavigateTo("/pod-dashboard", forceLoad: false);
-        else if (normalizedPosition.Equals("Adviser", StringComparison.OrdinalIgnoreCase))
-            NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
-        else if (normalizedPosition.Equals("Guidance Counselor", StringComparison.OrdinalIgnoreCase))
-            NavigationManager.NavigateTo("/guidance-dashboard", forceLoad: false);
-        else
-            NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+        if (position.Equals("POD", StringComparison.OrdinalIgnoreCase)) NavigationManager.NavigateTo("/pod-dashboard", false);
+        else if (position.Equals("Adviser", StringComparison.OrdinalIgnoreCase)) NavigationManager.NavigateTo("/adviser-dashboard", false);
+        else if (position.Equals("Guidance Counselor", StringComparison.OrdinalIgnoreCase)) NavigationManager.NavigateTo("/guidance-dashboard", false);
+        else NavigationManager.NavigateTo("/adviser-dashboard", false);
             
-        // Clear flag after a delay
-        _ = Task.Run(async () => {
-            await Task.Delay(2000);
-            await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating");
-        });
+        _ = Task.Run(async () => { await Task.Delay(2000); await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating"); });
+    }
+    
+    // Address loading methods
+    private async Task LoadRegions()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    regions = apiResponse.Data.Where(s => !string.IsNullOrEmpty(s.Region)).GroupBy(s => s.Region.Trim()).Select(g => new School { Region = g.Key }).ToList();
+                }
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"Error loading regions: {ex.Message}"); }
+    }
+
+    private async Task OnRegionChanged(string val)
+    {
+        selectedRegion = val;
+        selectedDivision = string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        divisions.Clear(); districts.Clear(); schools.Clear();
+        ClearSchoolFields();
+
+        if (!string.IsNullOrEmpty(selectedRegion))
+        {
+            // Load divisions (filter from API or reload)
+            // Ideally we re-fetch or filter cached. Here we re-fetch to keep logic simple as in LoginTeacher
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true)
+                {
+                     divisions = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion)
+                        .Where(s => !string.IsNullOrEmpty(s.Division))
+                        .GroupBy(s => s.Division.Trim())
+                        .Select(g => new School { Division = g.Key })
+                        .ToList();
+                }
+            }
+        }
+    }
+
+    private async Task OnDivisionChanged(string val)
+    {
+        selectedDivision = val;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        districts.Clear(); schools.Clear();
+        ClearSchoolFields();
+        
+        if (!string.IsNullOrEmpty(selectedDivision))
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true)
+                {
+                     districts = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion && s.Division?.Trim() == selectedDivision)
+                        .Where(s => !string.IsNullOrEmpty(s.District))
+                        .GroupBy(s => s.District.Trim())
+                        .Select(g => new School { District = g.Key })
+                        .ToList();
+                }
+            }
+        }
+    }
+
+    private async Task OnDistrictChanged(string val)
+    {
+        selectedDistrict = val;
+        selectedSchool = string.Empty;
+        schools.Clear();
+        ClearSchoolFields();
+
+        if (!string.IsNullOrEmpty(selectedDistrict))
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true)
+                {
+                     schools = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion && s.Division?.Trim() == selectedDivision && s.District?.Trim() == selectedDistrict)
+                        .ToList();
+                }
+            }
+        }
+    }
+
+    private void OnSchoolChanged(string val)
+    {
+        selectedSchool = val;
+        if (int.TryParse(val, out int index) && index >= 0 && index < schools.Count)
+        {
+            var s = schools[index];
+            registrationRequest.SchoolName = s.SchoolName;
+            registrationRequest.School_ID = s.School_ID;
+            registrationRequest.SchoolID = s.SchoolID;
+        }
+        else
+        {
+            ClearSchoolFields();
+        }
+    }
+
+    private void ClearSchoolFields()
+    {
+        registrationRequest.SchoolName = string.Empty;
+        registrationRequest.School_ID = string.Empty;
+        registrationRequest.SchoolID = null;
     }
 }

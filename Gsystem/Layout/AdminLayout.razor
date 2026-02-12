@@ -95,7 +95,7 @@
     private async Task Logout()
     {
         await AuthService.LogoutAsync();
-        NavigationManager.NavigateTo("/login/teacher", forceLoad: true);
+        NavigationManager.NavigateTo("/", forceLoad: true);
     }
 }
 
