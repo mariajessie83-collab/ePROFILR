@@ -1,0 +1,146 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<header class="student-header">
+    <div class="student-header-inner">
+        <div class="student-brand">
+            <h3 class="student-app-name">Student Portal</h3>
+            <span class="student-sub">For learners only</span>
+        </div>
+        <nav class="student-nav">
+            <a class="student-nav-item" href="/">Back to Main</a>
+            <a class="student-nav-item" href="/student-dashboard">Dashboard</a>
+            <a class="student-nav-item" href="/incident-report">Report Incident</a>
+            <button class="student-logout-btn" @onclick="Logout">Logout</button>
+        </nav>
+    </div>
+    <div class="student-divider"></div>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        .student-header {
+            background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-header * {
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .student-app-name {
+            margin: 0;
+            color: #ffffff;
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-sub {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+            display: block;
+            margin-top: 4px;
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-nav {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .student-nav-item {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-nav-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .student-logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 14px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .student-logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-1px);
+        }
+        .student-divider {
+            height: 3px;
+            background: linear-gradient(90deg, #003d82 0%, #00a8e8 100%);
+        }
+        .student-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            min-height: calc(100vh - 100px);
+        }
+        @@media (max-width: 768px) {
+            .student-header-inner {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .student-nav {
+                flex-wrap: wrap;
+                justify-content: center;
+                width: 100%;
+            }
+            .student-nav-item {
+                padding: 8px 14px;
+                font-size: 0.95rem;
+            }
+            .student-app-name {
+                font-size: 1.75rem;
+            }
+            .student-sub {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</header>
+
+<div class="student-content">
+    @Body
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "username");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userFullName");
+            NavigationManager.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+            NavigationManager.NavigateTo("/", true);
+        }
+    }
+}
+
+

@@ -1,0 +1,87 @@
+﻿@inject IJSRuntime JSRuntime
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Gsystem</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="incident-report">
+                <span class="bi bi-clipboard-data-nav-menu" aria-hidden="true"></span> Incident Report
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="simplified-case-record">
+                <span class="bi bi-file-earmark-text-nav-menu" aria-hidden="true"></span> Case Record
+            </NavLink>
+        </div>
+        @if (isPODUser)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="pod-dashboard">
+                    <span class="bi bi-speedometer2-nav-menu" aria-hidden="true"></span> POD Dashboard
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool isPODUser = false;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckPODUser();
+    }
+
+    private async Task CheckPODUser()
+    {
+        try
+        {
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            
+            // Normalize: trim whitespace and handle case-insensitive comparison
+            var normalizedRole = userRole?.Trim() ?? string.Empty;
+            var normalizedPosition = userPosition?.Trim() ?? string.Empty;
+            
+            bool isTeacherRole = normalizedRole.Equals("teacher", StringComparison.OrdinalIgnoreCase);
+            bool isPODPosition = normalizedPosition.Equals("POD", StringComparison.OrdinalIgnoreCase);
+            
+            isPODUser = isTeacherRole && isPODPosition;
+        }
+        catch
+        {
+            isPODUser = false;
+        }
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

@@ -1,0 +1,1720 @@
+@page "/login/teacher"
+@layout Gsystem.Layout.SimpleLayout
+@using System.Text.Json
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using SharedProject
+@using Gsystem.Services
+@inject HttpClient Http
+@inject OfflineStorageService OfflineStorage
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<PageTitle>Teacher/Admin Login</PageTitle>
+
+<!-- Airplane Background -->
+<div class="sky-background">
+    <div class="clouds"></div>
+    <div class="airplanes-container">
+        <!-- Paper Planes (SVG Backgrounds) -->
+        <div class="paper-plane plane-1"></div>
+        <div class="paper-plane plane-2"></div>
+        <div class="paper-plane plane-3"></div>
+        <div class="paper-plane plane-4"></div>
+        <div class="paper-plane plane-5"></div>
+    </div>
+</div>
+
+@if (isStudentAccessingTeacherPage)
+{
+    <div class="student-access-warning" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    ">
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        ">
+            <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
+            <h3 style="color: #d32f2f; margin-bottom: 15px;">Access Restricted</h3>
+            <p style="color: #666; margin-bottom: 20px;">
+                Students cannot access the teacher login page. You will be redirected to the student login page.
+            </p>
+            <div style="color: #999; font-size: 14px;">
+                Redirecting in 3 seconds...
+            </div>
+        </div>
+    </div>
+}
+
+<div class="login-container">
+    <div class="login-card @(isRegisterMode ? "register-mode" : "")">
+        <div class="login-header">
+            <h2>@(isRegisterMode ? "Teacher/Admin Registration" : "Teacher/Admin Login")</h2>
+            <p>@(isRegisterMode ? "Fill out the form below to register as a teacher or administrator" : "Enter your credentials to access your account")</p>
+        </div>
+        
+        <!-- Toggle Buttons -->
+        <div class="toggle-buttons">
+            <button class="toggle-btn @(isRegisterMode ? "" : "active")" @onclick="@(() => ToggleMode(false))">Login</button>
+            <button class="toggle-btn @(isRegisterMode ? "active" : "")" @onclick="@(() => ToggleMode(true))">Register</button>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p class="fade-in-text">@loadingMessage</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isSuccess ? "alert-success" : "alert-error")">
+                @message
+            </div>
+        }
+
+        <!-- Snackbar -->
+        @if (showSnackbar)
+        {
+            <div class="snackbar @snackbarType" style="position: fixed; bottom: 20px; right: 20px; background: @(snackbarType == "success" ? "#4CAF50" : "#f44336"); color: white; padding: 16px; border-radius: 4px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                @snackbarMessage
+            </div>
+        }
+
+        @if (isRegisterMode)
+        {
+            <!-- Registration Form -->
+            <EditForm Model="registrationRequest" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+                <!-- <ValidationSummary /> -->
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="teacherName">Full Name *</label>
+                        <InputText id="teacherName" class="form-control" placeholder="Enter your full name" @bind-Value="registrationRequest.TeacherName" style="text-transform: uppercase;" />
+                        <ValidationMessage For="@(() => registrationRequest.TeacherName)" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <InputText id="email" type="email" class="form-control" placeholder="Enter your email" @bind-Value="registrationRequest.Email" />
+                        <ValidationMessage For="@(() => registrationRequest.Email)" />
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username *</label>
+                        <InputText id="username" class="form-control" placeholder="Choose a username" @bind-Value="registrationRequest.Username" />
+                        <ValidationMessage For="@(() => registrationRequest.Username)" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number (Philippine Format)</label>
+                        <InputText id="phoneNumber" type="tel" class="form-control" placeholder="09XXXXXXXXX (11 digits)" @bind-Value="phoneNumber" maxlength="11" />
+                        <small class="text-muted">Format: 09XXXXXXXXX (11 digits starting with 09)</small>
+                        @if (!string.IsNullOrEmpty(phoneError))
+                        {
+                            <small class="phone-error">@phoneError</small>
+                        }
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <div class="password-input-wrapper">
+                            <InputText id="password" type="@(showRegPassword ? "text" : "password")" class="form-control" placeholder="Enter your password" @bind-Value="registrationRequest.Password" />
+                            <button type="button" class="password-toggle-btn" @onclick="() => showRegPassword = !showRegPassword">
+                                @(showRegPassword ? "👁️" : "👁️‍🗨️")
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => registrationRequest.Password)" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password *</label>
+                        <div class="password-input-wrapper">
+                            <InputText id="confirmPassword" type="@(showConfirmPassword ? "text" : "password")" class="form-control" placeholder="Confirm your password" @bind-Value="confirmPassword" />
+                            <button type="button" class="password-toggle-btn" @onclick="() => showConfirmPassword = !showConfirmPassword">
+                                @(showConfirmPassword ? "👁️" : "👁️‍🗨️")
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(passwordError))
+                        {
+                            <small class="phone-error">@passwordError</small>
+                        }
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="position">Position *</label>
+                        <InputSelect id="position" class="form-control" @bind-Value="registrationRequest.Position" @onchange="OnPositionChanged">
+                            <option value="">Select Position</option>
+                            <option value="Adviser">Adviser</option>
+                            <option value="Subject Teacher">Subject Teacher</option>
+                            <option value="IT Coordinator">IT Coordinator</option>
+                            <option value="Librarian">Librarian</option>
+                            <option value="Registrar">Registrar</option>
+                            <option value="POD">Prefect of Discipline</option>
+                            <option value="Guidance Counselor">Guidance Counselor</option>
+                            <option value="Principal">Principal</option>
+                            <option value="Vice Principal">Vice Principal</option>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => registrationRequest.Position)" />
+                    </div>
+                    
+                </div>
+
+                <!-- Grade Level and Section Fields (only for Adviser position) -->
+                @if (ShowAdviserFields)
+                {
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="gradeLevel">Grade Handle *</label>
+                            <InputSelect id="gradeLevel" class="form-control" TValue="string" @bind-Value="registrationRequest.GradeLevel" @onchange="OnGradeLevelChanged">
+                                <option value="">Select Grade Level</option>
+                                <option value="Grade 7">Grade 7</option>
+                                <option value="Grade 8">Grade 8</option>
+                                <option value="Grade 9">Grade 9</option>
+                                <option value="Grade 10">Grade 10</option>
+                                <option value="Grade 11">Grade 11</option>
+                                <option value="Grade 12">Grade 12</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => registrationRequest.GradeLevel)" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="section">Section *</label>
+                            <InputText id="section" class="form-control" placeholder="Enter section (e.g., A, B, C)" @bind-Value="registrationRequest.Section" style="text-transform: uppercase;" />
+                            <ValidationMessage For="@(() => registrationRequest.Section)" />
+                        </div>
+                    </div>
+
+                    <!-- Strand Field (only for Grade 11-12) -->
+                    @if (ShowStrandField)
+                    {
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="strand">Strand *</label>
+                                <InputSelect id="strand" class="form-control" TValue="string" @bind-Value="registrationRequest.Strand">
+                                    <option value="">Select Strand</option>
+                                    <optgroup label="Academic Strands">
+                                        <option value="GAS">GAS - General Academic Strand</option>
+                                        <option value="HUMSS">HUMSS - Humanities and Social Sciences</option>
+                                        <option value="STEM">STEM - Science, Technology, Engineering, and Mathematics</option>
+                                    </optgroup>
+                                    <optgroup label="TVL Strands">
+                                        <option value="TVL">TVL - Technical-Vocational-Livelihood</option>
+                                        <option value="TVL-IT">TVL-IT - Information Technology</option>
+                                        <option value="TVL-HE">TVL-HE - Home Economics</option>
+                                        <option value="TVL-IA">TVL-IA - Industrial Arts</option>
+                                        <option value="TVL-ICT">TVL-ICT - Information and Communications Technology</option>
+                                        <option value="TVL-AGRI">TVL-AGRI - Agriculture</option>
+                                        <option value="TVL-FISH">TVL-FISH - Fisheries</option>
+                                        <option value="TVL-TOURISM">TVL-TOURISM - Tourism</option>
+                                        <option value="TVL-COOKERY">TVL-COOKERY - Cookery</option>
+                                        <option value="TVL-BREAD">TVL-BREAD - Bread and Pastry Production</option>
+                                        <option value="TVL-FOOD">TVL-FOOD - Food and Beverage Services</option>
+                                        <option value="TVL-HOUSE">TVL-HOUSE - Housekeeping</option>
+                                        <option value="TVL-FRONT">TVL-FRONT - Front Office Services</option>
+                                        <option value="TVL-TRAVEL">TVL-TRAVEL - Travel Services</option>
+                                        <option value="TVL-EVENTS">TVL-EVENTS - Events Management</option>
+                                        <option value="TVL-ATTRACTION">TVL-ATTRACTION - Attractions and Theme Parks</option>
+                                        <option value="TVL-RECREATION">TVL-RECREATION - Recreation and Leisure</option>
+                                    </optgroup>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => registrationRequest.Strand)" />
+                            </div>
+
+                            <div class="form-group">
+                                <!-- Empty div to maintain layout -->
+                            </div>
+                        </div>
+                    }
+                }
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gender">Gender</label>
+                        <InputSelect id="gender" class="form-control" @bind-Value="registrationRequest.Gender">
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </InputSelect>
+                    </div>
+                    
+                    <div class="form-group">
+                        <!-- Empty div to maintain layout -->
+                    </div>
+                </div>
+
+                <!-- School Information Section -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="region">Region *</label>
+                        <InputSelect id="region" class="form-control" TValue="string" Value="@selectedRegion" ValueChanged="@OnRegionChanged" ValueExpression="@(() => selectedRegion)">
+                            <option value="">Select Region</option>
+                            @foreach (var region in regions)
+                            {
+                                <option value="@region.Region">@region.Region</option>
+                            }
+                        </InputSelect>
+                        @if (string.IsNullOrEmpty(selectedRegion))
+                        {
+                            <small class="phone-error">Please select a region</small>
+                        }
+                    </div>
+
+                    <div class="form-group">
+                        <label for="division">Division *</label>
+                        <InputSelect id="division" class="form-control" TValue="string" Value="@selectedDivision" ValueChanged="@OnDivisionChanged" ValueExpression="@(() => selectedDivision)" disabled="@(string.IsNullOrEmpty(selectedRegion))">
+                            <option value="">Select Division</option>
+                            @foreach (var division in divisions)
+                            {
+                                <option value="@division.Division">@division.Division</option>
+                            }
+                        </InputSelect>
+                        @if (string.IsNullOrEmpty(selectedDivision) && !string.IsNullOrEmpty(selectedRegion))
+                        {
+                            <small class="phone-error">Please select a division</small>
+                        }
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="district">District *</label>
+                        <InputSelect id="district" class="form-control" TValue="string" Value="@selectedDistrict" ValueChanged="@OnDistrictChanged" ValueExpression="@(() => selectedDistrict)" disabled="@(string.IsNullOrEmpty(selectedDivision))">
+                            <option value="">Select District</option>
+                            @foreach (var district in districts)
+                            {
+                                <option value="@district.District">@district.District</option>
+                            }
+                        </InputSelect>
+                        @if (string.IsNullOrEmpty(selectedDistrict) && !string.IsNullOrEmpty(selectedDivision))
+                        {
+                            <small class="phone-error">Please select a district</small>
+                        }
+                    </div>
+
+                    <div class="form-group">
+                        <label for="school">School *</label>
+                        <InputSelect id="school" class="form-control" TValue="string" Value="@selectedSchool" ValueChanged="@OnSchoolChanged" ValueExpression="@(() => selectedSchool)" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
+                            <option value="">Select School</option>
+                            @for (int i = 0; i < schools.Count; i++)
+                            {
+                                <option value="@i">@schools[i].SchoolName</option>
+                            }
+                        </InputSelect>
+                        @if (string.IsNullOrEmpty(selectedSchool) && !string.IsNullOrEmpty(selectedDistrict))
+                        {
+                            <small class="phone-error">Please select a school</small>
+                        }
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="schoolId">School ID (Auto-filled)</label>
+                        <InputText id="schoolId" class="form-control" @bind-Value="registrationRequest.School_ID" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <!-- Empty div to maintain layout -->
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="agreeTerms" />
+                        <span class="checkmark"></span>
+                        I agree to the terms and conditions *
+                    </label>
+                    @if (!agreeTerms)
+                    {
+                        <small class="phone-error">You must agree to the terms and conditions</small>
+                    }
+                </div>
+                
+                <button type="button" class="btn btn-primary btn-login" disabled="@isLoading" @onclick="HandleRegisterClick">
+                    @(isLoading ? loadingMessage : "REGISTER")
+                </button>
+            </EditForm>
+        }
+        else
+        {
+            <!-- Login Form -->
+            <form class="login-form" @onsubmit="HandleLogin">
+            <div class="form-group">
+                <label for="teacherId">Username</label>
+                    <input type="text" id="teacherId" class="form-control" placeholder="Enter your username" @bind="loginRequest.Username" required />
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="password-input-wrapper">
+                    <input type="@(showLoginPassword ? "text" : "password")" id="password" class="form-control" placeholder="Enter your password" @bind="loginRequest.Password" required />
+                    <button type="button" class="password-toggle-btn" @onclick="() => showLoginPassword = !showLoginPassword">
+                        @(showLoginPassword ? "👁️" : "👁️‍🗨️")
+                    </button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                        <input type="checkbox" @bind="rememberMe" />
+                    <span class="checkmark"></span>
+                    Remember me
+                </label>
+            </div>
+            
+                <button type="submit" class="btn btn-primary btn-login" disabled="@isLoading">
+                    @(isLoading ? loadingMessage : "LOGIN")
+                </button>
+            </form>
+        }
+            
+            <!-- Footer removed to prevent scrolling as requested -->
+            <!-- Toggle buttons at top are sufficient for navigation -->
+    </div>
+</div>
+
+
+@code {
+    private bool isRegisterMode = false;
+    private bool isStudentAccessingTeacherPage = false;
+    private TeacherRegistrationRequest registrationRequest = new();
+    private LoginRequest loginRequest = new();
+    private string phoneNumber = string.Empty;
+    private string confirmPassword = string.Empty;
+    private bool agreeTerms = false;
+    private bool rememberMe = false;
+    private bool isLoading = false;
+    private string loadingMessage = "Loading..."; // Dynamic loading message
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private string phoneError = string.Empty;
+    private string passwordError = string.Empty;
+    private bool showLoginPassword = false;
+    private bool showRegPassword = false;
+    private bool showConfirmPassword = false;
+    private bool ShowAdviserFields => registrationRequest.Position == "Adviser";
+    private bool ShowStrandField => ShowAdviserFields && (registrationRequest.GradeLevel == "Grade 11" || registrationRequest.GradeLevel == "Grade 12");
+    
+    // Snackbar variables
+    private bool showSnackbar = false;
+    private string snackbarMessage = string.Empty;
+    private string snackbarType = "success";
+
+    // School dropdown variables
+    private List<School> regions = new();
+    private List<School> divisions = new();
+    private List<School> districts = new();
+    private List<School> schools = new();
+    private string selectedRegion = string.Empty;
+    private string selectedDivision = string.Empty;
+    private string selectedDistrict = string.Empty;
+    private string selectedSchool = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckIfStudentIsAccessingTeacherPage();
+        await SetupBrowserCloseListener();
+        await LoadRegions();
+
+        // Check for register query parameter
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (System.Web.HttpUtility.ParseQueryString(uri.Query).Get("register") == "true")
+        {
+            isRegisterMode = true;
+        }
+    }
+
+    private async Task SetupBrowserCloseListener()
+    {
+        // Set up listener to clear localStorage ONLY when browser is actually closed (not during navigation)
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            window.addEventListener('beforeunload', function() {
+                // Check if this is a navigation (not browser close)
+                var isNavigating = sessionStorage.getItem('isNavigating');
+                
+                // Only clear localStorage if this is NOT a navigation (i.e., browser is closing)
+                if (!isNavigating) {
+                    // Clear all authentication data when browser is closing
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userRole');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('userFullName');
+                    localStorage.removeItem('userPosition');
+                    localStorage.removeItem('teacherName');
+                    localStorage.removeItem('lastLoginType');
+                    localStorage.removeItem('teacherId');
+                }
+            });
+            
+            // Also clear on page unload (only if not navigating)
+            window.addEventListener('unload', function() {
+                var isNavigating = sessionStorage.getItem('isNavigating');
+                if (!isNavigating) {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userRole');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('userFullName');
+                    localStorage.removeItem('userPosition');
+                    localStorage.removeItem('teacherName');
+                    localStorage.removeItem('lastLoginType');
+                    localStorage.removeItem('teacherId');
+                }
+                // Always clear the navigation flag on unload
+                sessionStorage.removeItem('isNavigating');
+            });
+        ");
+    }
+
+    private async Task CheckIfStudentIsAccessingTeacherPage()
+    {
+        try
+        {
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var lastLoginType = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastLoginType");
+            var studentGrade = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "studentGrade");
+            
+            // Check if user is currently logged in as student (has valid auth token)
+            if (!string.IsNullOrEmpty(authToken) && userRole == "student")
+            {
+                isStudentAccessingTeacherPage = true;
+                StateHasChanged();
+                
+                // Redirect to student login page after showing message
+                await Task.Delay(3000);
+                NavigationManager.NavigateTo("/login/student");
+            }
+            // If user has student role but no auth token, they're logged out - clear the data and allow access
+            else if (!string.IsNullOrEmpty(userRole) && userRole == "student" && string.IsNullOrEmpty(authToken))
+            {
+                // Clear the old student data since they're logged out
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userFullName");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+                
+                // Allow access to teacher login page
+                Console.WriteLine("Student data cleared - allowing access to teacher login page");
+            }
+            // Check if user has student grade saved (indicates they were a student before)
+            else if (!string.IsNullOrEmpty(studentGrade) && 
+                     (studentGrade.StartsWith("Grade") || studentGrade.Contains("STEM") || studentGrade.Contains("HUMSS") || 
+                      studentGrade.Contains("GAS") || studentGrade.Contains("TVL")))
+            {
+                isStudentAccessingTeacherPage = true;
+                StateHasChanged();
+                
+                // Clear old data and redirect to student login page
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "studentGrade");
+                await Task.Delay(3000);
+                NavigationManager.NavigateTo("/login/student");
+            }
+            // Check if last login type was student
+            else if (!string.IsNullOrEmpty(lastLoginType) && lastLoginType == "student")
+            {
+                isStudentAccessingTeacherPage = true;
+                StateHasChanged();
+                
+                // Clear the last login type and redirect to student login page
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+                await Task.Delay(3000);
+                NavigationManager.NavigateTo("/login/student");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking user role: {ex.Message}");
+        }
+    }
+
+    private void ToggleMode(bool register)
+    {
+        isRegisterMode = register;
+        message = string.Empty;
+        phoneError = string.Empty;
+        passwordError = string.Empty;
+    }
+
+    private void ResetRegistrationForm()
+    {
+        // Reset all registration form fields to prevent duplicates
+        registrationRequest = new();
+        phoneNumber = string.Empty;
+        confirmPassword = string.Empty;
+        agreeTerms = false;
+        
+        // Clear all error messages
+        phoneError = string.Empty;
+        passwordError = string.Empty;
+        message = string.Empty;
+
+        // Clear grade/section/strand fields
+        registrationRequest.GradeLevel = string.Empty;
+        registrationRequest.Section = string.Empty;
+        registrationRequest.Strand = string.Empty;
+    }
+
+    private async Task HandleRegisterClick()
+    {
+        // Prevent multiple submissions while loading
+        if (isLoading)
+        {
+            Console.WriteLine("Teacher registration already in progress, ignoring click");
+            return;
+        }
+        
+        Console.WriteLine("Teacher Register button clicked!");
+        Console.WriteLine($"Current registrationRequest state: {System.Text.Json.JsonSerializer.Serialize(registrationRequest)}");
+        await HandleRegister();
+    }
+
+    private async Task HandleRegister()
+    {
+        Console.WriteLine("Teacher HandleRegister method called!");
+        Console.WriteLine("RegistrationRequest details:");
+        Console.WriteLine($"- TeacherName: {registrationRequest.TeacherName ?? "NULL"}");
+        Console.WriteLine($"- Email: {registrationRequest.Email ?? "NULL"}");
+        Console.WriteLine($"- Username: {registrationRequest.Username ?? "NULL"}");
+        Console.WriteLine($"- Password: {registrationRequest.Password ?? "NULL"}");
+        Console.WriteLine($"- Position: {registrationRequest.Position ?? "NULL"}");
+        Console.WriteLine($"- PhoneNumber: {registrationRequest.PhoneNumber ?? "NULL"}");
+        Console.WriteLine($"- GradeLevel: {registrationRequest.GradeLevel ?? "NULL"}");
+        
+        if (!agreeTerms)
+        {
+            ShowMessage("Please agree to the terms and conditions", false);
+            return;
+        }
+
+        // Validate password confirmation
+        if (registrationRequest.Password != confirmPassword)
+        {
+            passwordError = "Passwords do not match";
+            return;
+        }
+        passwordError = string.Empty;
+
+        // Validate phone number
+        if (!string.IsNullOrEmpty(phoneNumber) && !IsValidPhilippinePhoneNumber(phoneNumber))
+        {
+            phoneError = "Phone number must be 11 digits starting with 09";
+            return;
+        }
+        phoneError = string.Empty;
+
+        // Set phone number to the request
+        registrationRequest.PhoneNumber = phoneNumber;
+
+        try
+        {
+            // Validate that required fields are not null or empty
+            if (string.IsNullOrEmpty(registrationRequest.TeacherName))
+            {
+                ShowMessage("Teacher name is required", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(registrationRequest.Email))
+            {
+                ShowMessage("Email is required", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(registrationRequest.Username))
+            {
+                ShowMessage("Username is required", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(registrationRequest.Password))
+            {
+                ShowMessage("Password is required", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(registrationRequest.Position))
+            {
+                ShowMessage("Position is required", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(selectedRegion))
+            {
+                ShowMessage("Please select a region", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(selectedDivision))
+            {
+                ShowMessage("Please select a division", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(selectedDistrict))
+            {
+                ShowMessage("Please select a district", false);
+                return;
+            }
+            if (string.IsNullOrEmpty(selectedSchool))
+            {
+                ShowMessage("Please select a school", false);
+                return;
+            }
+
+            // Validate grade level and section fields only for Adviser position
+            if (ShowAdviserFields)
+            {
+                if (string.IsNullOrEmpty(registrationRequest.GradeLevel))
+                {
+                    ShowMessage("Grade level is required for Adviser position", false);
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(registrationRequest.Section))
+                {
+                    ShowMessage("Section is required for Adviser position", false);
+                    return;
+                }
+
+                // Validate strand for Grade 11-12
+                if (ShowStrandField && string.IsNullOrEmpty(registrationRequest.Strand))
+                {
+                    ShowMessage("Strand is required for Grade 11-12", false);
+                    return;
+                }
+            }
+
+            isLoading = true;
+            _ = StartLoadingAnimation(); // Start dynamic text animation
+            message = string.Empty;
+
+            var json = JsonSerializer.Serialize(registrationRequest);
+            
+            // Debug: Check if json is empty or null
+            if (string.IsNullOrEmpty(json) || json == "{}")
+            {
+                isLoading = false; // Reset loading if we return here
+                ShowMessage("Registration data is empty. Please fill out all required fields.", false);
+                return;
+            }
+
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+            // Debug: Log the request
+            Console.WriteLine($"Sending teacher registration request: {json}");
+            Console.WriteLine($"RegistrationRequest object: {System.Text.Json.JsonSerializer.Serialize(registrationRequest)}");
+            Console.WriteLine($"TeacherName: {registrationRequest.TeacherName}");
+            Console.WriteLine($"Email: {registrationRequest.Email}");
+            Console.WriteLine($"Username: {registrationRequest.Username}");
+            Console.WriteLine($"Position: {registrationRequest.Position}");
+
+            // Add timeout to prevent infinite loading
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await Http.PostAsync("/api/Auth/register/teacher", content, cts.Token);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            // Debug: Log the response
+            Console.WriteLine($"Teacher registration response: {response.StatusCode} - {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<int>>(responseContent);
+                
+                if (apiResponse != null && apiResponse.Success)
+                {
+                    await HandleSuccessfulRegistration();
+                }
+                else
+                {
+                    isLoading = false;
+                    ShowMessage(apiResponse?.Message ?? "Registration failed", false);
+                }
+            }
+            else
+            {
+                // Try to parse the error response for more details
+                try
+                {
+                    var errorResponse = JsonSerializer.Deserialize<ApiResponse<int>>(responseContent);
+                    if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
+                    {
+                        isLoading = false;
+                        ShowMessage($"Registration failed: {errorResponse.Message}", false);
+                    }
+                    else
+                    {
+                        isLoading = false;
+                        ShowMessage($"Registration failed: {response.StatusCode}", false);
+                    }
+                }
+                catch
+                {
+                    isLoading = false;
+                    ShowMessage($"Registration failed: {response.StatusCode}", false);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            isLoading = false;
+            ShowMessage("Registration request timed out. Please try again.", false);
+        }
+        catch (Exception ex)
+        {
+            isLoading = false;
+            ShowMessage($"An error occurred: {ex.Message}", false);
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        _ = StartLoadingAnimation(); // Start dynamic text animation
+        message = string.Empty;
+
+        try
+        {
+            var json = JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+            var response = await Http.PostAsync("/api/Auth/login", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    // Debug: Log the response data
+                    Console.WriteLine($"Login response data: {data}");
+                    
+                    // Check if the user is actually a teacher
+                    if (data.TryGetProperty("userRole", out var userRole))
+                    {
+                        var role = userRole.GetString();
+                        
+                        // Check if the user is a student trying to login on teacher page
+                        if (role == "student")
+                        {
+                            ShowMessage("Access denied. Students cannot login on the teacher page. Please use the student login page.", false);
+                            return;
+                        }
+                        
+                        // Handle admin, schoolhead, and division roles - redirect to admin login page
+                        if (role == "admin" || role == "schoolhead" || role == "division")
+                        {
+                            ShowMessage($"Access denied. Admin, School Head, and Division accounts must use the admin login page. Redirecting...", false);
+                            
+                            await Task.Delay(2000);
+                            
+                            // Redirect to admin login page
+                            Console.WriteLine($"✓ {role} user detected! Redirecting to Admin Login Page...");
+                            NavigationManager.NavigateTo("/login/admin", forceLoad: false);
+                        }
+                        // Only proceed if user is actually a teacher
+                        else if (role == "teacher")
+                        {
+                            // Get and normalize position before storing
+                            var userPositionRaw = data.GetProperty("position").GetString();
+                            var normalizedPosition = userPositionRaw?.Trim() ?? string.Empty;
+                            
+                            // Store authentication data (store normalized position for consistency)
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", "teacher_token_" + DateTime.Now.Ticks);
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", data.GetProperty("userRole").GetString());
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", data.GetProperty("username").GetString());
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userPosition", normalizedPosition);
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherName", data.GetProperty("teacherName").GetString());
+                            
+                            // Store location details if available
+                            if (data.TryGetProperty("schoolName", out var sn)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "schoolName", sn.GetString());
+                            if (data.TryGetProperty("region", out var r)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "region", r.GetString());
+                            if (data.TryGetProperty("division", out var d)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "division", d.GetString());
+                            if (data.TryGetProperty("district", out var dist)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "district", dist.GetString());
+
+                            // Store TeacherID (not UserID) - check if TeacherID exists in response, fallback to userID if not
+                            if (data.TryGetProperty("teacherID", out var teacherIdProp))
+                            {
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", teacherIdProp.GetInt32().ToString());
+                                Console.WriteLine($"✅ Stored TeacherID: {teacherIdProp.GetInt32()}");
+                            }
+                            else if (data.TryGetProperty("TeacherID", out var teacherIdProp2))
+                            {
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", teacherIdProp2.GetInt32().ToString());
+                                Console.WriteLine($"✅ Stored TeacherID (capital): {teacherIdProp2.GetInt32()}");
+                            }
+                            else
+                            {
+                                // Fallback to userID if TeacherID not available (for backward compatibility)
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", data.GetProperty("userID").GetInt32().ToString());
+                                Console.WriteLine($"⚠️ TeacherID not found in response, using UserID as fallback: {data.GetProperty("userID").GetInt32()}");
+                            }
+                            
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", "teacher");
+                            
+                            // Cache Students Immediately if SchoolName is present
+                            if (data.TryGetProperty("schoolName", out var schoolNameProp) && !string.IsNullOrEmpty(schoolNameProp.GetString()))
+                            {
+                                // Show specific status in the cycle/override briefly
+                                loadingMessage = "Caching student list for offline use...";
+                                StateHasChanged();
+                                await CacheStudentsAsync(schoolNameProp.GetString());
+                            }
+
+                            // Verify data was saved to localStorage
+                            var savedAuthToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+                            var savedUserPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+                            Console.WriteLine($"✅ Saved to localStorage - AuthToken: '{savedAuthToken?.Substring(0, Math.Min(20, savedAuthToken?.Length ?? 0))}...', Position: '{savedUserPosition}'");
+                            
+                            ShowMessage("Login successful!", true);
+                            
+                            Console.WriteLine($"User position from API (raw): '{userPositionRaw}'");
+                            Console.WriteLine($"User position (normalized): '{normalizedPosition}'");
+                            Console.WriteLine($"Position length: {normalizedPosition?.Length ?? 0}");
+                            
+                            // Case-insensitive comparison
+                            bool isPOD = normalizedPosition.Equals("POD", StringComparison.OrdinalIgnoreCase);
+                            bool isAdviser = normalizedPosition.Equals("Adviser", StringComparison.OrdinalIgnoreCase);
+                            bool isGuidance = normalizedPosition.Equals("Guidance Counselor", StringComparison.OrdinalIgnoreCase);
+                            
+                            Console.WriteLine($"Is POD user: {isPOD}");
+                            Console.WriteLine($"Is Adviser user: {isAdviser}");
+                            Console.WriteLine($"Is Guidance user: {isGuidance}");
+                            
+                            // Small delay to ensure localStorage is fully saved
+                            await Task.Delay(200);
+                            
+                            // Set a flag in sessionStorage to indicate this is a navigation (not browser close)
+                            await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+                            
+                            // Small delay after setting navigation flag
+                            await Task.Delay(100);
+                            
+                            // Redirect based on user position (case-insensitive and trimmed)
+                            // Use forceLoad: false to prevent beforeunload from clearing localStorage
+                            if (isPOD)
+                            {
+                                Console.WriteLine($"✓ POD user detected! Redirecting to POD Dashboard...");
+                                NavigationManager.NavigateTo("/pod-dashboard", forceLoad: false);
+                                
+                                // Fallback redirect after a delay to ensure navigation
+                                await Task.Delay(500);
+                                if (!NavigationManager.Uri.Contains("pod-dashboard"))
+                                {
+                                    Console.WriteLine("Fallback redirect to POD Dashboard...");
+                                    NavigationManager.NavigateTo("/pod-dashboard", forceLoad: false);
+                                }
+                            }
+                            else if (isAdviser)
+                            {
+                                Console.WriteLine($"✓ Adviser user detected! Redirecting to Adviser Dashboard...");
+                                NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+                                
+                                // Fallback redirect after a delay to ensure navigation
+                                await Task.Delay(500);
+                                if (!NavigationManager.Uri.Contains("adviser-dashboard"))
+                                {
+                                    Console.WriteLine("Fallback redirect to Adviser Dashboard...");
+                                    NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+                                }
+                            }
+                            else if (isGuidance)
+                            {
+                                Console.WriteLine($"✓ Guidance Counselor user detected! Redirecting to Guidance Dashboard...");
+                                NavigationManager.NavigateTo("/guidance-dashboard", forceLoad: false);
+                                
+                                // Fallback redirect after a delay to ensure navigation
+                                await Task.Delay(500);
+                                if (!NavigationManager.Uri.Contains("guidance-dashboard"))
+                                {
+                                    Console.WriteLine("Fallback redirect to Guidance Dashboard...");
+                                    NavigationManager.NavigateTo("/guidance-dashboard", forceLoad: false);
+                                }
+                            }
+                            else
+                            {
+                                // For other teacher positions (Subject Teacher, IT Coordinator, etc.), redirect to Adviser Dashboard as default
+                                Console.WriteLine($"⚠ Teacher with position '{normalizedPosition}' redirecting to Adviser Dashboard (default)...");
+                                NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+                                
+                                // Fallback redirect after a delay to ensure navigation
+                                await Task.Delay(500);
+                                if (!NavigationManager.Uri.Contains("adviser-dashboard"))
+                                {
+                                    Console.WriteLine("Fallback redirect to Adviser Dashboard...");
+                                    NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+                                }
+                            }
+                            
+                            // Clear the navigation flag after a short delay
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(2000);
+                                await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating");
+                            });
+                        }
+                        else
+                        {
+                            ShowMessage("Access denied. Only teachers can login on this page.", false);
+                        }
+                    }
+                    else
+                    {
+                        ShowMessage("Login failed. Invalid response from server.", false);
+                    }
+                }
+                else
+                {
+                    ShowMessage("Login failed. Invalid response from server.", false);
+                }
+            }
+            else
+            {
+                ShowMessage("Login failed. Please check your credentials.", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"An error occurred: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    // New method to cache students on login
+    private async Task CacheStudentsAsync(string schoolName)
+    {
+        try 
+        {
+            Console.WriteLine($"Caching students for school: {schoolName}...");
+            var query = $"schoolName={Uri.EscapeDataString(schoolName)}";
+            var response = await Http.GetAsync($"api/IncidentReport/students-by-location?{query}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("data", out var data))
+                {
+                    var students = new List<SharedProject.Studentclass>();
+                    foreach (var item in data.EnumerateArray())
+                    {
+                        students.Add(new SharedProject.Studentclass {
+                            StudentName = item.GetProperty("studentName").GetString() ?? "",
+                            GradeLevel = item.GetProperty("gradeLevel").GetString() ?? "",
+                            Section = item.GetProperty("section").GetString() ?? ""
+                        });
+                    }
+                    await OfflineStorage.SaveStudentsAsync(students);
+                    Console.WriteLine($"✅ Successfully cached {students.Count} students.");
+                }
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"Failed to cache students: {ex.Message}"); }
+    }
+
+    private void ShowMessage(string msg, bool success)
+    {
+        message = msg;
+        isSuccess = success;
+    }
+
+    private void ShowSnackbar(string message, string type)
+    {
+        Console.WriteLine($"ShowSnackbar called: {message}, type: {type}");
+        snackbarMessage = message;
+        snackbarType = type;
+        showSnackbar = true;
+        Console.WriteLine($"showSnackbar set to: {showSnackbar}");
+        StateHasChanged();
+
+        // Auto-hide after 5 seconds using Task.Run to avoid blocking
+        Task.Run(async () =>
+        {
+            await Task.Delay(5000);
+            await InvokeAsync(() =>
+            {
+                showSnackbar = false;
+                StateHasChanged();
+            });
+        });
+    }
+
+    private bool IsValidPhilippinePhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrEmpty(phoneNumber))
+            return true; // Allow empty phone numbers
+
+        // Remove any non-digit characters
+        phoneNumber = System.Text.RegularExpressions.Regex.Replace(phoneNumber, "[^0-9]", "");
+
+        // Check if it's exactly 11 digits and starts with 09
+        return phoneNumber.Length == 11 && phoneNumber.StartsWith("09");
+    }
+
+    private bool IsAdminPosition(string position)
+    {
+        var adminPositions = new[] { "POD", "Guidance Counselor", "Principal", "Vice Principal" };
+        return adminPositions.Contains(position);
+    }
+
+    private bool IsAdvisorPosition(string position)
+    {
+        var advisorPositions = new[] { "Adviser", "Subject Teacher" };
+        return advisorPositions.Contains(position);
+    }
+
+    private void OnPositionChanged(ChangeEventArgs e)
+    {
+        registrationRequest.Position = e.Value?.ToString() ?? string.Empty;
+        
+        // Clear grade/section/strand fields if position is not Adviser
+        if (!ShowAdviserFields)
+        {
+            registrationRequest.GradeLevel = string.Empty;
+            registrationRequest.Section = string.Empty;
+            registrationRequest.Strand = string.Empty;
+        }
+        
+        StateHasChanged();
+    }
+
+    private void OnGradeLevelChanged(ChangeEventArgs e)
+    {
+        registrationRequest.GradeLevel = e.Value?.ToString() ?? string.Empty;
+        
+        // Clear strand selection when grade level changes
+        if (!ShowStrandField)
+        {
+            registrationRequest.Strand = string.Empty;
+        }
+        
+        StateHasChanged();
+    }
+
+    // School dropdown methods
+    private async Task LoadRegions()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"API Response Content: {content}");
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    // Debug: Log the data we received
+                    Console.WriteLine($"Received {apiResponse.Data.Count} schools from database");
+                    foreach (var school in apiResponse.Data)
+                    {
+                        Console.WriteLine($"School: {school.SchoolName}, Region: {school.Region}");
+                    }
+                    
+                    // Get unique regions from schools database
+                    regions = apiResponse.Data
+                        .Where(s => !string.IsNullOrEmpty(s.Region))
+                        .GroupBy(s => s.Region?.Trim())
+                        .Select(g => new School { Region = g.Key, RegionName = g.Key })
+                        .ToList();
+                    
+                    Console.WriteLine($"Found {regions.Count} unique regions from database");
+                    StateHasChanged();
+                }
+                else
+                {
+                    Console.WriteLine($"API response failed: {apiResponse?.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"HTTP request failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading regions: {ex.Message}");
+        }
+    }
+
+    private async Task OnRegionChanged(string newValue)
+    {
+        Console.WriteLine("=== ONREGIONCHANGED CALLED ===");
+        Console.WriteLine($"Old selectedRegion: {selectedRegion}");
+        Console.WriteLine($"New value: {newValue}");
+        
+        selectedRegion = newValue ?? string.Empty;
+        selectedDivision = string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        divisions.Clear();
+        districts.Clear();
+        schools.Clear();
+        
+        Console.WriteLine($"Region changed to: {selectedRegion}");
+        
+        if (!string.IsNullOrEmpty(selectedRegion))
+        {
+            Console.WriteLine("Calling LoadDivisions...");
+            // Force clear and reload divisions
+            divisions.Clear();
+            await LoadDivisions();
+            
+            Console.WriteLine($"After LoadDivisions, divisions count: {divisions.Count}");
+            
+            // Force UI update
+            StateHasChanged();
+            await Task.Delay(100); // Small delay to ensure UI updates
+            StateHasChanged();
+        }
+        
+        ClearSchoolFields();
+        StateHasChanged();
+        Console.WriteLine("=== END ONREGIONCHANGED ===");
+    }
+
+    private async Task LoadDivisions()
+    {
+        Console.WriteLine("=== LOADDIVISIONS START ===");
+        try
+        {
+            Console.WriteLine("Making API call to /api/Auth/schools");
+            var response = await Http.GetAsync("/api/Auth/schools");
+            Console.WriteLine($"API Response Status: {response.StatusCode}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    Console.WriteLine($"Loading divisions for region: {selectedRegion}");
+                    
+                    // Debug: Show all schools and their regions
+                    foreach (var school in apiResponse.Data)
+                    {
+                        Console.WriteLine($"School Region: '{school.Region}', Division: '{school.Division}', District: '{school.District}'");
+                    }
+                    
+                    // Get unique divisions for selected region from database
+                    var matchingSchools = apiResponse.Data.Where(s => s.Region?.Trim() == selectedRegion?.Trim()).ToList();
+                    Console.WriteLine($"Found {matchingSchools.Count} schools matching region '{selectedRegion}'");
+                    
+                    // Debug: Show what schools match the region
+                    foreach (var school in matchingSchools)
+                    {
+                        Console.WriteLine($"Matching school: {school.SchoolName}, Region: '{school.Region}', Division: '{school.Division}'");
+                    }
+                    
+                    divisions = matchingSchools
+                        .Where(s => !string.IsNullOrEmpty(s.Division))
+                        .GroupBy(s => s.Division?.Trim())
+                        .Select(g => new School { Division = g.Key, DivisionName = g.Key })
+                        .ToList();
+                    
+                    Console.WriteLine($"Found {divisions.Count} divisions for region {selectedRegion}");
+                    foreach (var div in divisions)
+                    {
+                        Console.WriteLine($"Division: {div.Division}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("API response was null or failed");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"HTTP request failed with status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading divisions: {ex.Message}");
+        }
+        
+        // If no divisions found, add a test division for REGION XII
+        if (divisions.Count == 0 && selectedRegion == "REGION XII")
+        {
+            Console.WriteLine("No divisions found, adding test division for REGION XII");
+            divisions.Add(new School { Division = "SOUTH COTABATO", DivisionName = "SOUTH COTABATO" });
+            Console.WriteLine($"Added test division. Total divisions now: {divisions.Count}");
+        }
+    }
+
+    private async Task OnDivisionChanged(string newValue)
+    {
+        Console.WriteLine("=== ONDIVISIONCHANGED CALLED ===");
+        Console.WriteLine($"Old selectedDivision: {selectedDivision}");
+        Console.WriteLine($"New value: {newValue}");
+        
+        selectedDivision = newValue ?? string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        districts.Clear();
+        schools.Clear();
+        
+        Console.WriteLine($"Division changed to: {selectedDivision}");
+        
+        if (!string.IsNullOrEmpty(selectedDivision))
+        {
+            Console.WriteLine("Calling LoadDistricts...");
+            await LoadDistricts();
+            Console.WriteLine($"After LoadDistricts, districts count: {districts.Count}");
+        }
+        
+        ClearSchoolFields();
+        StateHasChanged();
+        Console.WriteLine("=== END ONDIVISIONCHANGED ===");
+    }
+
+    private async Task LoadDistricts()
+    {
+        Console.WriteLine("=== LOADDISTRICTS START ===");
+        try
+        {
+            Console.WriteLine($"Loading districts for division: {selectedDivision}");
+            var response = await Http.GetAsync("/api/Auth/schools");
+            Console.WriteLine($"API Response Status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"API Response Content Length: {content?.Length ?? 0}");
+                
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    Console.WriteLine($"Total schools in database: {apiResponse.Data.Count}");
+                    
+                    // Debug: Show all schools and their divisions/districts
+                    foreach (var school in apiResponse.Data)
+                    {
+                        Console.WriteLine($"School: {school.SchoolName}, Region: '{school.Region}', Division: '{school.Division}', District: '{school.District}'");
+                    }
+                    
+                    // Get unique districts for selected division from database
+                    // First filter by region, then by division
+                    var matchingSchools = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion?.Trim() && s.Division?.Trim() == selectedDivision?.Trim())
+                        .ToList();
+                    Console.WriteLine($"Found {matchingSchools.Count} schools matching region '{selectedRegion}' and division '{selectedDivision}'");
+                    
+                    districts = matchingSchools
+                        .Where(s => !string.IsNullOrEmpty(s.District))
+                        .GroupBy(s => s.District?.Trim())
+                        .Select(g => new School { District = g.Key, DistrictName = g.Key })
+                        .ToList();
+                    
+                    Console.WriteLine($"Found {districts.Count} districts for division {selectedDivision}");
+                    foreach (var district in districts)
+                    {
+                        Console.WriteLine($"District: {district.District}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("API response was null or failed");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"HTTP request failed with status: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading districts: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        
+        Console.WriteLine("=== END LOADDISTRICTS ===");
+    }
+
+    private async Task OnDistrictChanged(string newValue)
+    {
+        Console.WriteLine("=== ONDISTRICTCHANGED CALLED ===");
+        Console.WriteLine($"Old selectedDistrict: {selectedDistrict}");
+        Console.WriteLine($"New value: {newValue}");
+        
+        selectedDistrict = newValue ?? string.Empty;
+        selectedSchool = string.Empty;
+        schools.Clear();
+        
+        Console.WriteLine($"District changed to: {selectedDistrict}");
+        
+        if (!string.IsNullOrEmpty(selectedDistrict))
+        {
+            // Load schools from database based on selected district
+            await LoadSchools();
+        }
+        
+        ClearSchoolFields();
+        StateHasChanged();
+        Console.WriteLine("=== END ONDISTRICTCHANGED ===");
+    }
+
+    private async Task LoadSchools()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    Console.WriteLine($"Loading schools for region: {selectedRegion}, division: {selectedDivision}, district: {selectedDistrict}");
+                    
+                    // Get schools for selected region, division, and district from database
+                    schools = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion?.Trim() && 
+                                   s.Division?.Trim() == selectedDivision?.Trim() && 
+                                   s.District?.Trim() == selectedDistrict?.Trim())
+                        .ToList();
+                    
+                    Console.WriteLine($"Found {schools.Count} schools for region '{selectedRegion}', division '{selectedDivision}', district '{selectedDistrict}'");
+                    
+                    // Debug: Show all matching schools
+                    foreach (var school in schools)
+                    {
+                        Console.WriteLine($"Matching school: {school.SchoolName}, Region: '{school.Region}', Division: '{school.Division}', District: '{school.District}'");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading schools: {ex.Message}");
+        }
+    }
+
+    private void OnSchoolChanged(string newValue)
+    {
+        Console.WriteLine("=== ONSCHOOLCHANGED CALLED ===");
+        Console.WriteLine($"Old selectedSchool: {selectedSchool}");
+        Console.WriteLine($"New value: {newValue}");
+        
+        selectedSchool = newValue ?? string.Empty;
+        
+        if (!string.IsNullOrEmpty(selectedSchool) && int.TryParse(selectedSchool, out int schoolIndex))
+        {
+            if (schoolIndex >= 0 && schoolIndex < schools.Count)
+            {
+                var school = schools[schoolIndex];
+                registrationRequest.SchoolName = school.SchoolName;
+                registrationRequest.School_ID = school.School_ID;
+                registrationRequest.SchoolID = school.SchoolID; // This will be null
+                Console.WriteLine($"School selected: {school.SchoolName}, ID: {school.School_ID}, SchoolID: {school.SchoolID}");
+            }
+        }
+        else
+        {
+            ClearSchoolFields();
+        }
+        
+        StateHasChanged();
+        Console.WriteLine("=== END ONSCHOOLCHANGED ===");
+    }
+
+    private void ClearSchoolFields()
+    {
+        registrationRequest.SchoolName = string.Empty;
+        registrationRequest.School_ID = string.Empty;
+        registrationRequest.SchoolID = null;
+    }
+
+    private async Task HandleSuccessfulRegistration()
+    {
+        try
+        {
+            Console.WriteLine("HandleSuccessfulRegistration called!");
+            
+            // Stop loading immediately
+            isLoading = false;
+
+            // Show success snackbar
+            Console.WriteLine("Showing success snackbar...");
+            ShowSnackbar("✅ Registration successful! You can now login with your credentials.", "success");
+            StateHasChanged();
+
+            // Wait to show snackbar
+            await Task.Delay(1500);
+
+            // Clear everything
+            registrationRequest = new TeacherRegistrationRequest();
+            phoneNumber = string.Empty;
+            confirmPassword = string.Empty;
+            agreeTerms = false;
+            phoneError = string.Empty;
+            passwordError = string.Empty;
+            message = string.Empty;
+            isSuccess = false;
+
+            // Small delay to ensure form is cleared
+            await Task.Delay(300);
+
+            // Switch to login mode
+            isRegisterMode = false;
+            loginRequest = new LoginRequest();
+            rememberMe = false;
+
+            StateHasChanged();
+
+            // Hide snackbar after transition
+            await Task.Delay(200);
+            showSnackbar = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in HandleSuccessfulRegistration: {ex.Message}");
+            ShowSnackbar($"Error: {ex.Message}", "error");
+        }
+    }
+
+    private async Task StartLoadingAnimation()
+    {
+        var loginMessages = new[] 
+        { 
+            "Authenticating...", 
+            "Verifying credentials...", 
+            "Securing connection...", 
+            "Checking permissions...", 
+            "Loading user profile...",
+            "Caching student data...",
+            "Preparing dashboard...",
+            "Almost there..." 
+        };
+
+        var registerMessages = new[] 
+        { 
+            "Validating information...", 
+            "Creating account...", 
+            "Saving profile details...", 
+            "Setting up workspace...", 
+            "Finalizing registration...", 
+            "Almost done..." 
+        };
+
+        var messages = isRegisterMode ? registerMessages : loginMessages;
+        int index = 0;
+
+        while (isLoading)
+        {
+            // Update message
+            loadingMessage = messages[index % messages.Length];
+            StateHasChanged();
+
+            // Wait before next message
+            await Task.Delay(800);
+            index++;
+        }
+    }
+}
+
+<script>
+    // Global function to clear all authentication data
+    window.clearAllAuthData = function() {
+        console.log('Clearing all authentication data...');
+        
+        // Clear localStorage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userFullName');
+        localStorage.removeItem('userPosition');
+        localStorage.removeItem('teacherName');
+        localStorage.removeItem('lastLoginType');
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        console.log('All authentication data cleared');
+    };
+
+    // Set up global browser close listener
+    // Only clear if this is NOT a navigation
+    window.addEventListener('beforeunload', function() {
+        var isNavigating = sessionStorage.getItem('isNavigating');
+        if (!isNavigating) {
+            window.clearAllAuthData();
+        }
+    });
+    
+    // Aggressive cleanup removed to support page refreshes
+    // window.addEventListener('unload', function() {
+    //    var isNavigating = sessionStorage.getItem('isNavigating');
+    //    if (!isNavigating) {
+    //        window.clearAllAuthData();
+    //    }
+    //    // Always clear the navigation flag
+    //    sessionStorage.removeItem('isNavigating');
+    // });
+
+    // Initialize fluid background effects
+    document.addEventListener('DOMContentLoaded', function() {
+        createFloatingParticles();
+        createNeuralNetwork();
+        
+        // Efeito de respiração no fundo
+        setInterval(() => {
+            const waveEffect = document.querySelector('.wave-effect');
+            if (waveEffect) {
+                waveEffect.style.filter = `hue-rotate(${Math.sin(Date.now() * 0.001) * 30}deg)`;
+            }
+        }, 100);
+        
+        // Adicionar mais partículas periodicamente
+        setInterval(() => {
+            if (document.querySelectorAll('.particle').length < 80) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = '100%';
+                particle.style.animationDelay = '0s';
+                
+                const particlesContainer = document.getElementById('particles');
+                if (particlesContainer) {
+                    particlesContainer.appendChild(particle);
+                    
+                    // Remove após animação
+                    setTimeout(() => {
+                        if (particle.parentNode) {
+                            particle.parentNode.removeChild(particle);
+                        }
+                    }, 15000);
+                }
+            }
+        }, 2000);
+        
+        // Interação com mouse - faz as formas seguirem sutilmente
+        document.addEventListener('mousemove', (e) => {
+            const mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+            const mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+            
+            const shapes = document.querySelectorAll('.shape');
+            shapes.forEach((shape, index) => {
+                const factor = (index + 1) * 0.1;
+                const translateX = mouseX * 30 * factor;
+                const translateY = mouseY * 30 * factor;
+                
+                shape.style.transform += ` translate(${translateX}px, ${translateY}px)`;
+            });
+        });
+    });
+
+    // Criar partículas flutuantes dinâmicas
+    function createFloatingParticles() {
+        const container = document.getElementById('particles');
+        if (!container) return;
+        
+        const particleCount = 60;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            
+            // Posição inicial aleatória
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.top = Math.random() * 100 + '%';
+            
+            // Delay aleatório
+            particle.style.animationDelay = Math.random() * 15 + 's';
+            
+            // Tamanho variável
+            const size = Math.random() * 4 + 2;
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            
+            container.appendChild(particle);
+        }
+    }
+    
+    // Criar rede neural dinâmica
+    function createNeuralNetwork() {
+        const container = document.getElementById('network');
+        if (!container) return;
+        
+        const nodeCount = 20;
+        const nodes = [];
+        
+        // Criar nós
+        for (let i = 0; i < nodeCount; i++) {
+            const node = document.createElement('div');
+            node.className = 'node';
+            
+            const x = Math.random() * 100;
+            const y = Math.random() * 100;
+            
+            node.style.left = x + '%';
+            node.style.top = y + '%';
+            node.style.animationDelay = Math.random() * 3 + 's';
+            
+            container.appendChild(node);
+            nodes.push({element: node, x: x, y: y});
+        }
+        
+        // Criar conexões entre nós próximos
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                const distance = Math.sqrt(
+                    Math.pow(nodes[i].x - nodes[j].x, 2) + 
+                    Math.pow(nodes[i].y - nodes[j].y, 2)
+                );
+                
+                if (distance < 30) { // Conectar apenas nós próximos
+                    const connection = document.createElement('div');
+                    connection.className = 'connection';
+                    
+                    const angle = Math.atan2(
+                        nodes[j].y - nodes[i].y, 
+                        nodes[j].x - nodes[i].x
+                    ) * 180 / Math.PI;
+                    
+                    connection.style.left = nodes[i].x + '%';
+                    connection.style.top = nodes[i].y + '%';
+                    connection.style.width = distance + 'vw';
+                    connection.style.transform = `rotate(${angle}deg)`;
+                    connection.style.transformOrigin = '0 0';
+                    connection.style.animationDelay = Math.random() * 4 + 's';
+                    
+                    container.appendChild(connection);
+                }
+            }
+        }
+    }
+</script>
+
+

@@ -1,0 +1,451 @@
+@using SharedProject
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+
+@if (IsVisible)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        @if (showReschedForm)
+                        {
+                            <span>@(currentMeetingDate != null ? "Reschedule" : "Schedule") Parent Meeting</span>
+                        }
+                        else
+                        {
+                            <span>Available Forms</span>
+                        }
+                    </h5>
+                    <button type="button" class="close" @onclick="CloseModal">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 0;">
+                    @if (showReschedForm)
+                    {
+                        <div style="padding: 1.5rem;">
+                            <div class="form-group">
+                                <label><strong>Current Schedule:</strong></label>
+                                <p class="text-muted">@(currentMeetingDate?.ToString("MMMM dd, yyyy hh:mm tt") ?? "Not set")</p>
+                            </div>
+                            <div class="form-group">
+                                <label><strong>New Meeting Date & Time:</strong></label>
+                                <input type="datetime-local" class="form-control" @bind="newMeetingDate" />
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-primary" @onclick="SaveReschedule" disabled="@(!newMeetingDate.HasValue || isRescheduling)">
+                                    @if (isRescheduling)
+                                    {
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                        <span>Saving...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Save New Schedule</span>
+                                    }
+                                </button>
+                                <button class="btn btn-secondary" @onclick="BackToSelection">Cancel</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="padding: 1rem;">
+                            @if (isLoadingRecord)
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border" role="status"></div>
+                                    <p class="mt-2">Loading record...</p>
+                                </div>
+                            }
+                            else if (loadedSimplifiedRecordId.HasValue || SimplifiedRecordId.HasValue)
+                            {
+                                <p>Select a form to download:</p>
+                                <div class="list-group">
+                                    <!-- Direct PDF downloads from database -->
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Student Case Report</span>
+                                            <button class="btn btn-sm btn-success" @onclick="DownloadCaseRecordPdf" disabled="@isDownloading">
+                                                @if (isDownloading)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm"></span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Download PDF</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Parent Conference Request</span>
+                                            <div class="d-flex gap-2">
+                                                @if (currentMeetingDate != null)
+                                                {
+                                                    <button class="btn btn-sm btn-success" @onclick="DownloadParentConferencePdf" disabled="@isDownloading">
+                                                        @if (isDownloading)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>Download PDF</span>
+                                                        }
+                                                    </button>
+                                                }
+                                                <button class="btn btn-sm btn-warning" @onclick="ShowRescheduleForm">
+                                                    @(currentMeetingDate != null ? "Reschedule" : "Schedule")
+                                                </button>
+                                            </div>
+                                        </div>
+                                        @if (currentMeetingDate.HasValue)
+                                        {
+                                            <small class="text-muted d-block mt-1">
+                                                Scheduled: @currentMeetingDate.Value.ToString("MMM dd, yyyy hh:mm tt")
+                                            </small>
+                                        }
+                                    </div>
+                                     @if (recordStatus == "Resolved")
+                                    {
+                                        <!-- Annex B - Intake Sheet -->
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <span>Annex B - Intake Sheet</span>
+                                                    <small class="text-muted d-block">Official DepEd Intake Form</small>
+                                                </div>
+                                                <button class="btn btn-sm btn-success" @onclick="DownloadAnnexBPdf" disabled="@isDownloading">
+                                                    @if (isDownloading)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Download PDF</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    <!-- YAKAP Form - Direct download with student info pre-filled -->
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span>Y.A.K.A.P. Form</span>
+                                                <small class="text-muted d-block">Student info auto-filled</small>
+                                            </div>
+                                            <button class="btn btn-sm btn-success" @onclick="DownloadYakapFormPdf" disabled="@isDownloading">
+                                                @if (isDownloading)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm"></span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Download PDF</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert alert-warning">@errorMessage</div>
+                            }
+                            else
+                            {
+                                <p class="text-muted">No forms available for this record.</p>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    [Parameter]
+    public int IncidentId { get; set; }
+
+    [Parameter]
+    public bool IsEscalation { get; set; }
+
+    [Parameter]
+    public int? SimplifiedRecordId { get; set; }
+
+    [Parameter]
+    public DateTime? CurrentMeetingDate { get; set; }
+
+    [Parameter]
+    public EventCallback OnRescheduleSuccess { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> OnMeetingDateChanged { get; set; }
+
+    private bool showReschedForm = false;
+    private DateTime? currentMeetingDate;
+    private DateTime? newMeetingDate;
+    private bool isRescheduling = false;
+    private bool isDownloading = false;
+    private bool isLoadingRecord = false;
+    private string? recordStatus;
+    private string? errorMessage = null;
+    private int? loadedSimplifiedRecordId = null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        currentMeetingDate = CurrentMeetingDate;
+        
+        // If modal is visible and SimplifiedRecordId is not set, try to load from incident
+        if (IsVisible && !SimplifiedRecordId.HasValue && IncidentId > 0 && loadedSimplifiedRecordId == null)
+        {
+            await LoadSimplifiedRecordFromIncident();
+        }
+        else if (SimplifiedRecordId.HasValue)
+        {
+            loadedSimplifiedRecordId = SimplifiedRecordId;
+        }
+        
+        // Reset when modal closes
+        if (!IsVisible)
+        {
+            loadedSimplifiedRecordId = null;
+            errorMessage = null;
+        }
+    }
+
+    private async Task LoadSimplifiedRecordFromIncident()
+    {
+        isLoadingRecord = true;
+        errorMessage = null;
+        StateHasChanged();
+        
+        try
+        {
+            // Try to find simplified record by incident or escalation ID
+            var endpoint = IsEscalation ? $"simplified-escalation-id/{IncidentId}" : $"simplified-incident-id/{IncidentId}";
+            var response = await Http.GetAsync($"api/StudentProfileCaseRecord/{endpoint}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // API returns { success: true, data: record }, so we need to extract from wrapper
+                var content = await response.Content.ReadAsStringAsync();
+                var result = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    var record = System.Text.Json.JsonSerializer.Deserialize<SimplifiedStudentProfileCaseRecordModel>(
+                        data.GetRawText(), 
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    
+                    if (record != null && record.RecordID > 0)
+                    {
+                        loadedSimplifiedRecordId = record.RecordID;
+                        currentMeetingDate = record.ParentMeetingDate;
+                        recordStatus = record.Status;
+                        Console.WriteLine($"[DEBUG] Loaded simplified record ID: {record.RecordID}, Status: {recordStatus}");
+                    }
+                    else
+                    {
+                        errorMessage = "No case record found for this incident. Please create a Student Profile Case Record first.";
+                    }
+                }
+                else
+                {
+                    errorMessage = "No case record found for this incident. Please create a Student Profile Case Record first.";
+                }
+            }
+            else
+            {
+                errorMessage = "No case record found for this incident. Please create a Student Profile Case Record first.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading simplified record: {ex.Message}");
+            errorMessage = "Error loading record. Please try again.";
+        }
+        finally
+        {
+            isLoadingRecord = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BackToSelection()
+    {
+        showReschedForm = false;
+    }
+
+    private void ShowRescheduleForm()
+    {
+        showReschedForm = true;
+        newMeetingDate = currentMeetingDate ?? DateTime.Now.AddDays(1);
+    }
+
+    private async Task SaveReschedule()
+    {
+        var recordId = GetEffectiveRecordId();
+        if (!recordId.HasValue || !newMeetingDate.HasValue) return;
+
+        isRescheduling = true;
+        try
+        {
+            var payload = new
+            {
+                ParentMeetingDate = newMeetingDate.Value,
+                Status = "ParentOnHold"
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/StudentProfileCaseRecord/simplified/{recordId}/parent-meeting", payload);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                currentMeetingDate = newMeetingDate;
+                showReschedForm = false;
+                StateHasChanged(); // Force immediate UI update to show Download button
+                await OnMeetingDateChanged.InvokeAsync(currentMeetingDate);
+                await OnRescheduleSuccess.InvokeAsync();
+                await JSRuntime.InvokeVoidAsync("alert", "Meeting scheduled successfully!");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to reschedule meeting. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isRescheduling = false;
+        }
+    }
+
+    private int? GetEffectiveRecordId()
+    {
+        return SimplifiedRecordId ?? loadedSimplifiedRecordId;
+    }
+
+    private async Task DownloadParentConferencePdf()
+    {
+        var recordId = GetEffectiveRecordId();
+        if (!recordId.HasValue) return;
+
+        isDownloading = true;
+        try
+        {
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            var pdfUrl = $"{baseUrl}/api/StudentProfileCaseRecord/simplified/{recordId}/parent-conference-pdf";
+            
+            // Open in new tab - browser will download automatically since it's a PDF
+            await JSRuntime.InvokeVoidAsync("open", pdfUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading PDF: {ex.Message}");
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+
+    private async Task DownloadCaseRecordPdf()
+    {
+        var recordId = GetEffectiveRecordId();
+        if (!recordId.HasValue) return;
+
+        isDownloading = true;
+        try
+        {
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            var pdfUrl = $"{baseUrl}/api/StudentProfileCaseRecord/simplified/{recordId}/case-record-pdf";
+            
+            // Open in new tab - browser will download automatically since it's a PDF
+            await JSRuntime.InvokeVoidAsync("open", pdfUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading PDF: {ex.Message}");
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+
+    private async Task DownloadYakapFormPdf()
+    {
+        var recordId = GetEffectiveRecordId();
+        if (!recordId.HasValue) return;
+
+        isDownloading = true;
+        try
+        {
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            // Use the new endpoint that generates blank YAKAP form with student info pre-filled
+            var pdfUrl = $"{baseUrl}/api/StudentProfileCaseRecord/simplified/{recordId}/yakap-form-pdf";
+            
+            // Open in new tab - direct download
+            await JSRuntime.InvokeVoidAsync("open", pdfUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading YAKAP PDF: {ex.Message}");
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+
+    private async Task DownloadAnnexBPdf()
+    {
+        var recordId = GetEffectiveRecordId();
+        if (!recordId.HasValue) return;
+
+        isDownloading = true;
+        try
+        {
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            var pdfUrl = $"{baseUrl}/api/StudentProfileCaseRecord/simplified/{recordId}/annex-b-pdf";
+            
+            // Open in new tab - direct download
+            await JSRuntime.InvokeVoidAsync("open", pdfUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading Annex B PDF: {ex.Message}");
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        showReschedForm = false;
+        loadedSimplifiedRecordId = null;
+        errorMessage = null;
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+}

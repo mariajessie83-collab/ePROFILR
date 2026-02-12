@@ -1,0 +1,2319 @@
+@page "/walk-in-report"
+@layout Walkinlayout
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@using System.Net.Http.Headers
+@using SharedProject
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+
+<PageTitle>Walk-in Incident Report</PageTitle>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+    :root {
+        /* Premium Core Palette */
+        --primary-blue: #2563eb;
+        --deep-blue: #0f172a;
+        --accent-glow: #60a5fa;
+        --secondary-bg: #f8fafc;
+        
+        --glass-surface: rgba(255, 255, 255, 0.85);
+        --glass-border: rgba(255, 255, 255, 0.5);
+        --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        --glass-blur: blur(12px);
+
+        --font-main: 'Inter', sans-serif;
+        --font-display: 'Outfit', sans-serif;
+    }
+
+    * { box-sizing: border-box; font-family: var(--font-main); }
+    body { background-color: #f1f5f9; margin: 0; }
+    h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); letter-spacing: -0.02em; }
+
+    /* Animated Background */
+    .sky-background {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at 10% 20%, rgb(37, 99, 235) 0%, rgb(30, 64, 175) 40%, rgb(15, 23, 42) 90%);
+        z-index: -1; overflow: hidden;
+    }
+    .sky-background::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: radial-gradient(circle at center, rgba(255,255,255,0.03) 0%, transparent 50%);
+        animation: rotateBg 60s linear infinite;
+    }
+    
+    /* 
+     * Floating Blobs for Visual Interest 
+     * Adds dynamic movement and breaks up the solid background 
+     */
+    .blob {
+        position: absolute;
+        filter: blur(80px);
+        z-index: -1;
+        opacity: 0.6;
+        animation: floatBlob 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 50%;
+    }
+    .blob-1 {
+        top: 20%; left: 10%; width: 300px; height: 300px;
+        background: linear-gradient(135deg, #06b6d4, #3b82f6);
+        animation-delay: 0s;
+    }
+    .blob-2 {
+        bottom: 20%; right: 10%; width: 400px; height: 400px;
+        background: linear-gradient(135deg, #8b5cf6, #ec4899);
+        animation-delay: -5s;
+    }
+    .blob-3 {
+        top: 50%; left: 50%; width: 250px; height: 250px;
+        background: linear-gradient(135deg, #10b981, #3b82f6);
+        animation-delay: -10s;
+        transform: translate(-50%, -50%);
+    }
+
+    @@keyframes rotateBg { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @@keyframes floatBlob {
+        0% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -50px) scale(1.1); }
+        66% { transform: translate(-20px, 20px) scale(0.9); }
+        100% { transform: translate(0, 0) scale(1); }
+    }
+
+    /* Advanced Paper Plane Fleet */
+    .paper-plane {
+        position: absolute;
+        pointer-events: none;
+        filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        z-index: 0;
+    }
+
+    /* 1. The Glider: Large, majestic, slow diagonal */
+    .plane-1 {
+        top: 10%; left: -10%;
+        width: 120px; height: 120px;
+        color: rgba(255, 255, 255, 0.9);
+        animation: flightPath1 40s linear infinite;
+    }
+
+    /* 2. The Cruiser: Mid-size, steady cross-screen */
+    .plane-2 {
+        top: 60%; right: -10%;
+        width: 70px; height: 70px;
+        color: rgba(255, 255, 255, 0.6);
+        animation: flightPath2 35s linear infinite;
+        animation-delay: -5s;
+    }
+
+    /* 3. The Dasher: Small, fast, zips through */
+    .plane-3 {
+        bottom: 20%; left: -10%;
+        width: 40px; height: 40px;
+        color: rgba(255, 255, 255, 0.5);
+        animation: flightPath3 18s ease-in-out infinite;
+        animation-delay: -2s;
+    }
+
+    /* 4. The Looper: Curves around */
+    .plane-4 {
+        top: 40%; left: -10%;
+        width: 55px; height: 55px;
+        color: rgba(255, 255, 255, 0.7);
+        animation: flightPath4 45s linear infinite;
+        animation-delay: -15s;
+    }
+
+    /* 5. The Drifter: High altitude, slow */
+    .plane-5 {
+        top: 5%; right: -5%;
+        width: 30px; height: 30px;
+        color: rgba(255, 255, 255, 0.4);
+        animation: flightPath5 55s linear infinite;
+        animation-delay: -25s;
+        opacity: 0.6;
+    }
+
+    @@keyframes flightPath1 {
+        0% { transform: translate(-10vw, 10vh) rotate(15deg); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translate(120vw, 40vh) rotate(15deg); opacity: 0; }
+    }
+
+    @@keyframes flightPath2 {
+        0% { transform: translate(10vw, -10vh) rotate(-15deg) scaleX(-1); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translate(-120vw, 30vh) rotate(-15deg) scaleX(-1); opacity: 0; }
+    }
+
+    @@keyframes flightPath3 {
+        0% { transform: translate(-10vw, 0) rotate(5deg); opacity: 0; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { transform: translate(120vw, -10vh) rotate(5deg); opacity: 0; }
+    }
+
+    @@keyframes flightPath4 {
+        0% { transform: translate(-10vw, 20vh) rotate(25deg); opacity: 0; }
+        50% { transform: translate(50vw, -20vh) rotate(0deg); }
+        100% { transform: translate(110vw, 40vh) rotate(25deg); opacity: 0; }
+    }
+
+   @@keyframes flightPath5 {
+        0% { transform: translate(5vw, -10vh) rotate(-5deg); opacity: 0; }
+        50% { opacity: 1; }
+        100% { transform: translate(-110vw, 20vh) rotate(-5deg); opacity: 0; }
+    }
+
+    /* Glass Cards */
+    .login-container, .walk-in-container, .welcome-landing-container {
+        min-height: 100vh; width: 100%; display: flex;
+        justify-content: center; align-items: center; padding: 20px;
+        position: relative; z-index: 10;
+    }
+    
+    .login-card, .walk-in-card, .welcome-card {
+        background: rgba(255, 255, 255, 0.75); /* More translucent */
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.6); 
+        box-shadow: 0 20px 50px rgba(0,0,0,0.15); /* Softer, deeper shadow */
+        border-radius: 32px; padding: 40px; width: 100%; max-width: 500px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        position: relative; overflow: hidden;
+    }
+    
+    /* Subtle inner highlight to make card pop */
+    .login-card::after, .walk-in-card::after, .welcome-card::after {
+        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        border-radius: 32px;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+        pointer-events: none;
+    }
+
+    .walk-in-card { max-width: 900px; padding: 0; }
+    .walk-in-header { padding: 30px; background: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(0,0,0,0.05); text-align: center; }
+    .walk-in-body { padding: 40px; }
+
+    /* Gradient Text Utility */
+    .text-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .text-gradient-light {
+        background: linear-gradient(135deg, #fff 0%, #bfdbfe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* Controls - Matching IncidentReport.razor clean style */
+    .form-control {
+        background: #ffffff; 
+        border: 2px solid #e9ecef;
+        box-shadow: none;
+        border-radius: 12px; padding: 12px 16px; font-size: 1rem; color: #333;
+        width: 100%; transition: all 0.3s ease;
+    }
+    .form-control:focus {
+        background: white;
+        border-color: #007AFF; 
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15);
+        transform: translateY(-1px);
+    }
+    
+    /* Required Asterisk */
+    .required-asterisk {
+        color: #dc3545;
+        font-weight: bold;
+        margin-left: 4px;
+    }
+
+    /* Colored Dropdown Headers */
+    optgroup { 
+        color: var(--primary-blue); 
+        font-weight: 700; 
+        font-family: var(--font-display);
+        background: white;
+    }
+    option { 
+        color: #333; 
+        background: white;
+        padding: 10px;
+    }
+    
+    /* Custom Select Arrow */
+    select.form-control {
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        background-size: 1em;
+    }
+    
+    /* Colored Dropdown Headers */
+    optgroup { 
+        color: var(--primary-blue); 
+        font-weight: 700; 
+        font-family: var(--font-display);
+        background: white;
+    }
+    option { 
+        color: #334155; 
+        background: white;
+        padding: 10px;
+    }
+    
+    .btn {
+        padding: 14px 28px; border-radius: 16px; font-weight: 700; border: none; cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-family: var(--font-display);
+        letter-spacing: 0.5px;
+    }
+    .btn-primary { 
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: white; 
+        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4); 
+    }
+    .btn-primary:hover { 
+        transform: translateY(-3px) scale(1.02); 
+        box-shadow: 0 15px 25px -5px rgba(37, 99, 235, 0.5); 
+        filter: brightness(1.1);
+    }
+    .btn-secondary { background: #f1f5f9; color: #475569; }
+    .btn-secondary:hover { background: #e2e8f0; color: #1e293b; transform: translateY(-2px); }
+    
+    /* Stepper */
+    .wizard-stepper { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; }
+    /* Animated Line */
+    .wizard-stepper::before {
+        content: ''; position: absolute; top: 20px; left: 0; width: 100%; height: 4px;
+        background: #e2e8f0; z-index: 0; border-radius: 4px;
+    }
+    
+    .step-item { position: relative; z-index: 1; text-align: center; background: transparent; padding: 0 10px; }
+    
+    .step-circle {
+        width: 44px; height: 44px; border-radius: 50%; background: white;
+        border: 4px solid white; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        color: #94a3b8;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 8px; font-weight: 800; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 1.1rem;
+    }
+    .step-item.active .step-circle {
+        background: var(--primary-blue); border-color: #bfdbfe; color: white;
+        transform: scale(1.1);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+    }
+    .step-item.done .step-circle {
+        background: #10b981; border-color: #d1fae5; color: white;
+    }
+    .step-label { font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.3s; }
+    .step-item.active .step-label { color: var(--primary-blue); }
+
+    .wizard-nav { display: flex; justify-content: space-between; margin-top: 30px; }
+
+    /* Helpers */
+    .form-group { margin-bottom: 24px; }
+    .form-group label { display: block; margin-bottom: 10px; font-weight: 600; color: #475569; font-size: 0.95rem; }
+    .text-muted { color: #94a3b8 !important; }
+    .suggestions [class*="suggestion-item"] { padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.2s; }
+    .suggestions [class*="suggestion-item"]:hover { background: #f0f9ff; }
+</style>
+
+@if (!isPODLoggedIn)
+{
+    <div class="sky-background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <!-- 5 Paper Planes -->
+        <svg class="paper-plane plane-1" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21.435 2.582a1.933 1.933 0 00-1.93-.503L3.408 6.759a1.92 1.92 0 00-1.384 1.522c-.142.75.355 1.704 1.003 2.102l5.033 3.094a1.304 1.304 0 001.61-.194l5.763-5.799a.734.734 0 011.06 0c.29.292.29.765 0 1.067l-5.773 5.8a1.324 1.324 0 00-.193 1.623l3.056 5.069c.367.618 1.53.849 2.13.475a1.92 1.92 0 00.95-1.408l4.312-16.12a1.93 1.93 0 00-.44-1.408z" fill="currentColor" /></svg>
+        <svg class="paper-plane plane-2" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+        <svg class="paper-plane plane-3" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+        <svg class="paper-plane plane-4" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21.435 2.582a1.933 1.933 0 00-1.93-.503L3.408 6.759a1.92 1.92 0 00-1.384 1.522c-.142.75.355 1.704 1.003 2.102l5.033 3.094a1.304 1.304 0 001.61-.194l5.763-5.799a.734.734 0 011.06 0c.29.292.29.765 0 1.067l-5.773 5.8a1.324 1.324 0 00-.193 1.623l3.056 5.069c.367.618 1.53.849 2.13.475a1.92 1.92 0 00.95-1.408l4.312-16.12a1.93 1.93 0 00-.44-1.408z" fill="currentColor" /></svg>
+        <svg class="paper-plane plane-5" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+    </div>
+    <div class="login-container">
+        <div class="login-card">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 class="text-gradient" style="margin-bottom: 10px;">🔐 POD Access</h2>
+                <p class="text-muted">Security clearance required</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(loginMessage))
+            {
+                <div class="alert @(loginSuccess ? "alert-success" : "alert-danger")" style="padding: 10px; border-radius: 8px; margin-bottom: 20px; background: #fee2e2; color: #991b1b;">
+                    @loginMessage
+                </div>
+            }
+
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" class="form-control" @bind="podUsername" placeholder="Enter username" />
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <div style="position: relative;">
+                    <input type="@(showPodPassword ? "text" : "password")" class="form-control" @bind="podPassword" @onkeyup="HandlePasswordKeyUp" placeholder="••••••••" />
+                    <button type="button" @onclick="() => showPodPassword = !showPodPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer;">
+                        @(showPodPassword ? "👁️" : "👁️‍🗨️")
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" @onclick="HandlePODLogin" disabled="@isLoggingIn">
+                @(isLoggingIn ? "Verifying..." : "Access Dashboard")
+            </button>
+        </div>
+    </div>
+}
+else if (showWelcomePage)
+{
+    <div class="sky-background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <!-- 5 Paper Planes -->
+        <svg class="paper-plane plane-1" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21.435 2.582a1.933 1.933 0 00-1.93-.503L3.408 6.759a1.92 1.92 0 00-1.384 1.522c-.142.75.355 1.704 1.003 2.102l5.033 3.094a1.304 1.304 0 001.61-.194l5.763-5.799a.734.734 0 011.06 0c.29.292.29.765 0 1.067l-5.773 5.8a1.324 1.324 0 00-.193 1.623l3.056 5.069c.367.618 1.53.849 2.13.475a1.92 1.92 0 00.95-1.408l4.312-16.12a1.93 1.93 0 00-.44-1.408z" fill="currentColor" /></svg>
+        <svg class="paper-plane plane-2" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+        <svg class="paper-plane plane-3" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+        <svg class="paper-plane plane-4" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21.435 2.582a1.933 1.933 0 00-1.93-.503L3.408 6.759a1.92 1.92 0 00-1.384 1.522c-.142.75.355 1.704 1.003 2.102l5.033 3.094a1.304 1.304 0 001.61-.194l5.763-5.799a.734.734 0 011.06 0c.29.292.29.765 0 1.067l-5.773 5.8a1.324 1.324 0 00-.193 1.623l3.056 5.069c.367.618 1.53.849 2.13.475a1.92 1.92 0 00.95-1.408l4.312-16.12a1.93 1.93 0 00-.44-1.408z" fill="currentColor" /></svg>
+        <svg class="paper-plane plane-5" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M2 12l20-9-9 20-2-9-9-2z" fill="currentColor"/></svg>
+    </div>
+    <div class="welcome-landing-container" style="flex-direction: column;">
+        <div style="max-width: 1000px; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;">
+            <div style="color: white;">
+                <img src="q12png.png" alt="Logo" class="landing-logo" style="max-width: 300px; width: 100%; margin-bottom: 20px;" />
+                <h1 class="text-gradient-light" style="font-size: 5rem; margin-bottom: 20px; text-shadow: 0 4px 12px rgba(0,0,0,0.2);">ePROFILR</h1>
+                <p style="font-size: 1.25rem; opacity: 0.9; line-height: 1.6; margin-bottom: 40px;">
+                    Digital Student Profiling System. Track behavior, document incidents, and guide learners with empathy.
+                </p>
+                <button class="btn" style="background: white; color: var(--primary-blue); padding: 16px 40px; font-size: 1.1rem; border-radius: 50px;" @onclick="StartFilingReport">
+                    START FILING REPORT ➔
+                </button>
+            </div>
+
+            <!-- Carousel -->
+            <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); border-radius: 32px; padding: 40px; border: 1px solid rgba(255,255,255,0.2); min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.2);">
+                
+                <div style="font-size: 4rem; margin-bottom: 20px;">
+                    @(carouselIndex == 0 ? "👤" : carouselIndex == 1 ? "📝" : carouselIndex == 2 ? "🤝" : carouselIndex == 3 ? "📸" : "✅")
+                </div>
+                
+                <h3 style="color: white; font-size: 1.5rem; margin-bottom: 10px;">
+                    @(carouselIndex == 0 ? "Step 1: Complainant" : carouselIndex == 1 ? "Step 2: Incident Details" : carouselIndex == 2 ? "Step 3: Respondents" : carouselIndex == 3 ? "Step 4: Evidence" : "Step 5: Review")
+                </h3>
+                
+                <p style="color: rgba(255,255,255,0.8); margin-bottom: 30px; max-width: 300px;">
+                    @(carouselIndex == 0 ? "Identify the reporting individual." : carouselIndex == 1 ? "Where, when, and what happened?" : carouselIndex == 2 ? "Who are the involved parties?" : carouselIndex == 3 ? "Upload photos or documents." : "Verify and submit the report.")
+                </p>
+
+                <div style="display: flex; gap: 10px;">
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        int idx = i;
+                        <div @onclick="() => { carouselIndex = idx; ResetCarouselTimer(); }" style="width: 8px; height: 8px; border-radius: 50%; background: @(carouselIndex == i ? "white" : "rgba(255,255,255,0.3)"); cursor: pointer;"></div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sky-background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <svg class="paper-plane plane-1" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+             <path d="M21.435 2.582a1.933 1.933 0 00-1.93-.503L3.408 6.759a1.92 1.92 0 00-1.384 1.522c-.142.75.355 1.704 1.003 2.102l5.033 3.094a1.304 1.304 0 001.61-.194l5.763-5.799a.734.734 0 011.06 0c.29.292.29.765 0 1.067l-5.773 5.8a1.324 1.324 0 00-.193 1.623l3.056 5.069c.367.618 1.53.849 2.13.475a1.92 1.92 0 00.95-1.408l4.312-16.12a1.93 1.93 0 00-.44-1.408z" fill="#fff" />
+        </svg>
+    </div>
+    <div class="walk-in-container">
+        <div class="walk-in-card">
+            <div class="walk-in-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;" @onclick="ReturnToHome">← Home</button>
+                    <div>
+                        <h2 class="text-gradient" style="margin: 0; font-size: 1.8rem;">Incident Report</h2>
+                        <small class="text-muted">@podSchool</small>
+                    </div>
+                    <div style="width: 80px;"></div> <!-- Spacer -->
+                </div>
+            </div>
+
+            <div class="walk-in-body">
+                <!-- Stepper -->
+                <div class="wizard-stepper">
+                     @for (int i = 1; i <= 5; i++)
+                    {
+                        string label = i == 1 ? "Complainant" : i == 2 ? "Incident" : i == 3 ? "Respondent" : i == 4 ? "Evidence" : "Review";
+                        <div class="step-item @(step >= i ? "active" : "") @(step > i ? "done" : "")">
+                            <div class="step-circle">@i</div>
+                            <span class="step-label">@label</span>
+                        </div>
+                    }
+                </div>
+
+                @* SUCCESS ALERT REMOVED - REPLACED BY MODAL *@
+
+                <EditForm Model="incidentReport">
+                    @if (step == 1)
+                    {
+                        <h3 class="text-gradient" style="margin-bottom: 20px;">Complainant Information</h3>
+                        
+                        <!-- Anonymous Reporting Checkbox -->
+                        <div class="form-group">
+                            <div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #b3d9ff;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                                    <input type="checkbox" checked="@isAnonymous" @onchange="OnAnonymousToggled" style="width: 18px; height: 18px; cursor: pointer;" />
+                                    <span style="font-weight: 500; color: #003d82;">Report Anonymously</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Complainant Full Name <span class="required-asterisk">*</span></label>
+                            <input type="text" class="form-control" placeholder="Enter complainant full name" @bind="incidentReport.ComplainantName" disabled="@isAnonymous" style="text-transform: uppercase;" />
+                            <small class="form-text-guide"><em>Format: Last Name, First Name, Middle Initial (e.g., Dela Cruz, Juan P.)</em></small>
+                        </div>
+                        
+                        <!-- Complainant Contact Number -->
+                        <div class="form-group">
+                            <label>Complainant Contact Number <span class="required-asterisk">*</span></label>
+                            <input type="tel" 
+                                   class="form-control" 
+                                   @bind="incidentReport.ComplainantContactNumber" 
+                                   placeholder="09XXXXXXXXX" 
+                                   maxlength="11"
+                                   pattern="[0-9]*"
+                                   @oninput="FormatComplainantContactNumber" />
+                            <small class="form-text-guide"><em>Format: 09XXXXXXXXX (11 digits, must start with 09)</em></small>
+                        </div>
+                        
+                        <div class="wizard-nav">
+                            <div></div>
+                            <button type="button" class="btn btn-primary" @onclick="NextStep">Continue ➔</button>
+                        </div>
+                    }
+
+                    @if (step == 2)
+                    {
+                        <h3 class="text-gradient" style="margin-bottom: 20px;">Incident Details</h3>
+                        
+                        @if (hasNoVictim)
+                        {
+                            <div style="background: rgba(37, 99, 235, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(37, 99, 235, 0.1); display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">ℹ️</span>
+                                <span style="color: #64748b; font-size: 0.9rem;">You've selected <strong>Behavior/Policy Violation</strong>. Victim fields are hidden for a cleaner report.</span>
+                                <button type="button" class="btn btn-outline-secondary" style="padding: 4px 12px; font-size: 0.75rem; margin-left: auto;" @onclick="() => showVictimSelectionModal = true">Change</button>
+                            </div>
+                        }
+
+                        @if (!hasNoVictim)
+                        {
+                            <div class="form-group">
+                                <label>
+                                    Victim Name 
+                                    @if (victimlessIncidentTypes.Contains(incidentReport.IncidentType))
+                                    {
+                                        <span style="color: #64748b; font-weight: normal; font-size: 0.8rem; margin-left: 8px;">(Optional for this type)</span>
+                                    }
+                                </label>
+                                <div style="margin-bottom: 10px;">
+                                    <input type="checkbox" checked="@useComplainantAsVictim" @onchange="OnUseComplainantAsVictimChanged" /> Same as complainant
+                                </div>
+                                <input type="text" class="form-control" placeholder="Enter victim full name" @bind="incidentReport.VictimName" disabled="@useComplainantAsVictim" style="text-transform: uppercase;" />
+                                <small class="form-text-guide"><em>Format: Last Name, First Name, Middle Initial (e.g., Santos, Maria C.)</em></small>
+                            </div>
+                            <div class="form-group">
+                                <label>Contact Number (09XXXXXXXXX)</label>
+                                <input type="text" class="form-control" @bind="incidentReport.VictimContact" maxlength="11" @oninput="FormatPhoneNumber" placeholder="Optional if no victim" />
+                            </div>
+                        }
+
+                        <div class="form-group">
+                            <label>Violation Type <span class="required-asterisk">*</span></label>
+                            <select class="form-control" value="@incidentReport.IncidentType" @onchange="OnIncidentTypeChanged" style="font-weight: 500;">
+                                <option value="" style="color: #64748b;">-- Select Incident Type --</option>
+                                @{
+                                    // Helper function or inline logic to filter types
+                                    Func<string, bool> shouldInclude = (type) => hasNoVictim 
+                                        ? victimlessIncidentTypes.Contains(type) 
+                                        : !victimlessIncidentTypes.Contains(type);
+                                }
+
+
+                                @if (violationTypesByCategory.ContainsKey("Major") && violationTypesByCategory["Major"].Any(t => shouldInclude(t)))
+                                {
+                                    <optgroup label="━━━ MAJOR ━━━" style="color: #f97316; font-weight: 800; background: #fff7ed;">
+                                        @foreach (var type in violationTypesByCategory["Major"].Where(shouldInclude)) { <option value="@type" style="color: #c2410c; background: white; font-weight: 500;">@type</option> }
+                                    </optgroup>
+                                }
+                                @if (violationTypesByCategory.ContainsKey("Prohibited Acts") && violationTypesByCategory["Prohibited Acts"].Any(t => shouldInclude(t)))
+                                {
+                                    <optgroup label="━━━ PROHIBITED ACTS ━━━" style="color: #ef4444; font-weight: 800; background: #fef2f2;">
+                                        @foreach (var type in violationTypesByCategory["Prohibited Acts"].Where(shouldInclude)) { <option value="@type" style="color: #b91c1c; background: white; font-weight: 500;">@type</option> }
+                                    </optgroup>
+                                }
+                                <option value="Other" style="color: #334155;">Other (Please Specify)</option>
+                            </select>
+                        </div>
+                        @if (incidentReport.IncidentType == "Other") {
+                            <div class="form-group">
+                                <label>Specify Other</label>
+                                <input type="text" class="form-control" @bind="incidentReport.OtherIncidentType" />
+                            </div>
+                        }
+
+                        <div class="form-group">
+                            <label>Incident Narrative <span class="required-asterisk">*</span></label>
+                            <div @onclick="OpenDescriptionModal" style="cursor: pointer;">
+                                <textarea class="form-control" rows="3" readonly value="@incidentReport.IncidentDescription" placeholder="Click to enter details..."></textarea>
+                            </div>
+                        </div>
+
+                         <div class="wizard-nav">
+                            <button type="button" class="btn btn-secondary" @onclick="PrevStep">Back</button>
+                            <button type="button" class="btn btn-primary" @onclick="NextStep">Continue ➔</button>
+                        </div>
+                    }
+
+                    @if (step == 3)
+                    {
+                        <h3 class="text-gradient" style="margin-bottom: 20px;">Respondents</h3>
+                        <div class="form-group">
+                            <label>Respondent Full Name(s) <span class="required-asterisk">*</span></label>
+                            @for (int i = 0; i < respondentNames.Count; i++)
+                            {
+                                var index = i;
+                                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                    <div style="flex-grow: 1;">
+                                        <input type="text" class="form-control" placeholder="Enter respondent full name" @bind="respondentNames[index]" style="text-transform: uppercase;" />
+                                    </div>
+                                    @if (respondentNames.Count > 1)
+                                    {
+                                        <button type="button" class="btn btn-danger" @onclick="() => RemoveRespondentName(index)">✕</button>
+                                    }
+                                </div>
+                            }
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-1" @onclick="AddRespondentName">+ Add Another Respondent</button>
+                            <small class="form-text-guide"><em>Format: Last Name, First Name, Middle Initial (e.g., Santos, Maria C.)</em></small>
+                        </div>
+
+                        <div class="wizard-nav">
+                            <button type="button" class="btn btn-secondary" @onclick="PrevStep">Back</button>
+                            <button type="button" class="btn btn-primary" @onclick="NextStep">Continue ➔</button>
+                        </div>
+                    }
+
+                    @if (step == 4)
+                    {
+                         <h3 class="text-gradient" style="margin-bottom: 20px;">Evidence</h3>
+                         <div class="form-group">
+                             <label>Upload Photo</label>
+                             <InputFile class="form-control" OnChange="HandlePhotoUpload" accept="image/*" />
+                             <button type="button" class="btn btn-secondary" style="margin-top: 10px; width: 100%;" @onclick="OpenBluetoothModal">📱 Transfer from Phone</button>
+                         </div>
+                         @if (!string.IsNullOrEmpty(incidentReport.EvidencePhotoBase64))
+                         {
+                             <div style="text-align: center; margin-top: 20px;">
+                                 <img src="@incidentReport.EvidencePhotoBase64" style="max-width: 100%; border-radius: 12px;" />
+                                 <button type="button" class="btn btn-danger" style="margin-top: 10px;" @onclick="RemovePhoto">Remove</button>
+                             </div>
+                         }
+                        <div class="wizard-nav">
+                            <button type="button" class="btn btn-secondary" @onclick="PrevStep">Back</button>
+                            <button type="button" class="btn btn-primary" @onclick="NextStep">Review ➔</button>
+                        </div>
+                    }
+
+                    @if (step == 5)
+                    {
+                        <h3 class="text-gradient" style="margin-bottom: 20px;">Confirm Submission</h3>
+                        <div style="background: #f8fafc; padding: 20px; border-radius: 16px; margin-bottom: 20px; text-transform: uppercase;">
+                            <p><strong>Complainant:</strong> @incidentReport.ComplainantName</p>
+                            <p><strong>Victim:</strong> @incidentReport.VictimName</p>
+                            <p><strong>Violation:</strong> @incidentReport.IncidentType</p>
+                            <p><strong>Respondents:</strong> @string.Join(", ", respondentsList.Select(r => r.Name))</p>
+                            <p><strong>Description:</strong></p>
+                            <p style="white-space: pre-wrap; font-style: italic; color: #64748b;">@incidentReport.IncidentDescription</p>
+                        </div>
+                        <div class="wizard-nav">
+                            <button type="button" class="btn btn-secondary" @onclick="PrevStep">Back</button>
+                            <button type="button" class="btn btn-success" @onclick="HandleSubmit" disabled="@isSubmitting">
+                                @(isSubmitting ? "Submitting..." : "Submit Incident Report")
+                            </button>
+                        </div>
+                    }
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    @if (showDescriptionModal) {
+        <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;" @onclick="CloseDescriptionModal">
+            <div style="background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 600px;" @onclick:stopPropagation="true">
+                <h3>Incident Details</h3>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" class="form-control" @bind="incidentDate" />
+                </div>
+                 <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" class="form-control" @bind="incidentTime" />
+                </div>
+                 <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" class="form-control" @bind="incidentLocation" placeholder="e.g. Canteen, Room 304, Backend of Building A" />
+                </div>
+                <div class="form-group">
+                    <label>Summary</label>
+                    <textarea class="form-control" rows="4" @bind="briefSummary" placeholder="Please provide a brief description of the incident..."></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-secondary" @onclick="CloseDescriptionModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveDescriptionModal">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+    
+    @if (showSuccessPrintModal) {
+        <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 200;" @onclick="CloseSuccessModal">
+            <div style="background: white; padding: 40px; border-radius: 24px; width: 90%; max-width: 450px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);" @onclick:stopPropagation="true">
+                <div style="width: 80px; height: 80px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                     <span style="font-size: 40px;">✅</span>
+                </div>
+                
+                <h3 class="text-gradient" style="margin-bottom: 10px;">Submission Successful!</h3>
+                <p style="color: #64748b; margin-bottom: 25px;">Your report has been submitted. A reference slip should be printing automatically.</p>
+                
+                <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 30px;">
+                    <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Reference Number</small>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 5px;">@lastReferenceNumber</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn btn-success" style="padding: 12px; font-weight: 600; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px;" @onclick="RetryPrint">
+                        <span>🖨️</span> Re-Print Slip
+                    </button>
+                    <button class="btn btn-outline-secondary" style="padding: 12px; font-weight: 600; font-size: 1rem;" @onclick="CloseSuccessModal">
+                         🏠 Back to Home
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Setup Script for Bluetooth -->
+    @if (showBluetoothModal) {
+         <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;" @onclick="CloseBluetoothModal">
+            <div style="background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 500px;" @onclick:stopPropagation="true">
+                <h3>📱 Phone Transfer</h3>
+                <p>1. Connect via USB or Bluetooth.<br>2. Transfer file to PC.<br>3. Upload here.</p>
+                <button class="btn btn-primary" style="width: 100%;" @onclick="CloseBluetoothModal">Got it</button>
+            </div>
+         </div>
+    }
+    
+    @if (showVictimSelectionModal) {
+         <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 300;" @onclick="() => showVictimSelectionModal = false">
+            <div style="background: white; padding: 40px; border-radius: 32px; width: 95%; max-width: 550px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" @onclick:stopPropagation="true">
+                <div style="font-size: 60px; margin-bottom: 20px;">📋</div>
+                <h3 class="text-gradient" style="font-size: 1.8rem; margin-bottom: 35px;">Report Type</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
+                    <button class="btn" style="background: #f0f9ff; border: 2px solid #bae6fd; color: #0369a1; padding: 25px; border-radius: 20px; text-align: left; display: flex; align-items: center; gap: 20px; transition: all 0.2s;" @onclick="() => SelectVictimMode(true)">
+                        <span style="font-size: 2.5rem;">🧘</span>
+                        <div>
+                            <strong style="display: block; font-size: 1.1rem;">Behavior / Policy Only</strong>
+                            <small style="opacity: 0.8;">No specific victim (e.g. No ID, Cheating, Attire)</small>
+                        </div>
+                    </button>
+                    
+                    <button class="btn" style="background: #fef2f2; border: 2px solid #fecaca; color: #b91c1c; padding: 25px; border-radius: 20px; text-align: left; display: flex; align-items: center; gap: 20px; transition: all 0.2s;" @onclick="() => SelectVictimMode(false)">
+                        <span style="font-size: 2.5rem;">🤝</span>
+                        <div>
+                            <strong style="display: block; font-size: 1.1rem;">Incident with Victim</strong>
+                            <small style="opacity: 0.8;">Person-to-person (e.g. Fighting, Bullying)</small>
+                        </div>
+                    </button>
+                </div>
+                
+                <button class="btn btn-secondary" style="margin-top: 25px; width: 100%; padding: 12px;" @onclick="() => showVictimSelectionModal = false">
+                    Cancel
+                </button>
+            </div>
+         </div>
+    }
+
+    @if (showVictimConfirmationModal) {
+         <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;" @onclick="() => showVictimConfirmationModal = false">
+            <div style="background: white; padding: 35px; border-radius: 24px; width: 90%; max-width: 500px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2);" @onclick:stopPropagation="true">
+                <div style="font-size: 50px; margin-bottom: 20px;">👤❓</div>
+                <h3 class="text-gradient" style="margin-bottom: 15px;">No Victim Identified</h3>
+                <p style="color: #64748b; line-height: 1.6; margin-bottom: 30px;">
+                    You haven't entered a Victim Name. Are you sure this incident has no specific victim?
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn btn-primary" style="padding: 14px; font-weight: 600;" @onclick="ProceedWithoutVictim">
+                        Yes, Proceed without Victim ➔
+                    </button>
+                    <button class="btn btn-secondary" style="padding: 14px; font-weight: 600;" @onclick="() => showVictimConfirmationModal = false">
+                        Wait, I'll add one
+                    </button>
+                </div>
+            </div>
+         </div>
+    }
+}
+
+@code {
+    // POD Login State
+    private bool isPODLoggedIn = false;
+    private bool isLoggingIn = false;
+    private bool showPodPassword = false;
+    private bool loginSuccess = false;
+    private string loginMessage = string.Empty;
+    private string podUsername = string.Empty;
+    private string podPassword = string.Empty;
+    private string podName = string.Empty;
+    private int reporterId;
+    private string podSchool = string.Empty;
+    private string podSchoolID = string.Empty;
+    private string podDivision = string.Empty;
+    private string podRegion = string.Empty;
+    private string podDistrict = string.Empty;
+
+    // Incident Report State
+    private IncidentReportModel incidentReport = new();
+    private int step = 1;
+    private bool isSubmitting = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+
+    // Complainant Search
+    private string complainantSearchText = string.Empty;
+    private bool showComplainantSuggestions = false;
+    private List<Studentclass> schoolStudents = new();
+    private List<Studentclass> filteredComplainants = new();
+    
+    // Anonymous Reporting
+    private bool isAnonymous = false;
+    
+    // Victim search functionality
+    private string victimSearchText = string.Empty;
+    private bool showVictimSuggestions = false;
+    private List<Studentclass> filteredVictims = new();
+    private bool useComplainantAsVictim = false;
+    
+    // Respondent search functionality
+    private string respondentSearchText = string.Empty;
+    private bool showRespondentSuggestions = false;
+    private List<Studentclass> filteredRespondents = new();
+    
+    // Multiple respondents support
+    private class RespondentInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string AdviserName { get; set; } = string.Empty;
+    }
+    private List<RespondentInfo> respondentsList = new();
+    private string combinedAdviserNames = string.Empty;
+    
+    // POD Teachers
+    private List<PODTeacher> podTeachers = new();
+    private List<PODTeacher> allTeachers = new();
+    private List<PODTeacher> filteredTeachers = new();
+    private bool showTeacherSuggestions = false;
+    
+    // Violation types from database - grouped by category
+    private Dictionary<string, List<string>> violationTypesByCategory = new();
+    
+    // Incident description auto-generation fields
+    private DateTime? incidentDate = null;
+    private TimeOnly? incidentTime = null;
+    private string incidentLocation = string.Empty;
+    private string briefSummary = string.Empty;
+    private bool showDescriptionModal = false;
+    private bool showBluetoothModal = false;
+    private bool showWelcomePage = false;
+    private int carouselIndex = 0;
+    private System.Threading.Timer? carouselTimer;
+    
+    // Printing State
+    private string lastReferenceNumber = string.Empty;
+    private object lastPrintDetails = null;
+    private bool showSuccessPrintModal = false;
+    private bool showVictimConfirmationModal = false;
+    private bool showVictimSelectionModal = false;
+    private bool hasNoVictim = false;
+    
+    // Respondent names list for manual input
+    private List<string> respondentNames = new() { "" };
+    
+    // Incident types that typically don't have victims
+    private readonly List<string> victimlessIncidentTypes = new() 
+    { 
+        "Cheating/Plagiarism", 
+        "No ID", 
+        "Late/Unauthorized Absence", 
+        "Dress Code Violation",
+        "Charging Gadgets in Class",
+        "Earrings (Boys)",
+        "Glaring Hair/Nail Colors",
+        "Deadly/Bladed Weapons",
+        "Disrespect to Authorities",
+        "Fraud/Identity Theft",
+        "Acts Tarnishing School",
+        "Entering Under Influence",
+        "Gambling/Betting",
+        "Littering",
+        "Loitering During Class",
+        "Loud Gadget/Firecracker",
+        "No Monday Flag Ceremony",
+        "Picking Fruits/Flowers",
+        "Public Urination",
+        "Tardiness",
+        "Class Absences (Accumulated)",
+        "Cutting/Escaping Classes",
+        "Improper Haircut (Boys)",
+        "Inappropriate Accessories",
+        "Indecent Attire in Campus"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if POD is already logged in (from sessionStorage)
+        await CheckPODSession();
+        if (isPODLoggedIn)
+        {
+            await LoadViolationTypes();
+            await LoadPODTeachers();
+            StartCarouselTimer();
+        }
+    }
+
+    private void StartCarouselTimer()
+    {
+        carouselTimer?.Dispose();
+        carouselTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                NextCarousel();
+                StateHasChanged();
+            });
+        }, null, 5000, 5000);
+    }
+
+    private void ResetCarouselTimer()
+    {
+        carouselTimer?.Change(5000, 5000);
+    }
+
+    private void NextCarousel()
+    {
+        carouselIndex = (carouselIndex + 1) % 5;
+    }
+
+    private void PrevCarousel()
+    {
+        carouselIndex = (carouselIndex - 1 + 5) % 5;
+    }
+
+    public void Dispose()
+    {
+        carouselTimer?.Dispose();
+    }
+
+    private void OnAnonymousToggled(ChangeEventArgs e)
+    {
+        isAnonymous = (bool)(e.Value ?? false);
+        
+        if (isAnonymous)
+        {
+            incidentReport.ComplainantName = "Anonymous";
+            // Contact number remains as is (user required it)
+        }
+        else
+        {
+            if (string.Equals(incidentReport.ComplainantName, "Anonymous", StringComparison.OrdinalIgnoreCase))
+            {
+                incidentReport.ComplainantName = string.Empty;
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task CheckPODSession()
+    {
+        try
+        {
+            var podLoggedIn = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podLoggedIn");
+            var storedPodName = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podName");
+            var storedPodSchool = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podSchool");
+            var storedPodSchoolID = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podSchoolID");
+
+            if (podLoggedIn == "true" && !string.IsNullOrEmpty(storedPodName))
+            {
+                isPODLoggedIn = true;
+                podName = storedPodName;
+                podSchool = storedPodSchool ?? "";
+                podSchoolID = storedPodSchoolID ?? "";
+                
+                podDivision = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podDivision") ?? "";
+                podRegion = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podRegion") ?? "";
+                podDistrict = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podDistrict") ?? "";
+
+                // If location data is missing (old session), try to fetch it
+                if (string.IsNullOrEmpty(podDivision) || string.IsNullOrEmpty(podRegion) || string.IsNullOrEmpty(podDistrict))
+                {
+                    await LoadPODLocation(storedPodName);
+                }
+                
+                // Auto-set POD Incharge to logged-in POD's name
+                incidentReport.PODIncharge = podName;
+
+                var teacherIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "teacherId");
+                if (int.TryParse(teacherIdStr, out int tid))
+                {
+                    reporterId = tid;
+                }
+                
+                // Load school-specific data
+                await LoadSchoolStudents();
+                await LoadViolationTypes();
+                await LoadPODTeachers();
+            }
+            else
+            {
+                // Check for Main App Login (localStorage)
+                var mainAppUsername = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+                if (!string.IsNullOrEmpty(mainAppUsername))
+                {
+                    Console.WriteLine($"Found main app login: {mainAppUsername}. Auto-logging in...");
+                    
+                    // Fetch details for this user
+                    await LoadPODLocation(mainAppUsername);
+                    
+                    // Get name from local storage if available, otherwise it might be set by LoadPODLocation if we modified it (but we didn't)
+                    // Let's assume LoadPODLocation sets the school/division info. 
+                    // We also need the full name.
+                    var fullName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userFullName");
+                    podName = !string.IsNullOrEmpty(fullName) ? fullName : mainAppUsername;
+
+                    isPODLoggedIn = true;
+                    showWelcomePage = false; // DIRECT REPORTING - Skip welcome page
+                    
+                    // Auto-set POD Incharge
+                    incidentReport.PODIncharge = podName;
+                    
+                    var teacherIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "teacherId");
+                    if (int.TryParse(teacherIdStr, out int tid))
+                    {
+                        reporterId = tid;
+                    }
+                    
+                    // Load school-specific data
+                    await LoadSchoolStudents();
+                    await LoadViolationTypes();
+                    await LoadPODTeachers();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking POD session: {ex.Message}");
+        }
+    }
+
+    private async Task LoadPODLocation(string? username)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(username))
+            {
+                username = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            }
+            if (string.IsNullOrEmpty(username)) return;
+
+            var response = await Http.GetAsync($"api/IncidentReport/pod-location/{Uri.EscapeDataString(username)}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    podSchool = data.TryGetProperty("schoolName", out var sn) ? sn.GetString() ?? podSchool : podSchool;
+                    podDivision = data.TryGetProperty("division", out var div) ? div.GetString() ?? "" : "";
+                    podRegion = data.TryGetProperty("region", out var reg) ? reg.GetString() ?? "" : "";
+                    podDistrict = data.TryGetProperty("district", out var dist) ? dist.GetString() ?? "" : "";
+
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podSchool", podSchool);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podDivision", podDivision);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podRegion", podRegion);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podDistrict", podDistrict);
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading POD location: {ex.Message}");
+        }
+    }
+
+    private async Task HandlePasswordKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await HandlePODLogin();
+        }
+    }
+
+    private async Task HandlePODLogin()
+    {
+        if (string.IsNullOrWhiteSpace(podUsername) || string.IsNullOrWhiteSpace(podPassword))
+        {
+            loginMessage = "Please enter both username and password.";
+            loginSuccess = false;
+            return;
+        }
+
+        isLoggingIn = true;
+        loginMessage = string.Empty;
+
+        try
+        {
+            var loginRequest = new { Username = podUsername, Password = podPassword };
+            var json = JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await Http.PostAsync("/api/IncidentReport/pod-login", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    // Extract POD information
+                    if (data.TryGetProperty("teacherName", out var teacherName))
+                        podName = teacherName.GetString() ?? "";
+                    
+                    if (data.TryGetProperty("schoolName", out var schoolName))
+                        podSchool = schoolName.GetString() ?? "";
+                    
+                    if (data.TryGetProperty("schoolID", out var schoolID))
+                        podSchoolID = schoolID.GetString() ?? "";
+
+                    string podDivision = data.TryGetProperty("division", out var div) ? div.GetString() ?? "" : "";
+                    string podRegion = data.TryGetProperty("region", out var reg) ? reg.GetString() ?? "" : "";
+                    string podDistrict = data.TryGetProperty("district", out var dist) ? dist.GetString() ?? "" : "";
+
+                    // Store in sessionStorage (persists until tab is closed, no expiration)
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podLoggedIn", "true");
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podName", podName);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podSchool", podSchool);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podSchoolID", podSchoolID);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podDivision", podDivision);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podRegion", podRegion);
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "podDistrict", podDistrict);
+
+                    isPODLoggedIn = true;
+                    showWelcomePage = true; // Show welcome page first
+                    loginSuccess = true;
+                    loginMessage = "Login successful!";
+                    
+                    // Auto-set POD Incharge to logged-in POD's name
+                    incidentReport.PODIncharge = podName;
+
+                    // Start the carousel timer
+                    StartCarouselTimer();
+
+                    // Load school-specific data
+                    await LoadSchoolStudents();
+                    await LoadViolationTypes();
+                    await LoadPODTeachers();
+                }
+                else
+                {
+                    loginMessage = "Invalid credentials. Please try again.";
+                    loginSuccess = false;
+                }
+            }
+            else
+            {
+                loginMessage = "Login failed. Please check your credentials.";
+                loginSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            loginMessage = $"Error: {ex.Message}";
+            loginSuccess = false;
+        }
+        finally
+        {
+            isLoggingIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        // Clear sessionStorage
+        await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "podLoggedIn");
+        await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "podName");
+        await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "podSchool");
+        await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "podSchoolID");
+
+        // Reset state
+        isPODLoggedIn = false;
+        podUsername = string.Empty;
+        podPassword = string.Empty;
+        podName = string.Empty;
+        podSchool = string.Empty;
+        podSchoolID = string.Empty;
+        podDivision = string.Empty;
+        podRegion = string.Empty;
+        podDistrict = string.Empty;
+        step = 1;
+        incidentReport = new();
+        
+        StateHasChanged();
+    }
+
+    private async Task LoadSchoolStudents()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(podSchool))
+            {
+                Console.WriteLine("ERROR: podSchool is empty!");
+                return;
+            }
+
+            Console.WriteLine($"Loading students for school: {podSchool}");
+            var response = await Http.GetAsync($"api/IncidentReport/school-students/{Uri.EscapeDataString(podSchool)}");
+            
+            Console.WriteLine($"Response status: {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response content length: {content.Length}");
+                
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                
+                var result = JsonSerializer.Deserialize<JsonElement>(content, options);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    schoolStudents = JsonSerializer.Deserialize<List<Studentclass>>(data.GetRawText(), options) ?? new();
+                    filteredVictims = schoolStudents;
+                    filteredRespondents = schoolStudents;
+                    Console.WriteLine($"✅ Successfully loaded {schoolStudents.Count} students from {podSchool}");
+                }
+                else
+                {
+                    Console.WriteLine("ERROR: Response doesn't have success=true or data property");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"ERROR: API call failed with status {response.StatusCode}");
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error content: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ ERROR loading school students: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+    
+    private async Task LoadPODTeachers()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(podSchool))
+                return;
+                
+            var response = await Http.GetAsync($"api/IncidentReport/teachers-by-location?schoolName={Uri.EscapeDataString(podSchool)}&position=POD");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    podTeachers = ParseTeachersFromJson(data);
+                    // allTeachers = podTeachers; // Store for autocomplete - REMOVED
+                    Console.WriteLine($"Loaded {podTeachers.Count} POD teachers");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading POD teachers: {ex.Message}");
+        }
+    }
+    
+    private List<PODTeacher> ParseTeachersFromJson(JsonElement data)
+    {
+        var teachers = new List<PODTeacher>();
+        
+        if (data.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var teacherElement in data.EnumerateArray())
+            {
+                var teacher = new PODTeacher();
+                
+                if (teacherElement.TryGetProperty("teacherID", out var teacherId))
+                    teacher.TeacherID = teacherId.GetInt32();
+                if (teacherElement.TryGetProperty("teacherName", out var teacherName))
+                    teacher.TeacherName = teacherName.GetString() ?? "";
+                if (teacherElement.TryGetProperty("position", out var position))
+                    teacher.Position = position.GetString() ?? "";
+                
+                teachers.Add(teacher);
+            }
+        }
+        
+        return teachers;
+    }
+
+    // Complainant Search Methods
+    private void OnComplainantSearchInput(ChangeEventArgs e)
+    {
+        complainantSearchText = e.Value?.ToString() ?? string.Empty;
+        showComplainantSuggestions = !string.IsNullOrWhiteSpace(complainantSearchText);
+        FilterComplainants();
+    }
+
+    private void OnComplainantSearchFocus()
+    {
+        if (!string.IsNullOrWhiteSpace(complainantSearchText))
+        {
+            showComplainantSuggestions = true;
+            FilterComplainants();
+        }
+    }
+
+    private void OnComplainantSearchBlur()
+    {
+        Task.Delay(300).ContinueWith(_ => InvokeAsync(() => {
+            showComplainantSuggestions = false;
+            StateHasChanged();
+        }));
+    }
+
+    private void FilterComplainants()
+    {
+        if (string.IsNullOrEmpty(complainantSearchText))
+        {
+            filteredComplainants = new();
+        }
+        else
+        {
+            var searchLower = complainantSearchText.ToLower();
+            
+            filteredComplainants = schoolStudents
+                .Where(s => {
+                    if (string.IsNullOrEmpty(s.StudentName))
+                        return false;
+                    
+                    var nameLower = s.StudentName.ToLower();
+                    
+                    if (nameLower.Contains(searchLower))
+                        return true;
+                    
+                    if (nameLower.Contains(","))
+                    {
+                        var parts = nameLower.Split(',');
+                        var lastName = parts[0].Trim();
+                        var firstName = parts.Length > 1 ? parts[1].Trim() : "";
+                        
+                        if (lastName.Contains(searchLower) || firstName.Contains(searchLower))
+                            return true;
+                    }
+                    
+                    return false;
+                })
+                .ToList();
+        }
+        StateHasChanged();
+    }
+
+    private void SelectComplainant(Studentclass student)
+    {
+        incidentReport.ComplainantName = student.StudentName;
+        incidentReport.ComplainantGrade = student.GradeLevel ?? "";
+        incidentReport.ComplainantSection = student.Section ?? "";
+        incidentReport.ComplainantStrand = student.Strand ?? "";
+        
+        complainantSearchText = student.StudentName;
+        showComplainantSuggestions = false;
+        
+        StateHasChanged();
+    }
+    
+    // Victim search functionality
+    private void OnVictimSearchInput(ChangeEventArgs e)
+    {
+        victimSearchText = e.Value?.ToString() ?? string.Empty;
+        incidentReport.VictimName = victimSearchText;
+        showVictimSuggestions = !string.IsNullOrWhiteSpace(victimSearchText);
+        FilterVictims();
+    }
+
+    private void OnVictimSearchFocus()
+    {
+        if (!string.IsNullOrWhiteSpace(victimSearchText))
+        {
+            showVictimSuggestions = true;
+            FilterVictims();
+        }
+    }
+
+    private void OnVictimSearchKeyUp()
+    {
+        showVictimSuggestions = !string.IsNullOrWhiteSpace(victimSearchText);
+        FilterVictims();
+    }
+
+    private void OnVictimSearchBlur()
+    {
+        Task.Delay(300).ContinueWith(_ => InvokeAsync(() => {
+            showVictimSuggestions = false;
+            StateHasChanged();
+        }));
+    }
+
+    private void FilterVictims()
+    {
+        if (string.IsNullOrEmpty(victimSearchText))
+        {
+            filteredVictims = schoolStudents ?? new List<Studentclass>();
+        }
+        else
+        {
+            filteredVictims = (schoolStudents ?? new List<Studentclass>())
+                .Where(s => s.StudentName.ToLower().Contains(victimSearchText.ToLower()))
+                .ToList();
+        }
+        StateHasChanged();
+    }
+
+    private void SelectVictim(string studentName)
+    {
+        incidentReport.VictimName = studentName;
+        victimSearchText = studentName;
+        showVictimSuggestions = false;
+        
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+        });
+    }
+
+    private void OnUseComplainantAsVictimChanged(ChangeEventArgs e)
+    {
+        useComplainantAsVictim = (bool)(e.Value ?? false);
+        
+        if (useComplainantAsVictim)
+        {
+            incidentReport.VictimName = incidentReport.ComplainantName;
+            victimSearchText = incidentReport.ComplainantName;
+            showVictimSuggestions = false;
+        }
+        else
+        {
+            if (incidentReport.VictimName == incidentReport.ComplainantName)
+            {
+                incidentReport.VictimName = string.Empty;
+                victimSearchText = string.Empty;
+            }
+        }
+        
+        StateHasChanged();
+    }
+    
+    // Respondent search functionality
+    private void OnRespondentSearchInput(ChangeEventArgs e)
+    {
+        respondentSearchText = e.Value?.ToString() ?? string.Empty;
+        showRespondentSuggestions = !string.IsNullOrWhiteSpace(respondentSearchText);
+        FilterRespondents();
+    }
+
+    private void OnRespondentSearchFocus()
+    {
+        if (!string.IsNullOrWhiteSpace(respondentSearchText))
+        {
+            showRespondentSuggestions = true;
+            FilterRespondents();
+        }
+    }
+
+    private async Task OnRespondentSearchKeyUp(KeyboardEventArgs e)
+    {
+        showRespondentSuggestions = !string.IsNullOrWhiteSpace(respondentSearchText);
+        FilterRespondents();
+    }
+
+    private async Task OnRespondentSearchBlur()
+    {
+        await Task.Delay(300);
+        showRespondentSuggestions = false;
+        StateHasChanged();
+    }
+
+    private void FilterRespondents()
+    {
+        if (string.IsNullOrEmpty(respondentSearchText))
+        {
+            filteredRespondents = schoolStudents ?? new List<Studentclass>();
+        }
+        else
+        {
+            filteredRespondents = (schoolStudents ?? new List<Studentclass>())
+                .Where(s => s.StudentName.ToLower().Contains(respondentSearchText.ToLower()))
+                .ToList();
+        }
+        StateHasChanged();
+    }
+
+    private async Task SelectRespondentForAdd(string studentName)
+    {
+        respondentSearchText = studentName;
+        showRespondentSuggestions = false;
+        StateHasChanged();
+    }
+    
+    private async Task AddRespondent()
+    {
+        if (string.IsNullOrWhiteSpace(respondentSearchText))
+            return;
+            
+        if (respondentsList.Any(r => r.Name.Equals(respondentSearchText, StringComparison.OrdinalIgnoreCase)))
+        {
+            message = "This respondent is already in the list.";
+            isSuccess = false;
+            StateHasChanged();
+            return;
+        }
+        
+        var respondent = new RespondentInfo { Name = respondentSearchText.Trim() };
+        
+        // Auto-fill adviser based on selected student
+        await LoadAdviserForRespondent(respondent);
+        
+        respondentsList.Add(respondent);
+        UpdateCombinedAdviserNames();
+        UpdateIncidentReportRespondents();
+        GenerateIncidentDescription(); // Auto-update description
+        
+        respondentSearchText = string.Empty;
+        showRespondentSuggestions = false;
+        StateHasChanged();
+    }
+    
+    private void RemoveRespondent(RespondentInfo respondent)
+    {
+        respondentsList.Remove(respondent);
+        UpdateCombinedAdviserNames();
+        UpdateIncidentReportRespondents();
+        GenerateIncidentDescription(); // Auto-update description
+        StateHasChanged();
+    }
+    
+    private void GenerateIncidentDescription()
+    {
+        var sb = new System.Text.StringBuilder();
+
+        if (incidentDate.HasValue)
+        {
+            sb.Append($"On {incidentDate.Value:MMMM dd, yyyy}");
+        }
+
+        if (incidentTime.HasValue)
+        {
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append($"at approximately {incidentTime.Value:hh:mm tt}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(incidentLocation))
+        {
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append($"an incident occurred at {incidentLocation}");
+        }
+        else if (sb.Length > 0)
+        {
+             sb.Append(", an incident occurred");
+        }
+
+        // Include respondents if needed, fitting into the narrative
+        if (respondentsList.Any())
+        {
+            var respondentNames = string.Join(", ", respondentsList.Select(r => r.Name));
+            sb.Append($" involving {respondentNames}");
+        }
+
+        sb.Append(".");
+
+        if (!string.IsNullOrWhiteSpace(briefSummary))
+        {
+            sb.Append($" {briefSummary}");
+        }
+
+        incidentReport.IncidentDescription = sb.ToString();
+        
+        StateHasChanged();
+    }
+    
+    private void OpenDescriptionModal()
+    {
+        // Auto-fill date and time if not set
+        if (!incidentDate.HasValue)
+        {
+            incidentDate = DateTime.Now;
+        }
+        
+        if (!incidentTime.HasValue)
+        {
+            incidentTime = TimeOnly.FromDateTime(DateTime.Now);
+        }
+
+        showDescriptionModal = true;
+        StateHasChanged();
+    }
+    
+    private void CloseDescriptionModal()
+    {
+        showDescriptionModal = false;
+        StateHasChanged();
+    }
+
+    private void OpenBluetoothModal()
+    {
+        showBluetoothModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseBluetoothModal()
+    {
+        showBluetoothModal = false;
+        StateHasChanged();
+    }
+    
+    private void SaveDescriptionModal()
+    {
+        GenerateIncidentDescription();
+        showDescriptionModal = false;
+        StateHasChanged();
+    }
+    
+    private void StartFilingReport()
+    {
+        showWelcomePage = false;
+        step = 1;
+        incidentReport = new();
+        // Keep POD incharge set
+        incidentReport.PODIncharge = podName;
+        StateHasChanged();
+    }
+
+    private void ReturnToHome()
+    {
+        showWelcomePage = true;
+        step = 1;
+        StateHasChanged();
+    }
+    
+    private void AddRespondentName()
+    {
+        respondentNames.Add("");
+        StateHasChanged();
+    }
+    
+    private void RemoveRespondentName(int index)
+    {
+        if (respondentNames.Count > 1)
+        {
+            respondentNames.RemoveAt(index);
+            StateHasChanged();
+        }
+    }
+    
+    private void UpdateRespondentNamesInModel()
+    {
+        // sync respondentNames (string list) -> respondentsList (object list)
+        respondentsList.Clear();
+        var validNames = respondentNames.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        
+        foreach (var name in validNames)
+        {
+            respondentsList.Add(new RespondentInfo { Name = name });
+        }
+
+        // Join for DB model
+        incidentReport.RespondentName = string.Join(" / ", validNames);
+        
+        // Regenerate description to include new respondents
+        GenerateIncidentDescription();
+    }
+    
+    private void FormatComplainantContactNumber(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? string.Empty;
+        // Remove any non-digit characters
+        var digitsOnly = new string(input.Where(char.IsDigit).ToArray());
+        // Limit to 11 digits
+        if (digitsOnly.Length > 11)
+        {
+            digitsOnly = digitsOnly.Substring(0, 11);
+        }
+        incidentReport.ComplainantContactNumber = digitsOnly;
+        StateHasChanged();
+    }
+    private void SearchTeachers(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? "";
+        
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            filteredTeachers = new();
+            showTeacherSuggestions = false;
+        }
+        else
+        {
+            filteredTeachers = allTeachers
+                .Where(t => t.TeacherName.Contains(input, StringComparison.OrdinalIgnoreCase))
+                .Take(5)
+                .ToList();
+            showTeacherSuggestions = filteredTeachers.Any();
+        }
+    }
+
+    private void SelectTeacher(PODTeacher teacher)
+    {
+        // IncidentTeacher is deprecated, removing assignment
+        showTeacherSuggestions = false;
+        StateHasChanged();
+    }
+    
+    private async Task LoadAdviserForRespondent(RespondentInfo respondent)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(respondent.Name))
+                return;
+            
+            var apiUrl = $"api/IncidentReport/student-adviser/{Uri.EscapeDataString(respondent.Name)}";
+            if (!string.IsNullOrEmpty(podSchool))
+            {
+                apiUrl += $"?schoolName={Uri.EscapeDataString(podSchool)}";
+            }
+            
+            var response = await Http.GetAsync(apiUrl);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    if (data.TryGetProperty("adviserName", out var adviserNameElement))
+                    {
+                        var adviser = adviserNameElement.ValueKind == JsonValueKind.Null ? null : adviserNameElement.GetString();
+                        if (!string.IsNullOrEmpty(adviser))
+                        {
+                            respondent.AdviserName = adviser;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading adviser for respondent {respondent.Name}: {ex.Message}");
+        }
+    }
+    
+    private void UpdateCombinedAdviserNames()
+    {
+        var advisers = respondentsList
+            .Where(r => !string.IsNullOrEmpty(r.AdviserName))
+            .Select(r => r.AdviserName)
+            .Distinct()
+            .ToList();
+        
+        combinedAdviserNames = string.Join(", ", advisers);
+        incidentReport.AdviserName = combinedAdviserNames;
+    }
+    
+    private void UpdateIncidentReportRespondents()
+    {
+        var respondentNames = respondentsList.Select(r => r.Name).ToList();
+        incidentReport.RespondentName = string.Join("; ", respondentNames);
+    }
+    
+    private void OnSuggestionHover()
+    {
+        // Keep suggestions visible when hovering
+    }
+    
+    private void OnPODInchargeChanged(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+        Console.WriteLine($"POD Incharge changed to: {selectedValue}");
+        incidentReport.PODIncharge = selectedValue;
+        StateHasChanged();
+    }
+    
+    private async Task LoadViolationTypes()
+    {
+        try
+        {
+            violationTypesByCategory = new Dictionary<string, List<string>>();
+            
+            string[] categories = { "Prohibited Acts", "Minor", "Major" };
+            
+            foreach (var category in categories)
+            {
+                var response = await Http.GetAsync($"api/StudentProfileCaseRecord/violation-types?category={Uri.EscapeDataString(category)}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                        result.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                    {
+                        var violations = new List<string>();
+                        foreach (var item in data.EnumerateArray())
+                        {
+                            var violationName = item.GetString();
+                            if (!string.IsNullOrEmpty(violationName))
+                            {
+                                violations.Add(violationName);
+                            }
+                        }
+                        violationTypesByCategory[category] = violations;
+                    }
+                }
+            }
+            
+            if (!violationTypesByCategory.Any() || violationTypesByCategory.Values.All(v => !v.Any()))
+            {
+                violationTypesByCategory = new Dictionary<string, List<string>>
+                {
+                    ["Prohibited Acts"] = new List<string>
+                    {
+                        "Deadly/Bladed Weapons",
+                        "Fights/Rumbles (100m Radius)",
+                        "Entering Under Influence",
+                        "Gambling/Betting",
+                        "Extortion (Pangingikil)"
+                    },
+                    ["Minor"] = new List<string>
+                    {
+                        "Late/Unauthorized Absence",
+                        "Dress Code Violation",
+                        "Disruptive Behavior",
+                        "Use of Profane Language",
+                        "Charging Gadgets in Class",
+                        "Earrings (Boys)",
+                        "Glaring Hair/Nail Colors"
+                    },
+                    ["Major"] = new List<string>
+                    {
+                        "Cheating/Plagiarism",
+                        "Bullying/Harassment",
+                        "Cybercrime/Cyberbullying",
+                        "Forgery/Tampering Records",
+                        "Fraud/Identity Theft",
+                        "Disrespect to Authorities",
+                        "Acts Tarnishing School"
+                    }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading violation types: {ex.Message}");
+        }
+    }
+    
+    private void OnIncidentTypeChanged(ChangeEventArgs e)
+    {
+        var incidentType = e.Value?.ToString() ?? string.Empty;
+        Console.WriteLine($"Incident type changed to: {incidentType}");
+        incidentReport.IncidentType = incidentType;
+        
+        if (incidentType != "Other")
+        {
+            incidentReport.OtherIncidentType = null;
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void FormatPhoneNumber(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+        
+        var digitsOnly = System.Text.RegularExpressions.Regex.Replace(value, @"[^\d]", "");
+        
+        if (digitsOnly.Length > 11)
+        {
+            digitsOnly = digitsOnly.Substring(0, 11);
+        }
+        
+        if (digitsOnly.Length > 1 && !digitsOnly.StartsWith("09"))
+        {
+            if (digitsOnly.StartsWith("9"))
+            {
+                digitsOnly = "0" + digitsOnly;
+            }
+            else if (!digitsOnly.StartsWith("0"))
+            {
+                digitsOnly = "09" + digitsOnly.Substring(1);
+            }
+        }
+        
+        incidentReport.VictimContact = digitsOnly;
+        StateHasChanged();
+    }
+
+    private bool IsValidPhilippinePhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrEmpty(phoneNumber))
+            return false;
+
+        return phoneNumber.Length == 11 && phoneNumber.StartsWith("09") && phoneNumber.All(char.IsDigit);
+    }
+    
+    private async Task HandlePhotoUpload(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                if (file.Size > 5 * 1024 * 1024)
+                {
+                    message = "Photo size must be less than 5MB";
+                    isSuccess = false;
+                    return;
+                }
+
+                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/gif" };
+                if (!allowedTypes.Contains(file.ContentType))
+                {
+                    message = "Only JPG, PNG, and GIF images are allowed";
+                    isSuccess = false;
+                    return;
+                }
+
+                using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                var fileBytes = memoryStream.ToArray();
+                var base64String = Convert.ToBase64String(fileBytes);
+                
+                incidentReport.EvidencePhotoBase64 = $"data:{file.ContentType};base64,{base64String}";
+                incidentReport.EvidencePhotoPath = file.Name;
+                
+                message = "Photo uploaded successfully";
+                isSuccess = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error uploading photo: {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private void RemovePhoto()
+    {
+        incidentReport.EvidencePhotoBase64 = null;
+        incidentReport.EvidencePhotoPath = null;
+        message = string.Empty;
+    }
+
+    // Navigation Methods
+    private void NextStep()
+    {
+        if (ValidateCurrentStep())
+        {
+            // NEW: Intercept Step 1 to ask about victim
+            if (step == 1)
+            {
+                showVictimSelectionModal = true;
+                StateHasChanged();
+                return;
+            }
+
+            // If in Step 2, hasNoVictim is false, and Victim Name is empty, show confirmation modal
+            if (step == 2 && !hasNoVictim && string.IsNullOrWhiteSpace(incidentReport.VictimName))
+            {
+                showVictimConfirmationModal = true;
+                StateHasChanged();
+                return;
+            }
+
+            // Clear/Set victim data if hasNoVictim is true
+            if (step == 2 && hasNoVictim)
+            {
+                incidentReport.VictimName = "No Specific Victim";
+                incidentReport.VictimContact = "";
+                victimSearchText = "";
+            }
+            
+            // Sync respondent names when moving from Step 3
+            if (step == 3)
+            {
+                UpdateRespondentNamesInModel();
+            }
+
+            if (step < 5)
+            {
+                step++;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void SelectVictimMode(bool behaviorOnly)
+    {
+        hasNoVictim = behaviorOnly;
+        showVictimSelectionModal = false;
+        incidentReport.IncidentType = string.Empty; // Reset incident type to force re-selection
+        
+        if (behaviorOnly)
+        {
+            incidentReport.VictimName = "No Specific Victim";
+            incidentReport.VictimContact = "";
+            victimSearchText = "";
+        }
+        else
+        {
+            if (incidentReport.VictimName == "No Specific Victim")
+            {
+                incidentReport.VictimName = "";
+                victimSearchText = "";
+            }
+        }
+        
+        step = 2;
+        StateHasChanged();
+    }
+
+    private void ProceedWithoutVictim()
+    {
+        showVictimConfirmationModal = false;
+        if (step < 5)
+        {
+            step++;
+            StateHasChanged();
+        }
+    }
+
+    private void PrevStep()
+    {
+        if (step > 1)
+        {
+            step--;
+            StateHasChanged();
+        }
+    }
+    
+    private void GoToStep(int targetStep)
+    {
+        if (targetStep >= 1 && targetStep <= 5)
+        {
+            step = targetStep;
+            StateHasChanged();
+        }
+    }
+      private bool ValidateCurrentStep()
+    {
+        message = string.Empty;
+        
+        switch (step)
+        {
+            case 1:
+                if (string.IsNullOrWhiteSpace(incidentReport.ComplainantName))
+                {
+                    message = "⚠️ This field is required and must be filled. Please complete the Complainant Name.";
+                    return false;
+                }
+                // Grade and Section removed for manual input
+                return true;
+                
+            case 2:
+                // Victim name is now optional with confirmation, but contact number is still used.
+                // However, if there is no victim, contact number should also be optional or have a default.
+                
+                if (!string.IsNullOrWhiteSpace(incidentReport.VictimContact) && !IsValidPhilippinePhoneNumber(incidentReport.VictimContact))
+                {
+                    message = "⚠️ Please enter a valid Philippine mobile number (09XXXXXXXXX) or leave it blank.";
+                    return false;
+                }
+                if (string.IsNullOrWhiteSpace(incidentReport.IncidentType))
+                {
+                    message = "⚠️ This field is required and must be filled. Please select the Type of Incident.";
+                    return false;
+                }
+                if (incidentReport.IncidentType == "Other" && string.IsNullOrWhiteSpace(incidentReport.OtherIncidentType))
+                {
+                    message = "⚠️ This field is required and must be filled. Please specify the incident type.";
+                    return false;
+                }
+                if (!incidentDate.HasValue)
+                {
+                    message = "⚠️ This field is required and must be filled. Please enter the Date of Incident.";
+                    return false;
+                }
+                if (!incidentTime.HasValue)
+                {
+                    message = "⚠️ This field is required and must be filled. Please enter the Time of Incident.";
+                    return false;
+                }
+                if (string.IsNullOrWhiteSpace(incidentLocation))
+                {
+                    message = "⚠️ This field is required and must be filled. Please enter the Location.";
+                    return false;
+                }
+                if (string.IsNullOrWhiteSpace(briefSummary))
+                {
+                    message = "⚠️ This field is required and must be filled. Please enter the Brief Summary.";
+                    return false;
+                }
+                return true;
+                
+            case 3:
+                var validNames = respondentNames.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                if (!validNames.Any())
+                {
+                    message = "⚠️ Please add at least one Respondent/Offender.";
+                    return false;
+                }
+                return true;
+                
+            case 4:
+                return true;
+                
+            default:
+                return true;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        message = "Submitting report...";
+        
+        try
+        {
+            // Last resort check for location data
+            if (string.IsNullOrEmpty(podDivision) || string.IsNullOrEmpty(podRegion) || string.IsNullOrEmpty(podDistrict))
+            {
+                Console.WriteLine("Location data missing in state, checking sessionStorage...");
+                podDivision = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podDivision") ?? "";
+                podRegion = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podRegion") ?? "";
+                podDistrict = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "podDistrict") ?? "";
+            }
+
+            // If still empty, try to fetch from API one last time
+            if (string.IsNullOrEmpty(podDivision) || string.IsNullOrEmpty(podRegion) || string.IsNullOrEmpty(podDistrict))
+            {
+                Console.WriteLine("Location data still missing, fetching from API...");
+                await LoadPODLocation(podName);
+            }
+
+            Console.WriteLine($"Submitting report with location: School={podSchool}, Division={podDivision}, Region={podRegion}, District={podDistrict}");
+
+            // Convert to request object with POD school data
+            var request = new SimplifiedIncidentReportRequest
+            {
+                FullName = incidentReport.ComplainantName,
+                ComplainantContactNumber = incidentReport.ComplainantContactNumber,
+                VictimName = incidentReport.VictimName,
+                IncidentType = incidentReport.IncidentType,
+                Description = incidentReport.IncidentDescription,
+                RespondentName = incidentReport.RespondentName,
+                AdviserName = incidentReport.AdviserName,
+                EvidencePhotoBase64 = incidentReport.EvidencePhotoBase64,
+                Status = "Pending",
+                SchoolName = podSchool,
+                Division = podDivision,
+                ReporterID = isPODLoggedIn ? reporterId : (int?)null,
+                ReporterRole = isPODLoggedIn ? "POD" : "Guest"
+            };
+
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, System.Text.Encoding.UTF8);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+            var response = await Http.PostAsync("api/IncidentReport/simplified", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                var isSuccessKey = (result.TryGetProperty("success", out var success) && success.GetBoolean())
+                                   || (result.TryGetProperty("Success", out var successCaps) && successCaps.GetBoolean());
+                if (isSuccessKey)
+                {
+                    message = "Report submitted successfully!";
+                    isSuccess = true;
+                    
+                    // Extract Reference Number safely
+                    string refNum = "N/A";
+                    if (result.TryGetProperty("referenceNumber", out var refProp))
+                    {
+                        refNum = refProp.GetString() ?? "N/A";
+                    }
+
+                    // Prepare Print Details
+                    var printDetails = new
+                    {
+                        date = incidentReport.DateReported.ToString("yyyy-MM-dd"),
+                        time = DateTime.Now.ToShortTimeString(),
+                        type = incidentReport.IncidentType,
+                        complainant = incidentReport.ComplainantName
+                    };
+                    
+                    // Persist for manual retry
+                    lastReferenceNumber = refNum;
+                    lastPrintDetails = printDetails;
+
+                    // Auto-Print (Fire and Forget or Await?)
+                    try 
+                    {
+                        // We await it to catch errors, but we don't want to block the UI update too long.
+                        await JSRuntime.InvokeVoidAsync("bluetoothPrinter.printTicket", refNum, printDetails);
+                    }
+                    catch (Exception printEx)
+                    {
+                        Console.WriteLine($"Auto-print failed: {printEx.Message}");
+                    }
+
+                    // Auto-restart form
+                    ResetForm();
+                    
+                    // Show Success Modal instead of inline message
+                    showSuccessPrintModal = true;
+                    showWelcomePage = false; 
+                    
+                    StateHasChanged();
+                    
+                    // Stay on form instead of returning to welcome page
+                    showWelcomePage = false;
+                    
+                    StateHasChanged();
+                }
+                else
+                {
+                    message = "Failed to submit incident report. Please try again.";
+                    isSuccess = false;
+                }
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                message = $"Server error: {response.StatusCode}. Please try again.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error submitting report: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ResetForm()
+    {
+        incidentReport = new();
+        step = 1;
+        complainantSearchText = string.Empty;
+        victimSearchText = string.Empty;
+        respondentSearchText = string.Empty;
+        respondentsList.Clear();
+        combinedAdviserNames = string.Empty;
+        incidentDate = null;
+        incidentTime = null;
+        incidentLocation = string.Empty;
+        briefSummary = string.Empty;
+        useComplainantAsVictim = false;
+        
+        // Restore POD Incharge from session
+        incidentReport.PODIncharge = podName;
+        
+        StateHasChanged();
+    }
+    
+    private async Task RetryPrint()
+    {
+        if (!string.IsNullOrEmpty(lastReferenceNumber) && lastPrintDetails != null)
+        {
+             try 
+            {
+                await JSRuntime.InvokeVoidAsync("bluetoothPrinter.printTicket", lastReferenceNumber, lastPrintDetails);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Manual print failed: {ex.Message}");
+            }
+        }
+    }
+
+    private void CloseSuccessModal()
+    {
+        showSuccessPrintModal = false;
+        showWelcomePage = true; // Return to Home
+        StateHasChanged();
+    }
+}

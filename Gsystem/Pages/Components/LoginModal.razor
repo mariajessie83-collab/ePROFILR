@@ -1,0 +1,555 @@
+@using Blazored.LocalStorage
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using SharedProject
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService localStorage
+
+@if (IsOpen)
+{
+    <div class="login-modal-overlay" @onclick="Close">
+        <div class="login-modal-container" @onclick:stopPropagation="true">
+            <!-- Glassmorphic Background Elements -->
+            <div class="glass-bg"></div>
+            
+            <!-- Animated Waves -->
+            <div class="waves-container">
+                <svg class="waves" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                viewBox="0 24 150 28" preserveAspectRatio="none" shape-rendering="auto">
+                    <defs>
+                        <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
+                    </defs>
+                    <g class="parallax">
+                        <use xlink:href="#gentle-wave" x="48" y="0" fill="rgba(255,255,255,0.3)" />
+                        <use xlink:href="#gentle-wave" x="48" y="3" fill="rgba(255,255,255,0.2)" />
+                        <use xlink:href="#gentle-wave" x="48" y="5" fill="rgba(255,255,255,0.1)" />
+                        <use xlink:href="#gentle-wave" x="48" y="7" fill="rgba(255,255,255,0.05)" />
+                    </g>
+                </svg>
+            </div>
+
+            <button class="modal-close-btn" @onclick="Close">&times;</button>
+            
+            <div class="modal-content-wrapper">
+                <div class="login-form-view">
+                    <div class="modal-header">
+                        <h2 class="auth-title">Official Access</h2>
+                        <div class="logo-wrapper">
+                            <img src="q12png.png" alt="Portal Logo" class="auth-logo" />
+                        </div>
+                        <div class="header-divider"></div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-error">
+                            <i class="fas fa-exclamation-circle"></i>
+                            @errorMessage
+                        </div>
+                    }
+
+                    <form @onsubmit="HandleLogin">
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Username</label>
+                            <input type="text" class="form-control" @bind="loginRequest.Username" placeholder="Enter Username" required />
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-lock"></i> Password</label>
+                            <div class="password-wrapper">
+                                <input type="@(showPassword ? "text" : "password")" class="form-control" @bind="loginRequest.Password" placeholder="Enter Password" required />
+                                <button type="button" class="password-toggle" @onclick="() => showPassword = !showPassword">
+                                    <i class="fas @(showPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-footer-links">
+                            <a href="/login/teacher?register=true" class="register-link" @onclick="Close">Need an account? Register here</a>
+                        </div>
+
+                        <button type="submit" class="btn-login" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <div class="loader-ring"></div>
+                                <span>@loadingLabel</span>
+                            }
+                            else
+                            {
+                                <span>Login</span>
+                                <i class="fas fa-arrow-right"></i>
+                            }
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .login-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(12px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 11000;
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    .login-modal-container {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(25px) saturate(180%);
+        -webkit-backdrop-filter: blur(25px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 32px;
+        width: 100%;
+        max-width: 460px;
+        padding: 48px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 
+            0 25px 50px -12px rgba(0, 0, 0, 0.25),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        animation: modalEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        color: #f8fafc;
+    }
+
+    .glass-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        z-index: -1;
+    }
+
+    /* Waves CSS */
+    .waves-container {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        z-index: -1;
+        overflow: hidden;
+        transform: translateZ(0);
+    }
+
+    .waves {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .parallax > use {
+        animation: move-forever 25s cubic-bezier(.55, .5, .45, .5) infinite;
+    }
+    .parallax > use:nth-child(1) { animation-delay: -2s; animation-duration: 7s; }
+    .parallax > use:nth-child(2) { animation-delay: -3s; animation-duration: 10s; }
+    .parallax > use:nth-child(3) { animation-delay: -4s; animation-duration: 13s; }
+    .parallax > use:nth-child(4) { animation-delay: -5s; animation-duration: 20s; }
+
+    @@keyframes move-forever {
+        0% { transform: translate3d(-90px, 0, 0); }
+        100% { transform: translate3d(85px, 0, 0); }
+    }
+
+    .modal-close-btn {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        font-size: 20px;
+        color: #ffffff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        z-index: 10;
+    }
+
+    .modal-close-btn:hover {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 25px;
+        position: relative;
+    }
+
+    .logo-wrapper {
+        margin-top: 15px;
+        margin-bottom: 2px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.25));
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .logo-wrapper:hover {
+        transform: scale(1.05);
+    }
+
+    .auth-logo {
+        max-width: 220px;
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+    }
+
+    .auth-title {
+        color: #ffffff;
+        font-size: 28px;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        background: linear-gradient(to bottom, #ffffff, #e2e8f0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .header-divider {
+        width: 40px;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        margin: 10px 0;
+        border-radius: 2px;
+        opacity: 0.6;
+    }
+
+    .auth-subtitle {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+        font-weight: 500;
+        margin: 0;
+        max-width: 250px;
+        line-height: 1.5;
+        text-align: center;
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .form-group label i {
+        margin-right: 6px;
+        opacity: 0.7;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 14px 18px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        font-size: 16px;
+        color: #ffffff;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+    }
+
+    .form-control:focus {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: #3b82f6;
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+    }
+
+    .password-wrapper {
+        position: relative;
+    }
+
+    .password-toggle {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        padding: 8px;
+        font-size: 16px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .password-toggle:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-login {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        color: white;
+        border: none;
+        border-radius: 18px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        box-shadow: 0 10px 20px -10px rgba(59, 130, 246, 0.5);
+    }
+
+    .btn-login:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 30px -12px rgba(59, 130, 246, 0.6);
+        filter: brightness(1.1);
+    }
+
+    .btn-login:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    .btn-login i {
+        font-size: 14px;
+        transition: transform 0.3s;
+    }
+
+    .btn-login:hover i {
+        transform: translateX(4px);
+    }
+
+    .btn-login:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        padding: 14px 18px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .register-link {
+        display: block;
+        text-align: center;
+        color: #60a5fa;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .register-link:hover {
+        color: #93c5fd;
+        text-decoration: underline;
+    }
+
+    .form-footer-links {
+        margin-bottom: 20px;
+    }
+
+    .loader-ring {
+        width: 20px;
+        height: 20px;
+        border: 2.5px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @@keyframes modalEntrance {
+        from { 
+            transform: scale(0.9) translateY(30px); 
+            opacity: 0; 
+        }
+        to { 
+            transform: scale(1) translateY(0); 
+            opacity: 1; 
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .login-modal-container {
+            padding: 32px 24px;
+            margin: 16px;
+            border-radius: 24px;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback OnLoginSuccess { get; set; }
+
+    private LoginRequest loginRequest = new();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    private bool showPassword = false;
+    private string loadingLabel = "Logging in...";
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        loadingLabel = "Authenticating...";
+
+        try
+        {
+            var json = JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+            
+            var response = await Http.PostAsync("/api/Auth/login", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                var data = result.GetProperty("data");
+                var role = data.GetProperty("userRole").GetString();
+
+                // Validation: Only Teachers and Officials (Guidance, POD) are handled here
+                // Students should still be able to login if they have credentials, 
+                // but the UI won't explicitly offer it. 
+                // However, the user said "wala nang students direct teacher and officials".
+                // I will block student logins here to be safe.
+                if (role == "student")
+                {
+                    errorMessage = "Access denied. Please use the student portal.";
+                    isLoading = false;
+                    return;
+                }
+
+                loadingLabel = "Setting up session...";
+                await HandleTeacherLoginSuccess(data, role);
+            }
+            else
+            {
+                errorMessage = "Invalid credentials. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred during login: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleTeacherLoginSuccess(JsonElement data, string role)
+    {
+        // Admin, SchoolHead, Division are handled separately as requested ("wag mo na isali")
+        if (role == "admin" || role == "schoolhead" || role == "division")
+        {
+            errorMessage = $"Redirecting to {role} portal...";
+            await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+            await Task.Delay(500);
+            NavigationManager.NavigateTo("/login/admin", true);
+            return;
+        }
+
+        var userPositionRaw = data.GetProperty("position").GetString();
+        var normalizedPosition = userPositionRaw?.Trim() ?? string.Empty;
+
+        // Store basic teacher data
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", "teacher_token_" + DateTime.Now.Ticks);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", role);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", data.GetProperty("username").GetString());
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userPosition", normalizedPosition);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherName", data.GetProperty("teacherName").GetString());
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", "teacher");
+        await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "hasActiveSession", "true");
+
+        // Store location details
+        if (data.TryGetProperty("schoolName", out var sn)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "schoolName", sn.GetString());
+        if (data.TryGetProperty("region", out var r)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "region", r.GetString());
+        if (data.TryGetProperty("division", out var d)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "division", d.GetString());
+        if (data.TryGetProperty("district", out var dist)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "district", dist.GetString());
+
+        // Store TeacherID
+        if (data.TryGetProperty("teacherID", out var tid)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", tid.GetInt32().ToString());
+        else if (data.TryGetProperty("TeacherID", out var tid2)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", tid2.GetInt32().ToString());
+        else if (data.TryGetProperty("userID", out var uid)) await JSRuntime.InvokeVoidAsync("localStorage.setItem", "teacherId", uid.GetInt32().ToString());
+
+        await OnLoginSuccess.InvokeAsync();
+
+        // Set navigation flag to prevent SimpleLayout from clearing localStorage
+        await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+        // Small delay to ensure sessionStorage is written
+        await Task.Delay(150);
+
+        // Redirect based on position - use forceLoad: false to keep SPA context
+        if (normalizedPosition.Equals("POD", StringComparison.OrdinalIgnoreCase))
+            NavigationManager.NavigateTo("/pod-dashboard", forceLoad: false);
+        else if (normalizedPosition.Equals("Adviser", StringComparison.OrdinalIgnoreCase))
+            NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+        else if (normalizedPosition.Equals("Guidance Counselor", StringComparison.OrdinalIgnoreCase))
+            NavigationManager.NavigateTo("/guidance-dashboard", forceLoad: false);
+        else
+            NavigationManager.NavigateTo("/adviser-dashboard", forceLoad: false);
+            
+        // Clear flag after a delay
+        _ = Task.Run(async () => {
+            await Task.Delay(2000);
+            await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating");
+        });
+    }
+}

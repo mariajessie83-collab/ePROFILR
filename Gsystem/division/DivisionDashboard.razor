@@ -1,0 +1,3270 @@
+@page "/division-dashboard"
+@layout DivisionLayout
+@using Gsystem.Services
+@using SharedProject
+@using System.Text.Json
+@using System.Globalization
+@using System.Text
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+
+<PageTitle>Division Dashboard</PageTitle>      
+
+@if (isCheckingAuth)
+{
+    <div class="loading-container" style="height: 100vh;">
+        <div class="spinner"></div>
+        <p>Verifying access...</p>
+    </div>
+}
+else if (!isAuthenticated || !isDivisionUser)
+{
+    <div class="center-message">
+        <h2>Access Denied</h2>
+        <p>You do not have permission to view this dashboard.</p>
+        <a class="btn btn-primary" href="/login/admin" style="margin-top: 20px;">Go to Login</a>
+    </div>
+}
+else 
+{
+    <div class="division-dashboard">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="header-main">
+                <h1>@(divisionName?.ToUpper() ?? "DIVISION DASHBOARD")</h1>
+                <div class="region-label">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Region: @(regionName?.ToUpper() ?? "REGION XII")
+                </div>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading division data...</p>
+            </div>
+        }
+
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-total">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <h4>Total Incidents</h4>
+                    <h2>@totalReports</h2>
+                </div>
+            </div>
+            
+            <div class="kpi-card kpi-pending">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <h4>Pending</h4>
+                    <h2>@pendingReports</h2>
+                </div>
+            </div>
+            
+            <div class="kpi-card kpi-review">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <h4>Under Review</h4>
+                    <h2>@(totalReports - pendingReports - resolvedReports)</h2>
+                </div>
+            </div>
+            
+            <div class="kpi-card kpi-resolved">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <h4>Resolved</h4>
+                    <h2>@resolvedReports</h2>
+                </div>
+            </div>
+            
+            <div class="kpi-card kpi-schools">
+                <div class="kpi-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div class="kpi-content">
+                    <h4>Schools Reporting</h4>
+                    <h2>@schoolsWithIncidents / @schools.Count</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- I. DESCRIPTIVE ANALYTICS (DATA SUMMARY) -->
+        <div class="descriptive-analytics-section" style="margin-bottom: 30px;">
+            <div class="section-title-modern">
+                <h2>I. DESCRIPTIVE ANALYTICS (DATA SUMMARY)</h2>
+            </div>
+            
+            <div class="analytics-grid-modern">
+                <!-- A. Total Recorded Cases -->
+                <div class="analytics-card-modern">
+                    <div class="card-header-modern">
+                        <h3>A. Total Recorded Cases</h3>
+                    </div>
+                    <table class="analytics-table-modern">
+                        <thead>
+                            <tr>
+                                <th>Indicator</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Total Schools</td>
+                                <td>@schools.Count</td>
+                            </tr>
+                            <tr>
+                                <td>Total Learners Involved</td>
+                                <td>@totalLearnersInvolved</td>
+                            </tr>
+                            <tr>
+                                <td>Grade Levels</td>
+                                <td>@gradeLevelsDisplay</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- B. Offenses by Classification -->
+                <div class="analytics-card-modern">
+                    <div class="card-header-modern">
+                        <h3>B. Offenses by Classification</h3>
+                    </div>
+                    <table class="analytics-table-modern">
+                        <thead>
+                            <tr>
+                                <th>Offense Type</th>
+                                <th>Number of Cases</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var stat in offensesSummary)
+                            {
+                                <tr>
+                                    <td>@stat.Type</td>
+                                    <td>@stat.Count</td>
+                                    <td>@($"{stat.Percentage:F0}%")</td>
+                                </tr>
+                            }
+                            <tr class="total-row-modern">
+                                <td>TOTAL</td>
+                                <td>@offensesSummary.Sum(s => s.Count)</td>
+                                <td>100%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- C. Distribution by School (Division Level) -->
+                <div class="analytics-card-modern">
+                    <div class="card-header-modern">
+                        <h3>C. Distribution by School (Division Level)</h3>
+                    </div>
+                    <table class="analytics-table-modern">
+                        <thead>
+                            <tr>
+                                <th>School Category</th>
+                                <th>Number of Cases</th>
+                                <th>Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var stat in schoolDistribution)
+                            {
+                                <tr>
+                                    <td>@stat.Category</td>
+                                    <td>@stat.Count</td>
+                                    <td>@($"{stat.Percentage:F0}%")</td>
+                                </tr>
+                            }
+                            <tr class="total-row-modern">
+                                <td>TOTAL</td>
+                                <td>@schoolDistribution.Sum(s => s.Count)</td>
+                                <td>100%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Charts Grid -->
+        <div class="charts-container">
+            
+            <!-- Incident Categories Trend (Full Width) -->
+            <div class="chart-card full-width trend-card" style="margin-bottom: 30px;">
+                <div class="chart-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Incident Categories Trend</h3>
+                    <span class="chart-subtitle">Last 12 Months by Severity</span>
+                </div>
+                <div class="category-trend-container">
+                    @if (categoryTrendData.Any())
+                    {
+                        <svg viewBox="0 0 1200 350" style="width: 100%; height: 350px;">
+                            <defs>
+                                <!-- Gradients for each category -->
+                                <linearGradient id="divMinorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#ca8a04;stop-opacity:0.6" />
+                                    <stop offset="100%" style="stop-color:#ca8a04;stop-opacity:0" />
+                                </linearGradient>
+                                <linearGradient id="divMajorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#b91c1c;stop-opacity:0.6" />
+                                    <stop offset="100%" style="stop-color:#b91c1c;stop-opacity:0" />
+                                </linearGradient>
+                                <linearGradient id="divProhibitedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#1d4ed8;stop-opacity:0.6" />
+                                    <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:0" />
+                                </linearGradient>
+                            </defs>
+                            
+                            <!-- Grid Lines -->
+                            @for (int i = 0; i <= 5; i++)
+                            {
+                                <line x1="50" y1="@(50 + i * 46)" x2="1150" y2="@(50 + i * 46)" 
+                                      stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" opacity="0.5"/>
+                            }
+                            
+                            @{
+                                var categories = new[] { 
+                                    new { Name = "Minor", Color = "#EAB308", Gradient = "divMinorGradient", Data = categoryTrendData.Select(m => m.MinorCount).ToList() },
+                                    new { Name = "Major", Color = "#EF4444", Gradient = "divMajorGradient", Data = categoryTrendData.Select(m => m.MajorCount).ToList() },
+                                    new { Name = "Prohibited", Color = "#3B82F6", Gradient = "divProhibitedGradient", Data = categoryTrendData.Select(m => m.ProhibitedCount).ToList() }
+                                };
+                                
+                                var maxValue = categoryTrendData.SelectMany(m => new[] { m.MinorCount, m.MajorCount, m.ProhibitedCount }).Max();
+                                if (maxValue == 0) maxValue = 10;
+                            }
+                            
+                            @* First pass: Render all lines and areas *@
+                            @foreach (var cat in categories)
+                            {
+                                var points = new List<string>();
+                                var areaPoints = new List<string>();
+                                
+                                for (int i = 0; i < cat.Data.Count; i++)
+                                {
+                                    double x = 50 + (i * (1100.0 / (cat.Data.Count - 1)));
+                                    double y = 280 - ((double)cat.Data[i] / maxValue * 230);
+                                    points.Add($"{x},{y}");
+                                    
+                                    if (i == 0) areaPoints.Add($"M{x},280");
+                                    areaPoints.Add($"L{x},{y}");
+                                    if (i == cat.Data.Count - 1) areaPoints.Add($"L{x},280 Z");
+                                }
+                                
+                                var linePath = "M" + string.Join(" L", points);
+                                var areaPath = string.Join(" ", areaPoints);
+                                
+                                <!-- Area Fill -->
+                                <path d="@areaPath" fill="url(#@cat.Gradient)" class="category-area-animated"/>
+                                
+                                <!-- Line -->
+                                <path d="@linePath" stroke="@cat.Color" stroke-width="3" fill="none" 
+                                      stroke-linecap="round" stroke-linejoin="round" 
+                                      class="category-line-animated" style="filter: drop-shadow(0px 4px 8px @(cat.Color)66);"/>
+                            }
+                            
+                            @* Second pass: Render dots and labels with overlap handling *@
+                            @for (int monthIndex = 0; monthIndex < categoryTrendData.Count; monthIndex++)
+                            {
+                                double x = 50 + (monthIndex * (1100.0 / (categoryTrendData.Count - 1)));
+                                
+                                // Collect all category values for this month
+                                var monthData = new List<(string Name, string Color, int Value, double Y)>();
+                                foreach (var cat in categories)
+                                {
+                                    int categoryIndex = cat.Name == "Minor" ? 0 : (cat.Name == "Major" ? 1 : 2);
+                                    double y = 280 - ((double)cat.Data[monthIndex] / maxValue * 230);
+                                    monthData.Add((cat.Name, cat.Color, cat.Data[monthIndex], y));
+                                }
+                                
+                                // Group by value to detect overlaps
+                                var valueGroups = monthData.GroupBy(d => d.Value).ToList();
+                                
+                                <!-- Wrap entire month in a group for hover effect -->
+                                <g class="month-group">
+                                    @foreach (var group in valueGroups)
+                                    {
+                                        var items = group.ToList();
+                                        double baseY = items[0].Y;
+                                        
+                                        if (items.Count == 1)
+                                        {
+                                            // Single value - show label with category name and value
+                                            var item = items[0];
+                                            double labelY = baseY - 22; // Position label 22px above dot
+                                            
+                                            <g class="dot-group">
+                                                <circle cx="@x" cy="@baseY" r="5" fill="white" stroke="@item.Color" stroke-width="2.5" 
+                                                        class="category-dot-animated" style="animation-delay: @(monthIndex * 0.1)s;"/>
+                                                
+                                                <!-- Hover label with category name and value -->
+                                                <g class="data-label" style="pointer-events: none;">
+                                                    <rect x="@(x - 40)" y="@(labelY - 24)" width="80" height="32" rx="4" 
+                                                          fill="@item.Color" opacity="0.95" class="label-bg"/>
+                                                    <text x="@x" y="@(labelY - 13)" text-anchor="middle" font-size="14" font-weight="600" fill="white">
+                                                        @item.Name
+                                                    </text>
+                                                    <text x="@x" y="@(labelY - 1)" text-anchor="middle" font-size="15" font-weight="700" fill="white">
+                                                        @item.Value
+                                                    </text>
+                                                </g>
+                                            </g>
+                                        }
+                                        else
+                                        {
+                                            // Multiple categories with same value - show ONE dot but ALL labels on hover
+                                            <g class="dot-group">
+                                                <!-- Single dot for all overlapping values -->
+                                                <circle cx="@x" cy="@baseY" r="5" fill="white" stroke="#888" stroke-width="2.5" 
+                                                        class="category-dot-animated" style="animation-delay: @(monthIndex * 0.1)s;"/>
+                                                
+                                                <!-- Show all labels stacked vertically on hover -->
+                                                @for (int i = 0; i < items.Count; i++)
+                                                {
+                                                    var item = items[i];
+                                                    // Stack labels vertically: 32px spacing between each label
+                                                    double labelY = baseY - 24 - (i * 32);
+                                                    
+                                                    <!-- Connector line from dot to label -->
+                                                    @if (i > 0)
+                                                    {
+                                                        <line x1="@x" y1="@baseY" x2="@x" y2="@(labelY + 6)" 
+                                                              stroke="@item.Color" class="connector-line"/>
+                                                    }
+                                                    
+                                                    <!-- Stacked label with category name and value -->
+                                                    <g class="data-label" style="pointer-events: none;">
+                                                        <rect x="@(x - 40)" y="@(labelY - 24)" width="80" height="32" rx="4" 
+                                                              fill="@item.Color" opacity="0.95" class="label-bg"/>
+                                                        <text x="@x" y="@(labelY - 13)" text-anchor="middle" font-size="14" font-weight="600" fill="white">
+                                                            @item.Name
+                                                        </text>
+                                                        <text x="@x" y="@(labelY - 1)" text-anchor="middle" font-size="15" font-weight="700" fill="white">
+                                                            @item.Value
+                                                        </text>
+                                                    </g>
+                                                }
+                                            </g>
+                                        }
+                                    }
+                                </g>
+                            }
+                            
+                            
+                            <!-- X-Axis Labels -->
+                            @for (int i = 0; i < categoryTrendData.Count; i++)
+                            {
+                                double xPos = 50 + (i * (1100.0 / (categoryTrendData.Count - 1)));
+                                <g>
+                                    <text x="@xPos" y="320" text-anchor="middle" font-size="14" fill="#a3aed0" font-weight="500">
+                                        @categoryTrendData[i].Label
+                                    </text>
+                                </g>
+                            }
+                        </svg>
+                        
+                        <!-- Legend -->
+                        <div class="category-legend">
+                            <div class="legend-item-modern">
+                                <div class="legend-dot" style="background: #EAB308;"></div>
+                                <span>Minor Acts</span>
+                            </div>
+                            <div class="legend-item-modern">
+                                <div class="legend-dot" style="background: #EF4444;"></div>
+                                <span>Major Acts</span>
+                            </div>
+                            <div class="legend-item-modern">
+                                <div class="legend-dot" style="background: #3B82F6;"></div>
+                                <span>Prohibited Acts</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No trend data available</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Prescriptive Actions Section -->
+        @if (prescriptiveActions.Any())
+        {
+            <div class="insights-card prescriptive-card">
+                <div class="insights-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Prescriptive Actions: At-Risk Students</h3>
+                    <span class="insights-subtitle">Evidence-based interventions recommended</span>
+                </div>
+                <div class="prescriptive-table-wrapper">
+                    <table class="prescriptive-table">
+                        <thead>
+                            <tr>
+                                <th>Student Name</th>
+                                <th>School</th>
+                                <th>Risk Level</th>
+                                <th>Incidents</th>
+                                <th>Recommended Action</th>
+                                <th>Responsible Party</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var action in prescriptiveActions.Take(8))
+                            {
+                                <tr>
+                                    <td class="student-name-cell">@action.StudentName</td>
+                                    <td class="school-cell">@action.SchoolName</td>
+                                    <td>
+                                        <span class="risk-badge risk-@action.RiskLevel.ToLower()">
+                                            @action.RiskLevel
+                                        </span>
+                                    </td>
+                                    <td class="incident-count-cell">@action.IncidentCount</td>
+                                    <td class="action-cell">@action.RecommendedAction</td>
+                                    <td class="responsible-cell">@action.ResponsibleParty</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Descriptive Insights Section -->
+        @if (descriptiveInsights.Any())
+        {
+            <div class="insights-card descriptive-card">
+                <div class="insights-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/></svg> Descriptive Insights: Division Analysis</h3>
+                    <span class="insights-subtitle">Key patterns and trends identified</span>
+                </div>
+                <div class="insights-grid">
+                    @foreach (var insight in descriptiveInsights)
+                    {
+                        <div class="insight-item severity-@insight.Severity.ToLower()">
+                            <div class="insight-icon">
+                                @if (insight.Category == "District") {
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                                } else if (insight.Category == "School") {
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                } else {
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                }
+                            </div>
+                            <div class="insight-content">
+                                <h4>@insight.Title</h4>
+                                <p>@insight.Description</p>
+                                @if (insight.Metrics.Any())
+                                {
+                                    <div class="insight-metrics">
+                                        @foreach (var metric in insight.Metrics)
+                                        {
+                                            <div class="metric-item">
+                                                <span class="metric-label">@metric.Key:</span>
+                                                <span class="metric-value">@metric.Value</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Other Charts Grid -->
+        <div class="charts-container">
+
+            <div class="chart-card half-width">
+                <div class="chart-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg> Incidents by District</h3>
+                    <span class="chart-subtitle">@districtData.Count Districts</span>
+                </div>
+                <div class="chart-body">
+                    @if (districtData.Any())
+                    {
+                        <div class="bar-chart-list">
+                            @foreach (var district in districtData.OrderByDescending(d => d.Count))
+                            {
+                                var percentage = districtData.Max(d => d.Count) > 0 ? 
+                                    (district.Count / (double)districtData.Max(d => d.Count) * 100) : 0;
+                                var trend = GetTrendData(district.Name, "district");
+                                var districtTooltip = BuildTooltipContent(
+                                    district.Name,
+                                    "District Summary",
+                                    new List<(string Label, string Value)>
+                                    {
+                                        ("Incidents", district.Count.ToString()),
+                                        ("Trend", GetTrendMetricsText(trend))
+                                    });
+                                
+                                <div class="bar-item"
+                                     @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, districtTooltip, "district"))"
+                                     @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                     @onmouseleave="HideTooltip">
+                                    <div class="bar-header">
+                                        <span class="bar-label">@district.Name</span>
+                                        <span class="trend-indicator @GetTrendClass(trend)">
+                                            @if (trend?.Direction == "up") {
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                                            } else if (trend?.Direction == "down") {
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                                            } else {
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                            }
+                                            @if (trend != null && trend.ChangePercent != 0)
+                                            {
+                                                <span>@Math.Abs(trend.ChangePercent).ToString("F0")%</span>
+                                            }
+                                        </span>
+                                    </div>
+                                    <div class="bar-track">
+                                        <div class="bar-fill bar-fill-district" style="width: @percentage%">
+                                            <span class="bar-value">@district.Count</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No district data available</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Top Schools by Incidents -->
+            <div class="chart-card half-width">
+                <div class="chart-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg> Top Schools by Incidents</h3>
+                    <span class="chart-subtitle">Top 5 Schools</span>
+                </div>
+                <div class="chart-body">
+                    @if (topSchools.Any())
+                    {
+                        <div class="bar-chart-list">
+                            @foreach (var (school, rank) in topSchools.Select((s, i) => (s, i + 1)))
+                            {
+                                var percentage = topSchools.Max(s => s.Count) > 0 ? 
+                                    (school.Count / (double)topSchools.Max(s => s.Count) * 100) : 0;
+                                var schoolData = schoolComparisons.FirstOrDefault(sc => sc.SchoolName == school.Name);
+                                var schoolMetrics = new List<(string Label, string Value)>
+                                {
+                                    ("Total Incidents", school.Count.ToString())
+                                };
+                                if (schoolData != null)
+                                {
+                                    schoolMetrics.Add(("Minor", schoolData.MinorCount.ToString()));
+                                    schoolMetrics.Add(("Major", schoolData.MajorCount.ToString()));
+                                    schoolMetrics.Add(("Prohibited", schoolData.ProhibitedCount.ToString()));
+                                }
+                                var tooltipText = BuildTooltipContent(
+                                    school.Name,
+                                    $"Rank #{rank}",
+                                    schoolMetrics);
+                                
+                                <div class="bar-item"
+                                     @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, tooltipText, "school"))"
+                                     @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                     @onmouseleave="HideTooltip">
+                                    <div class="bar-header">
+                                        <span class="bar-label">
+                                            <span class="rank-badge">@rank</span>
+                                            @school.Name
+                                        </span>
+                                    </div>
+                                    <div class="bar-track">
+                                        <div class="bar-fill bar-fill-school" style="width: @percentage%">
+                                            <span class="bar-value">@school.Count</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No school data available</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Severity Distribution -->
+            <div class="chart-card half-width">
+                <div class="chart-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Severity Distribution</h3>
+                </div>
+                <div class="chart-body donut-container">
+                    @if (totalReports > 0)
+                    {
+                        <svg viewBox="0 0 240 240" class="donut-chart">
+                            @{
+                                var totalMinor = incidentReports.Count(r => r.LevelOfOffense?.Contains("Minor", StringComparison.OrdinalIgnoreCase) ?? false);
+                                var totalMajor = incidentReports.Count(r => r.LevelOfOffense?.Contains("Major", StringComparison.OrdinalIgnoreCase) ?? false);
+                                var totalProhibited = incidentReports.Count(r => r.LevelOfOffense?.Contains("Prohibited", StringComparison.OrdinalIgnoreCase) ?? false);
+                                var severityTotal = totalMinor + totalMajor + totalProhibited;
+                                
+                                if (severityTotal > 0)
+                                {
+                                    double minorAngle = (totalMinor / (double)severityTotal) * 360;
+                                    double majorAngle = (totalMajor / (double)severityTotal) * 360;
+                                    
+                                    var minorPath = GetDonutSlicePath(120, 120, 90, 60, 0, minorAngle);
+                                    var majorPath = GetDonutSlicePath(120, 120, 90, 60, minorAngle, minorAngle + majorAngle);
+                                    var prohibitedPath = GetDonutSlicePath(120, 120, 90, 60, minorAngle + majorAngle, 360);
+                            
+                                    var minorTooltip = BuildTooltipContent(
+                                        "Minor Acts",
+                                        $"{(totalMinor*100.0/severityTotal):F1}% of severity cases",
+                                        new List<(string Label, string Value)>
+                                        {
+                                            ("Incidents", totalMinor.ToString())
+                                        });
+                                    var majorTooltip = BuildTooltipContent(
+                                        "Major Acts",
+                                        $"{(totalMajor*100.0/severityTotal):F1}% of severity cases",
+                                        new List<(string Label, string Value)>
+                                        {
+                                            ("Incidents", totalMajor.ToString())
+                                        });
+                                    var prohibitedTooltip = BuildTooltipContent(
+                                        "Prohibited Acts",
+                                        $"{(totalProhibited*100.0/severityTotal):F1}% of severity cases",
+                                        new List<(string Label, string Value)>
+                                        {
+                                            ("Incidents", totalProhibited.ToString())
+                                        });
+
+                                    <path d="@minorPath" class="donut-slice donut-minor"
+                                          @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, minorTooltip, "minor"))"
+                                          @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                          @onmouseleave="HideTooltip" />
+                                    <path d="@majorPath" class="donut-slice donut-major"
+                                          @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, majorTooltip, "major"))"
+                                          @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                          @onmouseleave="HideTooltip" />
+                                    <path d="@prohibitedPath" class="donut-slice donut-prohibited"
+                                          @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, prohibitedTooltip, "prohibited"))"
+                                          @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                          @onmouseleave="HideTooltip" />
+                                    
+                                    <!-- Center Text -->
+                                    @((MarkupString)"<text x='120' y='115' class='donut-center-label'>Total</text>")
+                                    @((MarkupString)$"<text x='120' y='135' class='donut-center-value'>{severityTotal}</text>")
+                                }
+                            }
+                        </svg>
+                        <div class="donut-legend">
+                            <div class="legend-item">
+                                <div class="legend-square legend-minor"></div>
+                                <span>Minor (@totalMinor)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-square legend-major"></div>
+                                <span>Major (@totalMajor)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-square legend-prohibited"></div>
+                                <span>Prohibited (@totalProhibited)</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No data available</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Status Breakdown -->
+            <div class="chart-card half-width">
+                <div class="chart-header">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><path d="M14 4h7"/><path d="M14 9h7"/><path d="M14 15h7"/><path d="M14 20h7"/></svg> Status Breakdown</h3>
+                </div>
+                <div class="chart-body donut-container">
+                    @if (totalReports > 0)
+                    {
+                        <svg viewBox="0 0 240 240" class="donut-chart">
+                            @{
+                                var underReview = totalReports - pendingReports - resolvedReports;
+                                double pendingAngle = (pendingReports / (double)totalReports) * 360;
+                                double reviewAngle = (underReview / (double)totalReports) * 360;
+                                
+                                var pendingPath = GetDonutSlicePath(120, 120, 90, 60, 0, pendingAngle);
+                                var reviewPath = GetDonutSlicePath(120, 120, 90, 60, pendingAngle, pendingAngle + reviewAngle);
+                                var resolvedPath = GetDonutSlicePath(120, 120, 90, 60, pendingAngle + reviewAngle, 360);
+                            }
+                            
+                            @{
+                                var pendingTooltip = BuildTooltipContent(
+                                    "Pending Cases",
+                                    $"{(pendingReports*100.0/totalReports):F1}% of all incidents",
+                                    new List<(string Label, string Value)>
+                                    {
+                                        ("Incidents", pendingReports.ToString())
+                                    });
+                                var reviewTooltip = BuildTooltipContent(
+                                    "Under Review",
+                                    $"{(underReview*100.0/totalReports):F1}% of all incidents",
+                                    new List<(string Label, string Value)>
+                                    {
+                                        ("Incidents", underReview.ToString())
+                                    });
+                                var resolvedTooltip = BuildTooltipContent(
+                                    "Resolved Cases",
+                                    $"{(resolvedReports*100.0/totalReports):F1}% of all incidents",
+                                    new List<(string Label, string Value)>
+                                    {
+                                        ("Incidents", resolvedReports.ToString())
+                                    });
+                            }
+
+                            @if (pendingReports > 0)
+                            {
+                                <path d="@pendingPath" class="donut-slice donut-pending"
+                                      @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, pendingTooltip, "pending"))"
+                                      @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                      @onmouseleave="HideTooltip" />
+                            }
+                            @if (underReview > 0)
+                            {
+                                <path d="@reviewPath" class="donut-slice donut-review"
+                                      @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, reviewTooltip, "review"))"
+                                      @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                      @onmouseleave="HideTooltip" />
+                            }
+                            @if (resolvedReports > 0)
+                            {
+                                <path d="@resolvedPath" class="donut-slice donut-resolved"
+                                      @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, resolvedTooltip, "resolved"))"
+                                      @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                      @onmouseleave="HideTooltip" />
+                            }
+                            
+                            <!-- Center Text -->
+                            @((MarkupString)"<text x='120' y='115' class='donut-center-label'>Total</text>")
+                            @((MarkupString)$"<text x='120' y='135' class='donut-center-value'>{totalReports}</text>")
+                        </svg>
+                        <div class="donut-legend">
+                            <div class="legend-item">
+                                <div class="legend-square legend-pending"></div>
+                                <span>Pending (@pendingReports)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-square legend-review"></div>
+                                <span>Review (@underReview)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-square legend-resolved"></div>
+                                <span>Resolved (@resolvedReports)</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No data available</p>
+                    }
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Expandable School Comparison Panel -->
+        <div class="expandable-panel @(isPanelExpanded ? "expanded" : "")">
+            <div class="panel-header" @onclick="TogglePanel">
+                <div class="panel-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <h3>School Comparison Analysis</h3>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="panel-toggle-icon"><polyline points="@(isPanelExpanded ? "18 15 12 9 6 15" : "6 9 12 15 18 9")"/></svg>
+            </div>
+            
+            @if (isPanelExpanded)
+            {
+                <div class="panel-content">
+                    <!-- School Comparison Table -->
+                    <div class="comparison-section">
+                        <h4><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Incidents Per School</h4>
+                        <div class="comparison-table-wrapper">
+                            <table class="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th>School Name</th>
+                                        <th>Total</th>
+                                        <th>Minor</th>
+                                        <th>Major</th>
+                                        <th>Prohibited</th>
+                                        <th>Trend</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var school in schoolComparisons.OrderByDescending(s => s.TotalIncidents).Take(15))
+                                    {
+                                        var trend = school.Trend;
+                                        <tr>
+                                            <td class="school-name-cell">@school.SchoolName</td>
+                                            <td class="total-cell">@school.TotalIncidents</td>
+                                            <td>@school.MinorCount</td>
+                                            <td>@school.MajorCount</td>
+                                            <td>@school.ProhibitedCount</td>
+                                            <td class="trend-cell">
+                                                <span class="trend-indicator @GetTrendClass(trend)">
+                                                    @if (trend?.Direction == "up") {
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                                                    } else if (trend?.Direction == "down") {
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                                                    } else {
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                                    }
+                                                    @if (trend != null && trend.ChangePercent != 0)
+                                                    {
+                                                        <span>@Math.Abs(trend.ChangePercent).ToString("F0")%</span>
+                                                    }
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Category Heatmap -->
+                    <div class="comparison-section">
+                        <h4><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Category Heatmap</h4>
+                        <div class="heatmap-container">
+                            <div class="heatmap-grid">
+                                <div class="heatmap-header">
+                                    <div class="heatmap-cell header-cell"></div>
+                                    <div class="heatmap-cell header-cell">Minor</div>
+                                    <div class="heatmap-cell header-cell">Major</div>
+                                    <div class="heatmap-cell header-cell">Prohibited</div>
+                                </div>
+                                @foreach (var school in schoolComparisons.OrderByDescending(s => s.TotalIncidents).Take(10))
+                                {
+                                    var maxCount = Math.Max(school.MinorCount, Math.Max(school.MajorCount, school.ProhibitedCount));
+                                    <div class="heatmap-row">
+                                        <div class="heatmap-cell school-cell">@school.SchoolName</div>
+                                        @{
+                                            var heatmapMinorTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Minor Acts",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.MinorCount.ToString())
+                                                });
+                                            var heatmapMajorTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Major Acts",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.MajorCount.ToString())
+                                                });
+                                            var heatmapProhibitedTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Prohibited Acts",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.ProhibitedCount.ToString())
+                                                });
+                                        }
+                                        <div class="heatmap-cell data-cell" 
+                                             style="background-color: @GetHeatmapColor(school.MinorCount, maxCount, "#6AD2FF")"
+                                             @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, heatmapMinorTooltip, "heatmap"))"
+                                             @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                             @onmouseleave="HideTooltip">
+                                            @school.MinorCount
+                                        </div>
+                                        <div class="heatmap-cell data-cell" 
+                                             style="background-color: @GetHeatmapColor(school.MajorCount, maxCount, "#A78BFA")"
+                                             @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, heatmapMajorTooltip, "heatmap"))"
+                                             @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                             @onmouseleave="HideTooltip">
+                                            @school.MajorCount
+                                        </div>
+                                        <div class="heatmap-cell data-cell" 
+                                             style="background-color: @GetHeatmapColor(school.ProhibitedCount, maxCount, "#34D399")"
+                                             @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, heatmapProhibitedTooltip, "heatmap"))"
+                                             @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                             @onmouseleave="HideTooltip">
+                                            @school.ProhibitedCount
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Minor vs Major Breakdown -->
+                    <div class="comparison-section">
+                        <h4><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Severity Breakdown: Minor, Major & Prohibited Acts</h4>
+                        <div class="stacked-bar-legend" style="display: flex; gap: 20px; margin-bottom: 20px; font-size: 14px; padding-left: 10px;">
+                            <div class="legend-item" style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 14px; height: 14px; background: #EAB308; border-radius: 2px;"></div>
+                                <span>Minor Acts</span>
+                            </div>
+                            <div class="legend-item" style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 14px; height: 14px; background: #EF4444; border-radius: 2px;"></div>
+                                <span>Major Acts</span>
+                            </div>
+                            <div class="legend-item" style="display: flex; align-items: center; gap: 8px;">
+                                <div style="width: 14px; height: 14px; background: #3B82F6; border-radius: 2px;"></div>
+                                <span>Prohibited Acts</span>
+                            </div>
+                        </div>
+                        <div class="stacked-bars-container">
+                            @foreach (var school in schoolComparisons.OrderByDescending(s => s.TotalIncidents).Take(10))
+                            {
+                                var total = school.TotalIncidents > 0 ? school.TotalIncidents : 1;
+                                var minorPercent = (school.MinorCount / (double)total) * 100;
+                                var majorPercent = (school.MajorCount / (double)total) * 100;
+                                var prohibitedPercent = (school.ProhibitedCount / (double)total) * 100;
+                                
+                                <div class="stacked-bar-item">
+                                    <div class="stacked-bar-label">@school.SchoolName</div>
+                                    <div class="stacked-bar-track">
+                                        @if (school.MinorCount > 0)
+                                        {
+                                            var stackedMinorTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Minor Acts Share",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.MinorCount.ToString()),
+                                                    ("Percent", $"{minorPercent:F1}%")
+                                                });
+                                            <div class="stacked-segment segment-minor" 
+                                                 style="width: @minorPercent%"
+                                                 @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, stackedMinorTooltip, "minor"))"
+                                                 @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                                 @onmouseleave="HideTooltip">
+                                                @if (minorPercent > 10) { <span>@school.MinorCount</span> }
+                                            </div>
+                                        }
+                                        @if (school.MajorCount > 0)
+                                        {
+                                            var stackedMajorTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Major Acts Share",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.MajorCount.ToString()),
+                                                    ("Percent", $"{majorPercent:F1}%")
+                                                });
+                                            <div class="stacked-segment segment-major" 
+                                                 style="width: @majorPercent%"
+                                                 @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, stackedMajorTooltip, "major"))"
+                                                 @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                                 @onmouseleave="HideTooltip">
+                                                @if (majorPercent > 10) { <span>@school.MajorCount</span> }
+                                            </div>
+                                        }
+                                        @if (school.ProhibitedCount > 0)
+                                        {
+                                            var stackedProhibitedTooltip = BuildTooltipContent(
+                                                school.SchoolName,
+                                                "Prohibited Acts Share",
+                                                new List<(string Label, string Value)>
+                                                {
+                                                    ("Incidents", school.ProhibitedCount.ToString()),
+                                                    ("Percent", $"{prohibitedPercent:F1}%")
+                                                });
+                                            <div class="stacked-segment segment-prohibited" 
+                                                 style="width: @prohibitedPercent%"
+                                                 @onmouseenter="@((MouseEventArgs e) => ShowTooltip(e, stackedProhibitedTooltip, "prohibited"))"
+                                                 @onmousemove="@((MouseEventArgs e) => UpdateTooltipPosition(e))"
+                                                 @onmouseleave="HideTooltip">
+                                                @if (prohibitedPercent > 10) { <span>@school.ProhibitedCount</span> }
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="stacked-bar-total">@school.TotalIncidents</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="reports-table-card">
+            <div class="table-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; vertical-align: middle;"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h10"/></svg> Incident Reports This Week</h3>
+                <span class="table-subtitle">Division Wide</span>
+            </div>
+            <div class="table-wrapper recent-reports-scroll">
+                <table class="reports-table">
+                    <thead>
+                        <tr>
+                            <th>School</th>
+                            <th>Complainant</th>
+                            <th>Incident Type</th>
+                            <th>Respondent</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var startOfWeek = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+                        }
+                        @foreach (var report in incidentReports.Where(r => r.DateReported >= startOfWeek).Take(20))
+                        {
+                            <tr>
+                                <td>@report.SchoolName</td>
+                                <td>@MaskName(report.ComplainantName)</td>
+                                <td>@(string.IsNullOrEmpty(report.IncidentType) ? "–" : report.IncidentType)</td>
+                                <td>@(string.IsNullOrEmpty(report.RespondentName) ? "N/A" : MaskName(report.RespondentName))</td>
+                                <td>@report.DateReported.ToString("MMM dd, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tooltip -->
+        @if (showTooltip)
+        {
+            <div class="custom-tooltip" style="left: @tooltipX; top: @tooltipY;">
+                <div class="tooltip-content" style="@tooltipColorStyle">
+                    @((MarkupString)tooltipText)
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool isAuthenticated;
+    private bool isDivisionUser;
+    private bool isLoading = true;
+    private bool isCheckingAuth = true;
+
+    private string? divisionName;
+    private string? regionName;
+
+    private List<IncidentReportSummary> incidentReports = new();
+    private List<School> schools = new();
+    
+    // Stats
+    private int totalReports;
+    private int pendingReports;
+    private int resolvedReports;
+    private int schoolsWithIncidents;
+    private int schoolsHighVolume;
+
+    // Chart Data
+    private List<CategoryTrendMonth> categoryTrendData = new();
+    private List<DataCount> districtData = new();
+    private List<DataCount> topSchools = new();
+    private List<SchoolComparisonData> schoolComparisons = new();
+    private Dictionary<string, TrendData> districtTrends = new();
+    private List<PrescriptiveAction> prescriptiveActions = new();
+    private List<DescriptiveInsight> descriptiveInsights = new();
+    
+    // New Descriptive Analytics
+    private int totalLearnersInvolved;
+    private string gradeLevelsDisplay = "";
+    private List<ClassificationStat> offensesSummary = new();
+    private List<SchoolDistributionStat> schoolDistribution = new();
+    
+    // Panel State
+    private bool isPanelExpanded = false;
+    
+    // Tooltip
+    private bool showTooltip = false;
+    private string tooltipText = "";
+    private string tooltipX = "0px";
+    private string tooltipY = "0px";
+    private string tooltipColorStyle = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthentication();
+        if (isAuthenticated && isDivisionUser)
+        {
+            await LoadDivisionContext();
+            await LoadData();
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var role = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            isAuthenticated = !string.IsNullOrEmpty(token);
+            isDivisionUser = !string.IsNullOrEmpty(role) && role.Equals("division", StringComparison.OrdinalIgnoreCase);
+        }
+        catch 
+        { 
+            isAuthenticated = false;
+            isDivisionUser = false;
+        }
+        finally
+        {
+            isCheckingAuth = false;
+        }
+    }
+
+    private async Task LoadDivisionContext()
+    {
+        try
+        {
+            var adminAccountIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "adminAccountID");
+            if (int.TryParse(adminAccountIdStr, out var adminAccountId) && adminAccountId > 0)
+            {
+                var response = await Http.GetAsync($"api/Admin/accounts/{adminAccountId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var accountResponse = JsonSerializer.Deserialize<ApiResponse<AdminAccount>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (accountResponse?.Success == true && accountResponse.Data != null)
+                    {
+                        var account = accountResponse.Data;
+                        // Prefer Division property, then DivisionName
+                        divisionName = (account.Division ?? account.DivisionName)?.Trim();
+                        regionName = account.Region?.Trim();
+                    }
+                }
+            }
+        }
+        catch { /* Ignore */ }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            // 1. Load Incident Reports for Division
+            var queryParams = new List<string>();
+            
+            // DEBUG: Log what division we're filtering by
+            await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: divisionName = '{divisionName}'");
+            
+            if (!string.IsNullOrEmpty(divisionName)) queryParams.Add($"division={Uri.EscapeDataString(divisionName)}");
+            
+            // Fix: Increase page size to fetch all records for correct client-side stats
+            queryParams.Add("pageSize=10000");
+            
+            var url = "api/IncidentReport" + (queryParams.Any() ? "?" + string.Join("&", queryParams) : "");
+            
+            // DEBUG: Log the URL being called
+            await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: API URL = '{url}'");
+            
+            var response = await Http.GetAsync(url);
+            
+            // DEBUG: Log response status
+            await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: Response Status = {response.StatusCode}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                
+                // DEBUG: Log raw response
+                await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: Raw response length = {content.Length}");
+                
+                var result = JsonSerializer.Deserialize<ApiResponse<List<IncidentReportSummary>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result?.Success == true && result.Data != null)
+                {
+                    // DEBUG: Log data before filtering
+                    await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: Total records from API = {result.Data.Count}");
+                    
+                    // Log first few records to see what we have
+                    foreach (var r in result.Data.Take(3))
+                    {
+                        await JSRuntime.InvokeVoidAsync("console.log", $"  Record: Status={r.Status}, Division={r.Division}, School={r.SchoolName}");
+                    }
+                    
+                    incidentReports = result.Data
+                        .OrderByDescending(r => r.DateReported)
+                        .ToList();
+                    
+                    // DEBUG: Log count after filtering
+                    await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: Resolved records = {incidentReports.Count}");
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("console.log", $"DivisionDashboard: API returned Success={result?.Success}, Data is null={result?.Data == null}");
+                }
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", $"DivisionDashboard: API call failed with status {response.StatusCode}");
+            }
+
+            // 2. Load Schools in Division
+            if (!string.IsNullOrEmpty(divisionName))
+            {
+                var schoolsUrl = $"api/Admin/schools/by-division/{Uri.EscapeDataString(divisionName)}";
+                var schoolsResponse = await Http.GetAsync(schoolsUrl);
+                if (schoolsResponse.IsSuccessStatusCode)
+                {
+                    var schoolsContent = await schoolsResponse.Content.ReadAsStringAsync();
+                    var schoolsResult = JsonSerializer.Deserialize<ApiResponse<List<School>>>(schoolsContent, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (schoolsResult?.Success == true && schoolsResult.Data != null)
+                    {
+                        schools = schoolsResult.Data;
+                    }
+                }
+            }
+
+            ProcessAnalytics();
+        }
+        catch { /* Ignore */ }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ProcessAnalytics()
+    {
+        totalReports = incidentReports.Count;
+        pendingReports = incidentReports.Count(r => r.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
+        resolvedReports = incidentReports.Count(r => r.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase));
+
+        // Schools with incidents
+        schoolsWithIncidents = incidentReports.Select(r => r.SchoolName).Distinct().Count();
+        
+        // Schools with high volume (>10 incidents)
+        var incidentsBySchool = incidentReports.GroupBy(r => r.SchoolName).Select(g => g.Count());
+        schoolsHighVolume = incidentsBySchool.Count(count => count > 10);
+
+        // Category Trend Data - Use LevelOfOffense from studentprofilecaserecords
+        var now = DateTime.Now;
+        var last12Months = Enumerable.Range(0, 12).Select(i => now.AddMonths(-11 + i)).ToList();
+        
+        categoryTrendData = last12Months.Select(date => new CategoryTrendMonth
+        {
+            Month = date.ToString("MMM"),
+            Label = date.ToString("MMMM"),
+            MonthNumber = date.Month,
+            MinorCount = incidentReports.Count(r => 
+                IsValidForTrend(r) &&
+                r.DateReported.Month == date.Month && 
+                r.DateReported.Year == date.Year &&
+                (r.LevelOfOffense?.Contains("Minor", StringComparison.OrdinalIgnoreCase) ?? false)),
+            MajorCount = incidentReports.Count(r => 
+                IsValidForTrend(r) &&
+                r.DateReported.Month == date.Month && 
+                r.DateReported.Year == date.Year &&
+                (r.LevelOfOffense?.Contains("Major", StringComparison.OrdinalIgnoreCase) ?? false)),
+            ProhibitedCount = incidentReports.Count(r => 
+                IsValidForTrend(r) &&
+                r.DateReported.Month == date.Month && 
+                r.DateReported.Year == date.Year &&
+                (r.LevelOfOffense?.Contains("Prohibited", StringComparison.OrdinalIgnoreCase) ?? false))
+        }).OrderBy(m => m.MonthNumber).ToList();
+        
+        // District Data with Trends
+        var currentMonth = now.Month;
+        var currentYear = now.Year;
+        var previousMonth = now.AddMonths(-1).Month;
+        var previousYear = now.AddMonths(-1).Year;
+        
+        // Get all unique district names from loaded schools
+        var allDistricts = schools
+            .Where(s => !string.IsNullOrEmpty(s.District))
+            .Select(s => s.District)
+            .Distinct()
+            .ToList();
+
+        // Group incident reports by district
+        var incidentGroups = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.District))
+            .GroupBy(r => r.District)
+            .ToDictionary(g => g.Key!, g => g.Count());
+
+        // Create DataCount for each available district
+        districtData = allDistricts
+            .Select(d => new DataCount { 
+                Name = d, 
+                Count = incidentGroups.ContainsKey(d) ? incidentGroups[d] : 0 
+            })
+            .OrderByDescending(d => d.Count)
+            .ThenBy(d => d.Name)
+            .ToList();
+        
+        // Calculate district trends
+        foreach (var district in districtData)
+        {
+            var currentCount = incidentReports.Count(r => 
+                IsValidForTrend(r) &&
+                r.District == district.Name && 
+                r.DateReported.Month == currentMonth && 
+                r.DateReported.Year == currentYear);
+            var previousCount = incidentReports.Count(r => 
+                IsValidForTrend(r) &&
+                r.District == district.Name && 
+                r.DateReported.Month == previousMonth && 
+                r.DateReported.Year == previousYear);
+            
+            districtTrends[district.Name] = CalculateTrend(currentCount, previousCount);
+        }
+        
+        // Top Schools
+        topSchools = incidentReports
+            .GroupBy(r => r.SchoolName)
+            .Select(g => new DataCount { Name = g.Key, Count = g.Count() })
+            .OrderByDescending(s => s.Count)
+            .Take(5)
+            .ToList();
+        
+        // School Comparison Data - Use LevelOfOffense
+        schoolComparisons = incidentReports
+            .GroupBy(r => r.SchoolName)
+            .Select(g => {
+                var schoolIncidents = g.ToList();
+                var currentCount = schoolIncidents.Count(r => 
+                    IsValidForTrend(r) &&
+                    r.DateReported.Month == currentMonth && 
+                    r.DateReported.Year == currentYear);
+                var previousCount = schoolIncidents.Count(r => 
+                    IsValidForTrend(r) &&
+                    r.DateReported.Month == previousMonth && 
+                    r.DateReported.Year == previousYear);
+                
+                return new SchoolComparisonData
+                {
+                    SchoolName = g.Key,
+                    TotalIncidents = g.Count(),
+                    MinorCount = schoolIncidents.Count(r => r.LevelOfOffense?.Contains("Minor", StringComparison.OrdinalIgnoreCase) ?? false),
+                    MajorCount = schoolIncidents.Count(r => r.LevelOfOffense?.Contains("Major", StringComparison.OrdinalIgnoreCase) ?? false),
+                    ProhibitedCount = schoolIncidents.Count(r => r.LevelOfOffense?.Contains("Prohibited", StringComparison.OrdinalIgnoreCase) ?? false),
+                    Trend = CalculateTrend(currentCount, previousCount),
+                    CategoryBreakdown = new Dictionary<string, int>(),
+                    CurrentYearCount = schoolIncidents.Count(r => r.DateReported.Year == currentYear),
+                    PreviousYearCount = schoolIncidents.Count(r => r.DateReported.Year == currentYear - 1)
+                };
+            })
+            .ToList();
+        
+        // Generate Prescriptive Actions and Descriptive Insights
+        GeneratePrescriptiveActions();
+        GenerateDescriptiveInsights();
+        CalculateDescriptiveAnalytics();
+    }
+
+    private void CalculateDescriptiveAnalytics()
+    {
+        // 1. Total Learners Involved
+        totalLearnersInvolved = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.RespondentName))
+            .Select(r => r.RespondentName.Trim().ToLower())
+            .Distinct()
+            .Count();
+
+        // 2. Grade Levels Display
+        var distinctGrades = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.GradeLevel))
+            .Select(r => r.GradeLevel.Trim())
+            .Distinct()
+            .OrderBy(g => g)
+            .ToList();
+        
+        if (distinctGrades.Any())
+        {
+            gradeLevelsDisplay = string.Join(" & ", distinctGrades);
+        }
+        else
+        {
+            gradeLevelsDisplay = "N/A";
+        }
+
+        // 3. Offenses by Classification
+        var minorCount = incidentReports.Count(r => r.LevelOfOffense?.Contains("Minor", StringComparison.OrdinalIgnoreCase) ?? false);
+        var majorCount = incidentReports.Count(r => r.LevelOfOffense?.Contains("Major", StringComparison.OrdinalIgnoreCase) ?? false);
+        var prohibitedCount = incidentReports.Count(r => r.LevelOfOffense?.Contains("Prohibited", StringComparison.OrdinalIgnoreCase) ?? false);
+        var totalClassified = minorCount + majorCount + prohibitedCount;
+
+        offensesSummary = new List<ClassificationStat>
+        {
+            new ClassificationStat { Type = "Minor Offenses", Count = minorCount, Percentage = totalClassified > 0 ? (minorCount * 100.0 / totalClassified) : 0 },
+            new ClassificationStat { Type = "Major Offenses", Count = majorCount, Percentage = totalClassified > 0 ? (majorCount * 100.0 / totalClassified) : 0 },
+            new ClassificationStat { Type = "Prohibited Acts", Count = prohibitedCount, Percentage = totalClassified > 0 ? (prohibitedCount * 100.0 / totalClassified) : 0 }
+        };
+
+        // 4. Distribution by School
+        var schoolsWithCaseCounts = incidentReports
+            .GroupBy(r => r.SchoolName)
+            .Select(g => new { SchoolName = g.Key, Count = g.Count() })
+            .OrderByDescending(s => s.Count)
+            .ToList();
+
+        if (schoolsWithCaseCounts.Any())
+        {
+            var topSchool = schoolsWithCaseCounts.First();
+            var others = schoolsWithCaseCounts.Skip(1).ToList();
+            var othersCount = others.Sum(o => o.Count);
+            var totalCases = topSchool.Count + othersCount;
+
+            schoolDistribution = new List<SchoolDistributionStat>
+            {
+                new SchoolDistributionStat { 
+                    Category = $"High-Enrolment {topSchool.SchoolName}", 
+                    Count = topSchool.Count, 
+                    Percentage = totalCases > 0 ? (topSchool.Count * 100.0 / totalCases) : 0 
+                }
+            };
+
+            if (others.Any())
+            {
+                schoolDistribution.Add(new SchoolDistributionStat { 
+                    Category = $"Other {others.Count} Schools", 
+                    Count = othersCount, 
+                    Percentage = totalCases > 0 ? (othersCount * 100.0 / totalCases) : 0 
+                });
+            }
+        }
+    }
+
+    private TrendData CalculateTrend(int current, int previous)
+    {
+        var change = current - previous;
+        var changePercent = previous > 0 ? (change / (double)previous * 100) : (current > 0 ? 100 : 0);
+        
+        string direction;
+        if (Math.Abs(changePercent) < 5) direction = "stable";
+        else if (change > 0) direction = "up";
+        else direction = "down";
+        
+        return new TrendData
+        {
+            CurrentCount = current,
+            PreviousCount = previous,
+            Direction = direction,
+            ChangePercent = changePercent
+        };
+    }
+
+    private bool IsValidForTrend(IncidentReportSummary r)
+    {
+        // Exclude Pending and Rejected statuses from trend analysis
+        return !string.IsNullOrEmpty(r.Status) && 
+               !r.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase) && 
+               !r.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void GeneratePrescriptiveActions()
+    {
+        prescriptiveActions.Clear();
+        
+        // Identify students with multiple incidents (repeat offenders)
+        var studentIncidents = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.RespondentName))
+            .GroupBy(r => new { StudentName = r.RespondentName, r.SchoolName })
+            .Select(g => new
+            {
+                StudentName = g.Key.StudentName,
+                SchoolName = g.Key.SchoolName,
+                IncidentCount = g.Count(),
+                LastIncident = g.Max(r => r.DateReported),
+                HasMajor = g.Any(r => r.LevelOfOffense?.Contains("Major", StringComparison.OrdinalIgnoreCase) ?? false),
+                HasProhibited = g.Any(r => r.LevelOfOffense?.Contains("Prohibited", StringComparison.OrdinalIgnoreCase) ?? false)
+            })
+            .Where(s => s.IncidentCount >= 2) // At least 2 incidents
+            .OrderByDescending(s => s.IncidentCount)
+            .ThenByDescending(s => s.LastIncident)
+            .Take(10)
+            .ToList();
+        
+        foreach (var student in studentIncidents)
+        {
+            string riskLevel;
+            string recommendedAction;
+            string responsibleParty;
+            
+            // Determine risk level and recommended action
+            if (student.IncidentCount >= 4 || student.HasProhibited)
+            {
+                riskLevel = "High";
+                recommendedAction = "Mandatory Parent-School Attendance Contract";
+                responsibleParty = "School Head & Guidance Counselor";
+            }
+            else if (student.IncidentCount >= 3 || student.HasMajor)
+            {
+                riskLevel = "High";
+                recommendedAction = "Intensive Counseling & Behavioral Intervention";
+                responsibleParty = "Guidance Counselor";
+            }
+            else
+            {
+                riskLevel = "Medium";
+                recommendedAction = "Parent Conference & Monitoring";
+                responsibleParty = "Class Adviser";
+            }
+            
+            prescriptiveActions.Add(new PrescriptiveAction
+            {
+                StudentName = student.StudentName,
+                SchoolName = student.SchoolName,
+                RiskLevel = riskLevel,
+                RecommendedAction = recommendedAction,
+                ResponsibleParty = responsibleParty,
+                IncidentCount = student.IncidentCount,
+                LastIncidentDate = student.LastIncident
+            });
+        }
+    }
+
+    private void GenerateDescriptiveInsights()
+    {
+        descriptiveInsights.Clear();
+        
+        // Insight 1: District with highest repeat offender rate
+        var districtRepeatOffenders = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.District) && !string.IsNullOrEmpty(r.RespondentName))
+            .GroupBy(r => r.District)
+            .Select(g => new
+            {
+                District = g.Key,
+                TotalIncidents = g.Count(),
+                RepeatOffenders = g.GroupBy(r => r.RespondentName).Count(sg => sg.Count() > 1),
+                TotalStudents = g.Select(r => r.RespondentName).Distinct().Count()
+            })
+            .Where(d => d.TotalIncidents > 0)
+            .OrderByDescending(d => d.RepeatOffenders / (double)d.TotalStudents)
+            .FirstOrDefault();
+        
+        if (districtRepeatOffenders != null && districtRepeatOffenders.TotalIncidents >= 5)
+        {
+            var repeatRate = (districtRepeatOffenders.RepeatOffenders / (double)districtRepeatOffenders.TotalStudents * 100);
+            descriptiveInsights.Add(new DescriptiveInsight
+            {
+                Title = $"{districtRepeatOffenders.District}: High Repeat Offender Rate",
+                Description = $"{districtRepeatOffenders.District} has a moderate incident volume ({districtRepeatOffenders.TotalIncidents} incidents) but a high percentage of repeat offenders ({repeatRate:F0}% of students have multiple incidents).",
+                Category = "District",
+                Severity = "Warning",
+                Metrics = new Dictionary<string, string>
+                {
+                    { "Total Incidents", districtRepeatOffenders.TotalIncidents.ToString() },
+                    { "Repeat Offenders", districtRepeatOffenders.RepeatOffenders.ToString() },
+                    { "Repeat Rate", $"{repeatRate:F0}%" }
+                }
+            });
+        }
+        
+        // Insight 2: District with longest average resolution time
+        var now = DateTime.Now;
+        var districtResolutionTimes = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.District) && r.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(r => r.District)
+            .Select(g => new
+            {
+                District = g.Key,
+                TotalResolved = g.Count(),
+                AvgDaysToResolve = g.Average(r => (now - r.DateReported).TotalDays)
+            })
+            .Where(d => d.TotalResolved >= 3)
+            .OrderByDescending(d => d.AvgDaysToResolve)
+            .FirstOrDefault();
+        
+        if (districtResolutionTimes != null)
+        {
+            descriptiveInsights.Add(new DescriptiveInsight
+            {
+                Title = $"{districtResolutionTimes.District}: Extended Resolution Times",
+                Description = $"{districtResolutionTimes.District} has the longest average resolution time ({districtResolutionTimes.AvgDaysToResolve:F0} days), suggesting delays in the CPC process or case complexity.",
+                Category = "District",
+                Severity = districtResolutionTimes.AvgDaysToResolve > 30 ? "Critical" : "Warning",
+                Metrics = new Dictionary<string, string>
+                {
+                    { "Avg Resolution Time", $"{districtResolutionTimes.AvgDaysToResolve:F0} days" },
+                    { "Resolved Cases", districtResolutionTimes.TotalResolved.ToString() }
+                }
+            });
+        }
+        
+        // Insight 3: Most common incident type across division
+        var incidentTypeAnalysis = incidentReports
+            .Where(r => !string.IsNullOrEmpty(r.IncidentType))
+            .GroupBy(r => r.IncidentType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .OrderByDescending(t => t.Count)
+            .FirstOrDefault();
+        
+        if (incidentTypeAnalysis != null && incidentTypeAnalysis.Count >= 5)
+        {
+            var percentage = (incidentTypeAnalysis.Count / (double)totalReports * 100);
+            descriptiveInsights.Add(new DescriptiveInsight
+            {
+                Title = $"Predominant Incident Type: {incidentTypeAnalysis.Type}",
+                Description = $"{incidentTypeAnalysis.Type} accounts for {percentage:F0}% of all incidents across the division, indicating a systemic pattern requiring targeted intervention.",
+                Category = "Incident",
+                Severity = percentage > 40 ? "Warning" : "Info",
+                Metrics = new Dictionary<string, string>
+                {
+                    { "Incident Count", incidentTypeAnalysis.Count.ToString() },
+                    { "Percentage", $"{percentage:F0}%" }
+                }
+            });
+        }
+        
+        // Insight 4: Schools with increasing trend
+        var schoolsIncreasing = schoolComparisons
+            .Where(s => s.Trend != null && s.Trend.Direction == "up" && s.Trend.ChangePercent > 50)
+            .OrderByDescending(s => s.Trend.ChangePercent)
+            .Take(3)
+            .ToList();
+        
+        if (schoolsIncreasing.Any())
+        {
+            var schoolNames = string.Join(", ", schoolsIncreasing.Select(s => s.SchoolName));
+            descriptiveInsights.Add(new DescriptiveInsight
+            {
+                Title = "Schools with Rapid Incident Increase",
+                Description = $"The following schools show a significant increase in incidents (>50% from last month): {schoolNames}. Immediate attention recommended.",
+                Category = "School",
+                Severity = "Critical",
+                Metrics = new Dictionary<string, string>
+                {
+                    { "Schools Affected", schoolsIncreasing.Count.ToString() },
+                    { "Highest Increase", $"{schoolsIncreasing.First().Trend.ChangePercent:F0}%" }
+                }
+            });
+        }
+    }
+
+    private TrendData? GetTrendData(string name, string type)
+    {
+        if (type == "district" && districtTrends.ContainsKey(name))
+            return districtTrends[name];
+        
+        var school = schoolComparisons.FirstOrDefault(s => s.SchoolName == name);
+        return school?.Trend;
+    }
+
+    private string GetTrendClass(TrendData? trend)
+    {
+        if (trend == null) return "trend-stable";
+        return $"trend-{trend.Direction}";
+    }
+
+
+    private string GetTrendText(TrendData? trend)
+    {
+        if (trend == null) return "";
+        if (trend.Direction == "stable") return "(stable)";
+        var sign = trend.ChangePercent > 0 ? "+" : "";
+        return $"({sign}{trend.ChangePercent:F0}% from last month)";
+    }
+
+    private string GetTrendMetricsText(TrendData? trend)
+    {
+        if (trend == null) return "No change";
+        var direction = trend.Direction switch
+        {
+            "up" => "Increasing",
+            "down" => "Decreasing",
+            _ => "Stable"
+        };
+        var percent = trend.ChangePercent == 0 ? "0%" : $"{trend.ChangePercent:+0;-0;0}%";
+        return $"{direction} {percent}";
+    }
+
+    private string GetHeatmapColor(int value, int maxValue, string baseColor)
+    {
+        if (maxValue == 0) return "#F5F5F5";
+        var intensity = value / (double)maxValue;
+        
+        // Convert hex to RGB and apply opacity
+        var hex = baseColor.TrimStart('#');
+        var r = Convert.ToInt32(hex.Substring(0, 2), 16);
+        var g = Convert.ToInt32(hex.Substring(2, 2), 16);
+        var b = Convert.ToInt32(hex.Substring(4, 2), 16);
+        
+        return $"rgba({r}, {g}, {b}, {0.2 + (intensity * 0.8)})";
+    }
+
+
+    private string BuildTooltipContent(string title, string? subtitle = null, IEnumerable<(string Label, string Value)>? metrics = null)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"<div class='tooltip-title'>{title}</div>");
+        if (!string.IsNullOrWhiteSpace(subtitle))
+        {
+            sb.Append($"<div class='tooltip-subtitle'>{subtitle}</div>");
+        }
+        if (metrics != null)
+        {
+            sb.Append("<div class='tooltip-metrics'>");
+            foreach (var (label, value) in metrics)
+            {
+                sb.Append($"<div class='tooltip-metric'><span>{label}</span><strong>{value}</strong></div>");
+            }
+            sb.Append("</div>");
+        }
+
+        return sb.ToString();
+    }
+
+    private string GetTooltipBorderStyle(string category) => category switch
+    {
+        "minor" => "border-left: 4px solid #EAB308;",
+        "major" => "border-left: 4px solid #EF4444;",
+        "prohibited" => "border-left: 4px solid #3B82F6;",
+        "pending" => "border-left: 4px solid #FFB84D;",
+        "review" => "border-left: 4px solid #4ECDC4;",
+        "resolved" => "border-left: 4px solid #6BCF7F;",
+        "district" => "border-left: 4px solid #1d4ed8;",
+        "school" => "border-left: 4px solid #b91c1c;",
+        "heatmap" => "border-left: 4px solid #3B82F6;",
+        _ => ""
+    };
+
+    private void TogglePanel()
+    {
+        isPanelExpanded = !isPanelExpanded;
+    }
+
+    private void ShowTooltip(MouseEventArgs e, string text, string category)
+    {
+        tooltipText = text;
+        showTooltip = true;
+        tooltipColorStyle = GetTooltipBorderStyle(category);
+        UpdateTooltipPosition(e);
+    }
+    
+    // Overload for other charts that don't need mouse tracking
+    private void ShowTooltip(string text, string category = "")
+    {
+        tooltipText = text;
+        showTooltip = true;
+        tooltipColorStyle = GetTooltipBorderStyle(category);
+        // Position at top-center for non-tracked tooltips
+        tooltipX = "50%";
+        tooltipY = "20px";
+    }
+    
+    private void UpdateTooltipPosition(MouseEventArgs e)
+    {
+        if (!showTooltip) return;
+        
+        // Position tooltip slightly above and to the right of cursor
+        var offsetX = 10;
+        var offsetY = -35; // Above the cursor
+        
+        tooltipX = $"{e.ClientX + offsetX}px";
+        tooltipY = $"{e.ClientY + offsetY}px";
+    }
+
+    private void HideTooltip()
+    {
+        showTooltip = false;
+        tooltipColorStyle = "";
+    }
+
+    private string GetCategoryLinePath(List<CategoryTrendMonth> data, string category, double width, double height)
+    {
+        if (data.Count < 2) return "";
+        
+        var maxValue = GetMaxCategoryValue();
+        if (maxValue == 0) maxValue = 10;
+        
+        var points = new List<string>();
+        double stepX = 870.0 / (data.Count - 1);
+        double usableHeight = 225;
+
+        for (int i = 0; i < data.Count; i++)
+        {
+            double x = 80 + (i * stepX) + GetCategoryXOffset(category);
+            int value = category switch
+            {
+                "Minor" => data[i].MinorCount,
+                "Major" => data[i].MajorCount,
+                "Prohibited" => data[i].ProhibitedCount,
+                _ => 0
+            };
+            double y = 285 - ((double)value / maxValue * usableHeight);
+            points.Add($"{x},{y}");
+        }
+
+        return "M" + string.Join(" L", points);
+    }
+
+    private double GetCategoryXOffset(string category)
+    {
+        return category switch
+        {
+            "Minor" => -6,
+            "Prohibited" => 6,
+            _ => 0
+        };
+    }
+
+    private int GetMaxCategoryValue()
+    {
+        if (!categoryTrendData.Any()) return 10;
+        return Math.Max(1, new[] {
+            categoryTrendData.Max(m => m.MinorCount),
+            categoryTrendData.Max(m => m.MajorCount),
+            categoryTrendData.Max(m => m.ProhibitedCount)
+        }.Max());
+    }
+
+    private string GetDonutSlicePath(double cx, double cy, double outerRadius, double innerRadius, double startAngle, double endAngle)
+    {
+        if (endAngle - startAngle >= 360) endAngle = 359.99;
+        
+        var outerStart = PolarToCartesian(cx, cy, outerRadius, endAngle);
+        var outerEnd = PolarToCartesian(cx, cy, outerRadius, startAngle);
+        var innerStart = PolarToCartesian(cx, cy, innerRadius, endAngle);
+        var innerEnd = PolarToCartesian(cx, cy, innerRadius, startAngle);
+        
+        var largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+        
+        return $"M {outerStart.x} {outerStart.y} " +
+               $"A {outerRadius} {outerRadius} 0 {largeArc} 0 {outerEnd.x} {outerEnd.y} " +
+               $"L {innerEnd.x} {innerEnd.y} " +
+               $"A {innerRadius} {innerRadius} 0 {largeArc} 1 {innerStart.x} {innerStart.y} Z";
+    }
+
+    private (double x, double y) PolarToCartesian(double cx, double cy, double radius, double angle)
+    {
+        var angleInRadians = (angle - 90) * Math.PI / 180.0;
+        return (
+            cx + (radius * Math.Cos(angleInRadians)),
+            cy + (radius * Math.Sin(angleInRadians))
+        );
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "pending" => "pending",
+            "under review" => "review",
+            "resolved" => "resolved",
+            _ => "default"
+        };
+    }
+
+    public class CategoryTrendMonth 
+    { 
+        public string Month { get; set; } = "";
+        public string Label { get; set; } = "";
+        public int MonthNumber { get; set; }
+        public int MinorCount { get; set; }
+        public int MajorCount { get; set; }
+        public int ProhibitedCount { get; set; }
+    }
+    
+    public class DataCount
+    {
+        public string Name { get; set; } = "";
+        public int Count { get; set; }
+    }
+    
+    public class TrendData
+    {
+        public int CurrentCount { get; set; }
+        public int PreviousCount { get; set; }
+        public string Direction { get; set; } = "stable";
+        public double ChangePercent { get; set; }
+    }
+    
+    public class SchoolComparisonData
+    {
+        public string SchoolName { get; set; } = "";
+        public int TotalIncidents { get; set; }
+        public int MinorCount { get; set; }
+        public int MajorCount { get; set; }
+        public int ProhibitedCount { get; set; }
+        public TrendData? Trend { get; set; }
+        public Dictionary<string, int> CategoryBreakdown { get; set; } = new();
+        public int CurrentYearCount { get; set; }
+        public int PreviousYearCount { get; set; }
+    }
+    
+    public class PrescriptiveAction
+    {
+        public string StudentName { get; set; } = "";
+        public string SchoolName { get; set; } = "";
+        public string RiskLevel { get; set; } = "Medium"; // High, Medium, Low
+        public string RecommendedAction { get; set; } = "";
+        public string ResponsibleParty { get; set; } = "";
+        public int IncidentCount { get; set; }
+        public DateTime LastIncidentDate { get; set; }
+    }
+    
+    public class DescriptiveInsight
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "Info"; // District, School, Incident
+        public string Severity { get; set; } = "Info"; // Info, Warning, Critical
+        public Dictionary<string, string> Metrics { get; set; } = new();
+    }
+
+    public class ClassificationStat
+    {
+        public string Type { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+    }
+
+    public class SchoolDistributionStat
+    {
+        public string Category { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+    }
+
+    private string MaskName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "-";
+        var words = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => w.Length > 1 ? w[0] + new string('*', w.Length - 1) : "*"));
+    }
+}
+<style>
+    /* ========================================
+       SIMPLE, MINIMAL DESIGN
+       ======================================== */
+    
+    .division-dashboard {
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        color: #333;
+    }
+
+    /* ========================================
+       DESCRIPTIVE ANALYTICS SECTION
+       ======================================== */
+    
+    .section-title-modern {
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #333;
+    }
+
+    .section-title-modern h2 {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+        color: #000;
+        letter-spacing: 0.5px;
+    }
+
+    .analytics-grid-modern {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+    }
+
+    .analytics-card-modern {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-header-modern {
+        padding: 15px 20px;
+        border-bottom: 1.5px solid #333;
+        background: #fff;
+    }
+
+    .card-header-modern h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+        color: #000;
+    }
+
+    .analytics-table-modern {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .analytics-table-modern th {
+        text-align: left;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #333;
+        border-bottom: 1px solid #eee;
+        background: #fafafa;
+    }
+
+    .analytics-table-modern td {
+        padding: 12px 20px;
+        font-size: 14px;
+        color: #555;
+        border-bottom: 1px solid #eee;
+    }
+
+    .analytics-table-modern tr:last-child td {
+        border-bottom: none;
+    }
+
+    .total-row-modern {
+        background: #fafafa;
+    }
+
+    .total-row-modern td {
+        font-weight: 800;
+        color: #000;
+        border-top: 1px solid #333;
+    }
+
+    /* ========================================
+       HEADER
+       ======================================== */
+    
+    .dashboard-header {
+        margin-bottom: 40px;
+        text-align: center;
+        padding: 35px 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #edf2f7;
+    }
+
+    .dashboard-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        margin: 0;
+        background: linear-gradient(135deg, #1e293b, #334155);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.2;
+    }
+
+    .dashboard-header .region-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #64748b;
+        margin-top: 15px;
+        padding: 8px 20px;
+        background: #f8fafc;
+        border-radius: 100px;
+        text-transform: uppercase;
+        letter-spacing: 0.075em;
+        border: 1px solid #e2e8f0;
+    }
+
+    /* ========================================
+       KPI CARDS
+       ======================================== */
+    
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .kpi-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .kpi-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+        background: #e9ecef;
+        color: #495057;
+    }
+
+    .kpi-content h4 {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .kpi-content h2 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .kpi-card {
+        border: none !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .kpi-total { border-left: 4px solid #2563eb !important; }
+    .kpi-pending { border-left: 4px solid #f59e0b !important; }
+    .kpi-review { border-left: 4px solid #8b5cf6 !important; }
+    .kpi-resolved { border-left: 4px solid #10b981 !important; }
+    .kpi-schools { border-left: 4px solid #6366f1 !important; }
+
+    .kpi-total .kpi-icon { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+    .kpi-pending .kpi-icon { background: rgba(245, 158, 11, 0.1); color: #d97706; }
+    .kpi-review .kpi-icon { background: rgba(139, 92, 246, 0.1); color: #7c3aed; }
+    .kpi-resolved .kpi-icon { background: rgba(16, 185, 129, 0.1); color: #059669; }
+    .kpi-schools .kpi-icon { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+
+    /* ========================================
+       CHARTS CONTAINER
+       ======================================== */
+    
+    .charts-container {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .chart-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .full-width { grid-column: span 12; }
+    .half-width { grid-column: span 6; }
+    .third-width { grid-column: span 4; }
+
+    @@media (max-width: 1200px) {
+        .half-width, .third-width { grid-column: span 12; }
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .chart-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chart-header h3 i {
+        color: #007bff;
+    }
+
+    .chart-subtitle {
+        font-size: 14px;
+        color: #999;
+    }
+
+    .chart-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 300px;
+    }
+
+    .no-data {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        font-size: 16px;
+    }
+
+    /* ========================================
+       TREND CHART
+       ======================================== */
+    
+    .trend-card .chart-body {
+        min-height: 220px;
+    }
+
+    .trend-chart {
+        width: 100%;
+        height: 100%;
+        min-height: 220px;
+    }
+
+    .trend-line {
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .line-minor { stroke: #EAB308; }
+    .line-major { stroke: #EF4444; }
+    .line-prohibited { stroke: #3B82F6; }
+
+    .chart-dot {
+        fill: white;
+        stroke-width: 2;
+        cursor: pointer;
+    }
+
+    .dot-minor { stroke: #EAB308; }
+    .dot-major { stroke: #EF4444; }
+    .dot-prohibited { stroke: #3B82F6; }
+
+    .axis-label {
+        font-size: 12px;
+        fill: #666;
+    }
+
+    .month-label {
+        font-size: 13px;
+        fill: #333;
+        text-anchor: middle;
+        font-weight: 500;
+    }
+
+    .chart-legend {
+        display: flex;
+        gap: 20px;
+        margin-top: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .legend-minor { background: #EAB308; }
+    .legend-major { background: #EF4444; }
+    .legend-prohibited { background: #3B82F6; }
+    .legend-square { width: 16px; height: 16px; border-radius: 2px; }
+    .legend-pending { background: #ffc107; }
+    .legend-review { background: #17a2b8; }
+    .legend-resolved { background: #28a745; }
+
+    /* ========================================
+       BAR CHARTS
+       ======================================== */
+    
+    .bar-chart-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+
+    .bar-item {
+        cursor: default;
+    }
+
+    .bar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .bar-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        background: #007bff;
+        color: white;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .bar-track {
+        position: relative;
+        height: 32px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .bar-fill-district {
+        background: linear-gradient(135deg, #1e40af, #3b82f6);
+    }
+
+    .bar-fill-school {
+        background: linear-gradient(135deg, #7f1d1d, #ef4444);
+    }
+
+    .bar-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: white;
+    }
+
+    /* ========================================
+       TREND INDICATORS
+       ======================================== */
+    
+    .trend-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .trend-up { color: #dc3545; }
+    .trend-down { color: #28a745; }
+    .trend-stable { color: #6c757d; }
+
+    /* ========================================
+       DONUT CHARTS
+       ======================================== */
+    
+    .donut-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .donut-chart {
+        max-width: 200px;
+        width: 100%;
+        height: auto;
+    }
+
+    .donut-slice {
+        cursor: pointer;
+    }
+
+    .donut-minor { fill: #EAB308; }
+    .donut-major { fill: #EF4444; }
+    .donut-prohibited { fill: #3B82F6; }
+    .donut-pending { fill: #ffc107; }
+    .donut-review { fill: #17a2b8; }
+    .donut-resolved { fill: #28a745; }
+
+    .donut-center-label {
+        font-size: 14px;
+        fill: #666;
+        text-anchor: middle;
+    }
+
+    .donut-center-value {
+        font-size: 24px;
+        fill: #333;
+        text-anchor: middle;
+        font-weight: 600;
+    }
+
+    .donut-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 15px;
+        width: 100%;
+    }
+
+    /* ========================================
+       SCHOOLS SUMMARY
+       ======================================== */
+    
+    .schools-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 3px;
+    }
+
+    .summary-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: white;
+        flex-shrink: 0;
+        background: #6c757d;
+    }
+
+    .summary-content h4 {
+        margin: 0 0 3px 0;
+        font-size: 12px;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .summary-content h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    /* ========================================
+       EXPANDABLE PANEL
+       ======================================== */
+    
+    .expandable-panel {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+
+    .panel-header {
+        padding: 20px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8f9fa;
+    }
+
+    .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .panel-title i {
+        font-size: 20px;
+        color: #007bff;
+    }
+
+    .panel-title h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .panel-toggle-icon {
+        font-size: 18px;
+        color: #666;
+    }
+
+    .panel-content {
+        padding: 20px;
+    }
+
+    .comparison-section {
+        margin-bottom: 25px;
+    }
+
+    .comparison-section h4 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .comparison-section h4 i {
+        color: #007bff;
+    }
+
+    /* ========================================
+       TABLES
+       ======================================== */
+    
+    .comparison-table-wrapper,
+    .table-wrapper {
+        overflow-x: auto;
+        border-radius: 3px;
+    }
+
+    .recent-reports-scroll {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .recent-reports-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #f8f9fa;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .comparison-table,
+    .reports-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+
+    .comparison-table thead,
+    .reports-table thead {
+        background: #f8f9fa;
+    }
+
+    .comparison-table th,
+    .reports-table th {
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .comparison-table td,
+    .reports-table td {
+        padding: 10px 15px;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .comparison-table tbody tr:hover,
+    .reports-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .school-name-cell {
+        font-weight: 500;
+    }
+
+    .total-cell {
+        font-weight: 600;
+        color: #007bff;
+    }
+
+    .trend-cell {
+        text-align: center;
+    }
+
+    /* ========================================
+       HEATMAP
+       ======================================== */
+    
+    .heatmap-container {
+        overflow-x: auto;
+    }
+
+    .heatmap-grid {
+        display: inline-grid;
+        gap: 2px;
+        min-width: 100%;
+    }
+
+    .heatmap-header,
+    .heatmap-row {
+        display: grid;
+        grid-template-columns: 200px repeat(3, 100px);
+        gap: 2px;
+    }
+
+    .heatmap-cell {
+        padding: 10px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 2px;
+    }
+
+    .header-cell {
+        background: #007bff;
+        color: white;
+        font-weight: 600;
+    }
+
+    .school-cell {
+        background: #f8f9fa;
+        text-align: left;
+        font-weight: 500;
+    }
+
+    .data-cell {
+        background: #e9ecef;
+        cursor: pointer;
+    }
+
+    /* ========================================
+       STACKED BARS
+       ======================================== */
+    
+    .stacked-bars-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .stacked-bar-item {
+        display: grid;
+        grid-template-columns: 180px 1fr 50px;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .stacked-bar-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+    }
+
+    .stacked-bar-track {
+        display: flex;
+        height: 30px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .stacked-segment {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 500;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .segment-minor { background: linear-gradient(135deg, #ca8a04, #fde047); }
+    .segment-major { background: linear-gradient(135deg, #b91c1c, #f87171); }
+    .segment-prohibited { background: linear-gradient(135deg, #1d4ed8, #93c5fd); }
+
+    .stacked-bar-total {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        text-align: right;
+    }
+
+    /* ========================================
+       REPORTS TABLE CARD
+       ======================================== */
+    
+    .reports-table-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+    }
+
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .table-header h3 i {
+        color: #007bff;
+    }
+
+    .table-subtitle {
+        font-size: 14px;
+        color: #999;
+    }
+
+    .ref-cell {
+        font-weight: 500;
+        color: #007bff;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-review {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .status-resolved {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-default {
+        background: #e2e3e5;
+        color: #383d41;
+    }
+
+    /* ========================================
+       TOOLTIP
+       ======================================== */
+    
+    .custom-tooltip {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 0;
+        border-radius: 4px;
+        font-size: 13px;
+        pointer-events: none;
+        z-index: 1000;
+        max-width: 250px;
+    }
+    
+    .tooltip-content {
+        padding: 8px 10px;
+        border-radius: 4px;
+    }
+
+    .tooltip-title {
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 2px;
+    }
+
+    .tooltip-subtitle {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 6px;
+    }
+
+    .tooltip-metrics {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .tooltip-metric {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+    }
+
+    .tooltip-metric span {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .tooltip-metric strong {
+        color: #FFFFFF;
+    }
+
+    /* ========================================
+       LOADING & MESSAGES
+       ======================================== */
+    
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: #666;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #e9ecef;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-container p {
+        font-size: 16px;
+    }
+
+    .center-message {
+        text-align: center;
+        padding: 40px;
+        color: #333;
+    }
+
+    .center-message h2 {
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+
+    .center-message p {
+        font-size: 16px;
+        color: #666;
+    }
+
+    /* ========================================
+       CATEGORY TREND CHART ANIMATIONS
+       ======================================== */
+    
+    /* Category Trend Chart */
+    .category-trend-container {
+        padding: 20px 0;
+    }
+
+    .category-legend {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .legend-item-modern {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #2b3674;
+    }
+
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+
+    /* Animations */
+    .category-line-animated {
+        stroke-dasharray: 2000;
+        stroke-dashoffset: 2000;
+        animation: drawLine 2s ease-out forwards;
+    }
+
+    .category-area-animated {
+        opacity: 0;
+        animation: fadeInArea 1.5s ease-out 0.5s forwards;
+    }
+
+    .category-dot-animated {
+        opacity: 0;
+        transform: scale(0);
+        animation: popIn 0.5s ease-out 1s forwards;
+    }
+
+    @@keyframes drawLine {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+
+    @@keyframes fadeInArea {
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes popIn {
+        0% {
+            opacity: 0;
+            transform: scale(0);
+        }
+        70% {
+            transform: scale(1.2);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    /* Data Labels - Only visible on hover for clean UI */
+    .month-group .data-label {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+    }
+
+    .month-group:hover .data-label {
+        opacity: 1;
+    }
+    
+    .month-group:hover .connector-line {
+        opacity: 0.6;
+    }
+
+    .month-group:hover circle {
+        r: 7;
+        transition: r 0.2s ease;
+    }
+
+    .dot-group .label-bg {
+        filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.2));
+    }
+    
+    .connector-line {
+        stroke-width: 1;
+        stroke-dasharray: 2,2;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    
+    .month-group {
+        cursor: pointer;
+    }
+
+    /* ========================================
+       RESPONSIVE DESIGN
+       ======================================== */
+    
+    @@media (max-width: 768px) {
+        .division-dashboard {
+            padding: 15px;
+        }
+        
+        .dashboard-header h1 {
+            font-size: 20px;
+        }
+        
+        .kpi-card {
+            padding: 15px;
+        }
+        
+        .kpi-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+        }
+        
+        .kpi-content h2 {
+            font-size: 24px;
+        }
+        
+        .chart-card {
+            padding: 15px;
+        }
+        
+        .stacked-bar-item {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        
+        .heatmap-header,
+        .heatmap-row {
+            grid-template-columns: 120px repeat(3, 80px);
+        }
+    }
+
+    /* ========================================
+       INSIGHTS SECTIONS
+       ======================================== */
+    
+    .insights-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .insights-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .insights-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .insights-header h3 i {
+        color: #007bff;
+    }
+
+    .insights-subtitle {
+        font-size: 14px;
+        color: #999;
+    }
+
+    /* Prescriptive Actions Table */
+    .prescriptive-table-wrapper {
+        overflow-x: auto;
+    }
+
+    .prescriptive-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .prescriptive-table thead {
+        background: #f8f9fa;
+    }
+
+    .prescriptive-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .prescriptive-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e9ecef;
+        color: #333;
+    }
+
+    .prescriptive-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .student-name-cell {
+        font-weight: 500;
+    }
+
+    .school-cell {
+        color: #666;
+        font-size: 13px;
+    }
+
+    .incident-count-cell {
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .action-cell {
+        font-weight: 500;
+        color: #007bff;
+    }
+
+    .responsible-cell {
+        color: #666;
+        font-size: 13px;
+    }
+
+    /* Risk Level Badges */
+    .risk-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .risk-badge.risk-high {
+        background: #fee;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+    }
+
+    .risk-badge.risk-medium {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffc107;
+    }
+
+    .risk-badge.risk-low {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #28a745;
+    }
+
+    /* Descriptive Insights Grid */
+    .insights-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+    }
+
+    .insight-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-left: 4px solid #007bff;
+        border-radius: 4px;
+        padding: 15px;
+        display: flex;
+        gap: 15px;
+    }
+
+    .insight-item.severity-warning {
+        border-left-color: #ffc107;
+        background: #fffbf0;
+    }
+
+    .insight-item.severity-critical {
+        border-left-color: #dc3545;
+        background: #fff5f5;
+    }
+
+    .insight-item.severity-info {
+        border-left-color: #17a2b8;
+        background: #f0f9ff;
+    }
+
+    .insight-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 18px;
+        color: #495057;
+    }
+
+    .severity-warning .insight-icon {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .severity-critical .insight-icon {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .severity-info .insight-icon {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .insight-content {
+        flex: 1;
+    }
+
+    .insight-content h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .insight-content p {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #666;
+        line-height: 1.5;
+    }
+
+    .insight-metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .metric-item {
+        display: flex;
+        gap: 5px;
+        font-size: 13px;
+    }
+
+    .metric-label {
+        color: #666;
+    }
+
+    .metric-value {
+        font-weight: 600;
+        color: #333;
+    }
+</style>

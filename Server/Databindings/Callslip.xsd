@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="Callslip" targetNamespace="http://tempuri.org/Callslip.xsd" elementFormDefault="qualified" attributeFormDefault="qualified" xmlns="http://tempuri.org/Callslip.xsd" xmlns:mstns="http://tempuri.org/Callslip.xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" xmlns:msprop="urn:schemas-microsoft-com:xml-msprop">
+  <xs:element name="Callslip" msdata:IsDataSet="true" msdata:UseCurrentLocale="true" msprop:EnableTableAdapterManager="true">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="callSlipData" msdata:Locale="en-US" msdata:IsDataSet="false" msdata:EnforceConstraints="false">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="IncidentId" type="xs:int" minOccurs="0" />
+              <xs:element name="ComplainantName" type="xs:string" minOccurs="0" />
+              <xs:element name="VictimName" type="xs:string" minOccurs="0" />
+              <xs:element name="RespondentName" type="xs:string" minOccurs="0" />
+              <xs:element name="DateReported" type="xs:dateTime" minOccurs="0" />
+              <xs:element name="TimeReported" type="xs:dateTime" minOccurs="0" />
+              <xs:element name="SchoolName" type="xs:string" minOccurs="0" />
+              <xs:element name="GradeLevel" type="xs:string" minOccurs="0" />
+              <xs:element name="Section" type="xs:string" minOccurs="0" />
+              <xs:element name="RoomNumber" type="xs:string" minOccurs="0" />
+              <xs:element name="Status" type="xs:string" minOccurs="0" />
+              <xs:element name="TeacherName" type="xs:string" minOccurs="0" />
+              <xs:element name="Position" type="xs:string" minOccurs="0" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

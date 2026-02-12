@@ -1,0 +1,241 @@
+@inherits LayoutComponentBase
+@using Gsystem.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<div class="admin-shell">
+    <header class="admin-top-nav">
+        <div class="brand">
+            <span class="logo-dot"></span>
+            <div>
+                <strong>Gsystem</strong>
+                <small>Admin Portal</small>
+            </div>
+        </div>
+
+        <button class="menu-toggle" @onclick="ToggleMenu">☰</button>
+
+        <nav class="nav-links @(isMenuOpen ? "open" : string.Empty)">
+            @if (isAdminUser)
+            {
+                <a href="/admin-dashboard" class="nav-link @(IsActiveRoute("/admin-dashboard") ? "active" : "")">Admin</a>
+            }
+            <a href="/pod-dashboard" class="nav-link @(IsActiveRoute("/pod-dashboard") ? "active" : "")">POD Dashboard</a>
+            <a href="/case-records-dashboard" class="nav-link @(IsActiveRoute("/case-records-dashboard") ? "active" : "")">Case Records</a>
+        </nav>
+
+        <div class="user-actions">
+            <span>Welcome, <strong>@currentUserName</strong></span>
+            <button class="logout-btn" @onclick="Logout">Logout</button>
+        </div>
+    </header>
+
+    <section class="page-banner">
+        <div>
+            <h1>@PageTitle</h1>
+            <p>Manage administrative operations and reporting</p>
+        </div>
+    </section>
+
+    <main class="admin-content">
+        @Body
+    </main>
+</div>
+
+@code {
+    private string currentUserName = "Admin";
+    private string PageTitle = "Admin Dashboard";
+    private bool isMenuOpen;
+    private bool isAdminUser = false;
+    private bool isDivisionUser = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserInfo();
+    }
+
+    private async Task LoadUserInfo()
+    {
+        try
+        {
+            var username = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            var fullName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "fullName");
+            
+            if (!string.IsNullOrEmpty(fullName))
+            {
+                currentUserName = fullName;
+            }
+            else if (!string.IsNullOrEmpty(username))
+            {
+                currentUserName = username;
+            }
+
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            isAdminUser = (userRole?.ToLower() ?? "") == "admin";
+            isDivisionUser = (userRole?.ToLower() ?? "") == "division";
+            
+            // Redirect division users to their dashboard
+            if (isDivisionUser && !NavigationManager.Uri.Contains("/division-dashboard"))
+            {
+                NavigationManager.NavigateTo("/division-dashboard", forceLoad: true);
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
+
+    private bool IsActiveRoute(string route) =>
+        NavigationManager.Uri.Contains(route, StringComparison.OrdinalIgnoreCase);
+
+    private void ToggleMenu() => isMenuOpen = !isMenuOpen;
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/login/teacher", forceLoad: true);
+    }
+}
+
+<style>
+    :root {
+        --admin-blue: #0047ff;
+        --admin-cyan: #00c6ff;
+        --admin-dark: #081a4b;
+    }
+
+    .admin-shell {
+        min-height: 100vh;
+        background: #f2f6fb;
+        color: var(--admin-dark);
+    }
+
+    .admin-top-nav {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 16px 32px;
+        background: linear-gradient(100deg, var(--admin-blue), var(--admin-cyan));
+        color: white;
+        box-shadow: 0 10px 30px rgba(0,15,80,0.35);
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .logo-dot {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.55);
+        background: rgba(255,255,255,0.18);
+    }
+
+    .brand strong {
+        display: block;
+        font-size: 1.1rem;
+    }
+
+    .brand small {
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+
+    .menu-toggle {
+        display: none;
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 1.6rem;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 20px;
+        flex: 1;
+    }
+
+    .nav-link {
+        color: rgba(255,255,255,0.9);
+        text-decoration: none;
+        font-weight: 600;
+        padding-bottom: 4px;
+        border-bottom: 2px solid transparent;
+    }
+
+    .nav-link.active {
+        border-color: white;
+    }
+
+    .user-actions {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-size: 0.95rem;
+    }
+
+    .logout-btn {
+        background: rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .page-banner {
+        background: linear-gradient(120deg, rgba(0,71,255,0.1), rgba(0,198,255,0.15));
+        padding: 30px 32px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .page-banner h1 {
+        margin: 0;
+        font-size: 1.9rem;
+    }
+
+    .page-banner p {
+        margin: 6px 0 0;
+        color: #4d5b7f;
+    }
+
+    .admin-content {
+        padding: 32px;
+    }
+
+     @@media (max-width: 900px) {
+        .menu-toggle {
+            display: block;
+        }
+
+        .nav-links {
+            position: absolute;
+            top: 64px;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.75);
+            flex-direction: column;
+            padding: 12px 24px;
+            display: none;
+        }
+
+        .nav-links.open {
+            display: flex;
+        }
+
+        .user-actions {
+            flex-direction: column;
+            align-items: flex-end;
+        }
+    }
+</style>
+

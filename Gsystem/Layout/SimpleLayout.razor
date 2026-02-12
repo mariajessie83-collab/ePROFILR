@@ -1,0 +1,696 @@
+@inherits LayoutComponentBase
+@using Blazored.LocalStorage
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService localStorage
+@inject HttpClient Http
+
+<header class="simple-header">
+    <div class="header-inner">
+        <div class="brand">
+            <div class="app-logo">
+                <div class="tech-logo">
+                    <div class="logo-core"></div>
+                    <div class="logo-ring"></div>
+                    <div class="logo-pulse"></div>
+                </div>
+            </div>
+            <div class="app-name">
+                <h3>ePROFILR</h3>
+                <span class="app-subtitle">Digital Guidance & Discipline System</span>
+            </div>
+        </div>
+        <div class="quick-actions">
+            <span class="datetime">@DateTime.Now.ToString("MMM dd, yyyy")</span>
+            
+            @if (isLoggedIn)
+            {
+                <div class="user-info">
+                    <span class="welcome-text">Welcome, @userName</span>
+                    <button class="logout-btn" @onclick="Logout">Logout</button>
+                </div>
+            }
+            else
+            {
+                <div class="login-group">
+                    <button class="login-btn" type="button" @onclick="OpenLoginModal">
+                        Login
+                    </button>
+                </div>
+            }
+            
+            <button class="mobile-nav-toggle" aria-label="Open menu" onclick="toggleMobileMenu()">
+                ☰
+            </button>
+        </div>
+    </div>
+    <nav class="top-nav">
+        <a class="nav-item" href="/">Home</a>
+        <a class="nav-item" href="/incident-report">Incident Report</a>
+        @if (!string.IsNullOrEmpty(userRole) && userRole.ToLower() == "student")
+        {
+            <a class="nav-item" href="/student-dashboard">Student</a>
+        }
+        <button class="nav-item btn-link" @onclick="OpenTrackModal">Track</button>
+        <div class="dropdown">
+            <a class="nav-item" href="#" tabindex="0">School Discipline</a>
+            <div class="dropdown-menu">
+                <a class="dropdown-link" href="/discipline/section1">Section 1: Creation of School Discipline Committee</a>
+                <a class="dropdown-link" href="/discipline/section2">Section 2: Composition of the Committee</a>
+                <a class="dropdown-link" href="/discipline/section3">Section 3: Functions and Responsibilities</a>
+                <a class="dropdown-link" href="/discipline/section4">Section 4: Disciplinary Measures</a>
+                <a class="dropdown-link" href="/discipline/section5">Section 5: Procedures for Disciplinary Action</a>
+                <a class="dropdown-link" href="/discipline/section6">Section 6: Appeal Process</a>
+                <a class="dropdown-link" href="/discipline/section7">Section 7: Implementation Guidelines</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <a class="nav-item" href="#" tabindex="0">More</a>
+            <div class="dropdown-menu">
+                <a class="dropdown-link" href="/resources">Resources</a>
+                <a class="dropdown-link" href="/guidance">Guidance</a>
+                <a class="dropdown-link" href="/safety">Safety</a>
+            </div>
+        </div>
+    </nav>
+    
+    
+    <!-- Mobile Navigation Menu -->
+    <div class="mobile-nav-menu" id="mobileNavMenu">
+        <a class="mobile-nav-item" href="/">Home</a>
+        <a class="mobile-nav-item" href="/incident-report">Incident Report</a>
+        @if (!string.IsNullOrEmpty(userRole) && userRole.ToLower() == "student")
+        {
+            <a class="mobile-nav-item" href="/student-dashboard">Student</a>
+        }
+        <a class="mobile-nav-item" href="/resources">Resources</a>
+        <a class="mobile-nav-item" href="/guidance">Guidance</a>
+        <a class="mobile-nav-item" href="/safety">Safety</a>
+        <div class="mobile-nav-separator"></div>
+        <div class="mobile-nav-section-title">School Discipline Rules</div>
+        <a class="mobile-nav-item" href="/discipline/section1">Section 1: Creation of School Discipline Committee</a>
+        <a class="mobile-nav-item" href="/discipline/section2">Section 2: Composition of the Committee</a>
+        <a class="mobile-nav-item" href="/discipline/section3">Section 3: Functions and Responsibilities</a>
+        <a class="mobile-nav-item" href="/discipline/section4">Section 4: Disciplinary Measures</a>
+        <a class="mobile-nav-item" href="/discipline/section5">Section 5: Procedures for Disciplinary Action</a>
+        <a class="mobile-nav-item" href="/discipline/section6">Section 6: Appeal Process</a>
+        <a class="mobile-nav-item" href="/discipline/section7">Section 7: Implementation Guidelines</a>
+    </div>
+</header>
+
+<div class="page-wrapper">
+    <main class="simple-content">
+        @Body
+    </main>
+
+    <!-- Footer removed as requested -->
+</div>
+
+<!-- Track Modal -->
+@if (showTrackModal)
+{
+    <div class="modal-overlay" @onclick="CloseTrackModal">
+        <div class="modal-container" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4 class="modal-title">Track Incident Report</h4>
+                <button type="button" class="btn-close" @onclick="CloseTrackModal">✖</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-box">
+                    <input type="text" class="form-control" placeholder="Enter Reference Number (e.g., IR-20231027-1234)" @bind="searchReferenceNumber" @onkeyup="HandleTrackEnter" />
+                    <button class="btn btn-primary" @onclick="TrackIncident" disabled="@isTracking">
+                        @if (isTracking)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span> Searching...</span>
+                        }
+                        else
+                        {
+                            <span>Search</span>
+                        }
+                    </button>
+                </div>
+
+                @if (trackingResult != null)
+                {
+                    <div class="tracking-result mt-4">
+                        <div class="result-header @GetStatusClass(trackingResult.Status)">
+                            <h5>Status: @trackingResult.Status</h5>
+                        </div>
+                        <div class="result-details">
+                             <div class="detail-row">
+                                <strong>Reference No:</strong> <span>@trackingResult.ReferenceNumber</span>
+                            </div>
+                            <div class="detail-row">
+                                <strong>Date Reported:</strong> <span>@trackingResult.DateReported.ToString("MMM dd, yyyy hh:mm tt")</span>
+                            </div>
+                            <div class="detail-row">
+                                <strong>Incident Type:</strong> <span>@trackingResult.IncidentType</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(trackingResult.ComplainantName))
+                            {
+                                <div class="detail-row">
+                                    <strong>Complainant*:</strong> <span>@MaskName(trackingResult.ComplainantName)</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(trackingResult.SchoolName))
+                            {
+                                <div class="detail-row">
+                                    <strong>School:</strong> <span>@trackingResult.SchoolName</span>
+                                </div>
+                            }
+                            <div class="detail-row mt-2">
+                                <strong>Description:</strong>
+                                <p class="description-text">@trackingResult.IncidentDescription</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (hasSearched && trackingResult == null)
+                {
+                    <div class="alert alert-warning mt-3">
+                        No incident report found with that reference number.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Unified Login Modal -->
+<Gsystem.Pages.Components.LoginModal @bind-IsOpen="showLoginModal" OnLoginSuccess="CheckLoginStatus" />
+
+<style>
+    .btn-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        cursor: pointer;
+        color: inherit; /* Inherit color from nav-item */
+    }
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        backdrop-filter: blur(5px);
+    }
+    .modal-container {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 500px;
+        padding: 24px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+    @@keyframes modalSlideIn {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .modal-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #64748b;
+    }
+    .search-box {
+        display: flex;
+        gap: 10px;
+    }
+    .search-box input {
+        flex: 1;
+    }
+    .tracking-result {
+        background-color: #f8fafc;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+    .result-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .result-header.status-pending { background-color: #fff7ed; color: #c2410c; }
+    .result-header.status-resolved { background-color: #f0fdf4; color: #15803d; }
+    .result-header.status-investigating { background-color: #eff6ff; color: #1d4ed8; }
+    
+    .result-header h5 { margin: 0; font-weight: 600; font-size: 1rem; }
+    .result-details {
+        padding: 16px;
+    }
+    .detail-row {
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+    .detail-row strong {
+        color: #475569;
+        margin-right: 8px;
+    }
+    .description-text {
+        color: #334155;
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        margin-top: 4px;
+        font-size: 0.9rem;
+    }
+</style>
+
+
+<script>
+    // Login modal will be handled by the LoginModal component
+    
+    function toggleMobileMenu() {
+        const mobileMenu = document.getElementById('mobileNavMenu');
+        const toggle = document.querySelector('.mobile-nav-toggle');
+        
+        // Add null checks to prevent errors
+        if (!mobileMenu || !toggle) {
+            console.warn('Mobile menu or toggle element not found');
+            return;
+        }
+        
+        if (mobileMenu.classList.contains('show')) {
+            mobileMenu.classList.remove('show');
+            toggle.innerHTML = '☰';
+        } else {
+            mobileMenu.classList.add('show');
+            toggle.innerHTML = '✕';
+        }
+    }
+    
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', function(event) {
+        const mobileMenu = document.getElementById('mobileNavMenu');
+        const toggle = document.querySelector('.mobile-nav-toggle');
+        
+        // Add null checks to prevent errors
+        if (mobileMenu && toggle && !toggle.contains(event.target) && !mobileMenu.contains(event.target)) {
+            mobileMenu.classList.remove('show');
+            toggle.innerHTML = '☰';
+        }
+    });
+    
+    // Session management - ALWAYS clear localStorage on browser close
+    // Simple approach: Clear localStorage on every page load, then restore if navigating within session
+    
+    // Check on page load if we should clear localStorage
+    document.addEventListener('DOMContentLoaded', function() {
+    // Set active session flag for this browser session
+    // Don't clear localStorage on page load - only clear on browser close
+    sessionStorage.setItem('hasActiveSession', 'true');
+    });
+    
+    // Clear session flag when browser closes (try multiple methods)
+    // Only clear localStorage if this is NOT a navigation (i.e., browser is closing)
+    window.addEventListener('beforeunload', function(event) {
+        // Check if this is a navigation (not browser close)
+        var isNavigating = sessionStorage.getItem('isNavigating');
+        
+        // Clear the session flag immediately
+        sessionStorage.removeItem('hasActiveSession');
+        
+        // Only clear localStorage if this is NOT a navigation
+        if (!isNavigating) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userFullName');
+            localStorage.removeItem('userPosition');
+            localStorage.removeItem('teacherName');
+            localStorage.removeItem('teacherId');
+            localStorage.removeItem('lastLoginType');
+        }
+    });
+    
+    // Backup: Also clear on page unload
+    window.addEventListener('unload', function(event) {
+        var isNavigating = sessionStorage.getItem('isNavigating');
+        sessionStorage.removeItem('hasActiveSession');
+        
+        // Only clear localStorage if this is NOT a navigation
+        if (!isNavigating) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userFullName');
+            localStorage.removeItem('userPosition');
+            localStorage.removeItem('teacherName');
+            localStorage.removeItem('teacherId');
+            localStorage.removeItem('lastLoginType');
+        }
+        // Always clear the navigation flag on unload
+        sessionStorage.removeItem('isNavigating');
+    });
+    
+    // Additional safety: Session flag management
+    // The aggressive visibilitychange listener that was interfering with login state has been removed.
+    
+    // Function to refresh login state (called from login pages)
+    window.refreshLoginState = function() {
+        // Force a hard reload to update the login state
+        window.location.href = window.location.href;
+    };
+    
+    // Simplified function to trigger C# state update
+    window.updateLoginState = function() {
+        // Trigger a page reload to update C# state
+        window.location.reload();
+    };
+    
+    // Function to handle logout - will be called from C#
+    window.logout = function() {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userFullName');
+        sessionStorage.clear();
+        window.location.reload();
+    };
+    
+    // Session security: Only clear on actual browser close via beforeunload
+    // Remove the aggressive visibility change listener that was interfering with login state
+    
+    // Session timeout for security (30 minutes of inactivity)
+    var lastActivity = Date.now();
+    var sessionTimeout = 30 * 60 * 1000; // 30 minutes in milliseconds
+    
+    // Update last activity on user interaction
+    document.addEventListener('click', function() {
+        lastActivity = Date.now();
+    });
+    
+    document.addEventListener('keypress', function() {
+        lastActivity = Date.now();
+    });
+    
+    document.addEventListener('mousemove', function() {
+        lastActivity = Date.now();
+    });
+    
+    // Check for session timeout every minute
+    setInterval(function() {
+        var now = Date.now();
+        var authToken = localStorage.getItem('authToken');
+        
+        if (authToken && (now - lastActivity > sessionTimeout)) {
+            // Session expired due to inactivity
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userFullName');
+            sessionStorage.clear();
+            alert('Your session has expired due to inactivity. Please login again.');
+            window.location.reload();
+        }
+    }, 60000); // Check every minute
+</script>
+
+@code {
+    private bool isLoggedIn = false;
+    private string userName = string.Empty;
+    private string userRole = string.Empty;
+    
+    // Login Modal Logic
+    private bool showLoginModal = false;
+
+    private void OpenLoginModal()
+    {
+        showLoginModal = true;
+    }
+
+    // Track Modal Logic
+    private bool showTrackModal = false;
+    private string searchReferenceNumber = string.Empty;
+    private bool isTracking = false;
+    private bool hasSearched = false;
+    private SharedProject.IncidentReportModel? trackingResult = null;
+
+    private void OpenTrackModal()
+    {
+        showTrackModal = true;
+        searchReferenceNumber = string.Empty;
+        trackingResult = null;
+        hasSearched = false;
+    }
+
+    private void CloseTrackModal()
+    {
+        showTrackModal = false;
+    }
+    
+    private async Task HandleTrackEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await TrackIncident();
+        }
+    }
+
+    private async Task TrackIncident()
+    {
+        if (string.IsNullOrWhiteSpace(searchReferenceNumber)) return;
+
+        isTracking = true;
+        hasSearched = false;
+        trackingResult = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<ApiResponse<SharedProject.IncidentReportModel>>($"api/IncidentReport/reference/{searchReferenceNumber}");
+            if (response != null && response.Success)
+            {
+                trackingResult = response.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error tracking incident: {ex.Message}");
+        }
+        finally
+        {
+            isTracking = false;
+            hasSearched = true;
+        }
+    }
+    
+    private string GetStatusClass(string status)
+    {
+        return status?.ToLower() switch
+        {
+            "resolved" => "status-resolved",
+            "closed" => "status-resolved",
+            "investigating" => "status-investigating",
+            "ongoing" => "status-investigating",
+            _ => "status-pending"
+        };
+    }
+
+    private string MaskName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return string.Empty;
+        if (name.Length <= 1) return name;
+        return name[0] + new string('*', name.Length - 1);
+    }
+
+    public class ApiResponse<T>
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public T Data { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckLoginStatus();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckLoginStatus();
+        }
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        await CheckLoginStatus();
+    }
+    
+    // Method to force refresh login state (can be called from other components)
+    public async Task RefreshLoginState()
+    {
+        await CheckLoginStatus();
+        StateHasChanged();
+    }
+    
+    // Method to check if user is logged in (can be called from other components)
+    public async Task<bool> IsUserLoggedIn()
+    {
+        try
+        {
+            var authToken = await localStorage.GetItemAsStringAsync("authToken");
+            var username = await localStorage.GetItemAsStringAsync("username");
+            return !string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(username);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    // Method to debug localStorage contents
+    public async Task DebugLocalStorage()
+    {
+        try
+        {
+            string authToken = string.Empty;
+            string username = string.Empty;
+            string userRole = string.Empty;
+            string userFullName = string.Empty;
+            
+            try
+            {
+                authToken = await localStorage.GetItemAsStringAsync("authToken") ?? string.Empty;
+                username = await localStorage.GetItemAsStringAsync("username") ?? string.Empty;
+                userRole = await localStorage.GetItemAsStringAsync("userRole") ?? string.Empty;
+                userFullName = await localStorage.GetItemAsStringAsync("userFullName") ?? string.Empty;
+            }
+            catch
+            {
+                // Fallback to JavaScript localStorage
+                authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken") ?? string.Empty;
+                username = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username") ?? string.Empty;
+                userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole") ?? string.Empty;
+                userFullName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userFullName") ?? string.Empty;
+            }
+            
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== LOCALSTORAGE DEBUG ===");
+            await JSRuntime.InvokeVoidAsync("console.log", $"AuthToken: {authToken}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Username: {username}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"UserRole: {userRole}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"UserFullName: {userFullName}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Current State - isLoggedIn: {isLoggedIn}, userName: {userName}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== END DEBUG ===");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.log", $"Debug error: {ex.Message}");
+        }
+    }
+
+    private async Task CheckLoginStatus()
+    {
+        try
+        {
+            // Try Blazored.LocalStorage first, fallback to JavaScript localStorage
+            string authToken = string.Empty;
+            string storedUsername = string.Empty;
+            string storedUserRole = string.Empty;
+            
+            try
+            {
+                authToken = await localStorage.GetItemAsStringAsync("authToken") ?? string.Empty;
+                storedUsername = await localStorage.GetItemAsStringAsync("username") ?? string.Empty;
+                storedUserRole = await localStorage.GetItemAsStringAsync("userRole") ?? string.Empty;
+            }
+            catch
+            {
+                // Fallback to JavaScript localStorage
+                authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken") ?? string.Empty;
+                storedUsername = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username") ?? string.Empty;
+                storedUserRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole") ?? string.Empty;
+            }
+            
+            // Debug logging
+            await JSRuntime.InvokeVoidAsync("console.log", $"Login Status Check - AuthToken: {authToken}, Username: {storedUsername}, UserRole: {storedUserRole}");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(storedUsername))
+            {
+                isLoggedIn = true;
+                userName = storedUsername;
+                userRole = storedUserRole;
+                
+                // Debug logging
+                await JSRuntime.InvokeVoidAsync("console.log", $"User is logged in: {userName}");
+            }
+            else
+            {
+                isLoggedIn = false;
+                userName = string.Empty;
+                userRole = string.Empty;
+                
+                // Debug logging
+                await JSRuntime.InvokeVoidAsync("console.log", "User is not logged in");
+            }
+            
+            // Debug localStorage contents
+            await DebugLocalStorage();
+            
+            // Force state update
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            isLoggedIn = false;
+            userName = string.Empty;
+            userRole = string.Empty;
+            
+            // Debug logging
+            await JSRuntime.InvokeVoidAsync("console.log", $"Error checking login status: {ex.Message}");
+        }
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            // Clear all localStorage items using Blazored.LocalStorage
+            await localStorage.RemoveItemAsync("authToken");
+            await localStorage.RemoveItemAsync("userRole");
+            await localStorage.RemoveItemAsync("username");
+            await localStorage.RemoveItemAsync("userFullName");
+            
+            // Clear sessionStorage as well for additional security
+            await JSRuntime.InvokeVoidAsync("sessionStorage.clear");
+            
+            // Reset state
+            isLoggedIn = false;
+            userName = string.Empty;
+            userRole = string.Empty;
+            
+            // Force page reload to ensure clean state
+            await JSRuntime.InvokeVoidAsync("window.location.reload");
+        }
+        catch (Exception ex)
+        {
+            // Handle error if needed
+            Console.WriteLine($"Logout error: {ex.Message}");
+            // Force redirect even if there's an error
+            NavigationManager.NavigateTo("/", true);
+        }
+    }
+}

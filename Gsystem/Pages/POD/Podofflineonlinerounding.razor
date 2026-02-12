@@ -1,0 +1,1229 @@
+@page "/pod/offline-online-rounding"
+@layout Gsystem.Layout.PlainLayout
+@using SharedProject
+@using Gsystem.Services
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject OfflineStorageService OfflineStorage
+
+<PageTitle>POD Rounding</PageTitle>
+
+<script src="js/connection-monitor.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/bluetooth-printer.js"></script>
+
+<!-- Sticky Status Banner -->
+<!-- Status Banner Moved Inside Card -->
+
+<!-- Theme Toggle Button Moved to Main Card Header -->
+
+<script>
+    function toggleDarkMode() {
+        const body = document.body;
+        const isDark = body.classList.toggle('dark-mode');
+        const wrapper = document.querySelector('.page-wrapper');
+        if(wrapper) wrapper.classList.toggle('dark-mode', isDark);
+
+        localStorage.setItem('preferredTheme', isDark ? 'dark' : 'light');
+        
+        // Toggle icons
+        document.getElementById('theme-icon-sun').style.display = isDark ? 'block' : 'none';
+        document.getElementById('theme-icon-moon').style.display = isDark ? 'none' : 'block';
+    }
+    
+    // Initialize theme on page load
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedTheme = localStorage.getItem('preferredTheme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+        
+        if (isDark) {
+            document.body.classList.add('dark-mode');
+            const wrapper = document.querySelector('.page-wrapper');
+            if(wrapper) wrapper.classList.add('dark-mode');
+
+            document.getElementById('theme-icon-sun').style.display = 'block';
+            document.getElementById('theme-icon-moon').style.display = 'none';
+        }
+    });
+</script>
+
+<div class="page-wrapper">
+<div class="mobile-container" style="padding-top: 40px;">
+    
+    <div class="main-card">
+        <div class="main-card-header">
+            <div class="header-content">
+                <div class="header-text-column">
+                    <h2>POD Rounding</h2>
+                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Offline/Online Incident Reporting</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div class="status-pill @(isOnline ? "status-online" : "status-offline")">
+                    <span class="status-icon">@(isOnline ? "🟢" : "⚫")</span>
+                    <span class="status-text">@(isOnline ? "ONLINE" : "OFFLINE")</span>
+                </div>
+                
+                <button type="button" class="theme-toggle-header-btn" onclick="toggleDarkMode()" title="Toggle Light/Dark Mode">
+                    <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+    
+    <!-- Offline Reports Badge/Button -->
+    @if (pendingReports.Any())
+    {
+        <div class="offline-badge" @onclick="OpenOfflineModal">
+             <div class="badge-content">
+                 <span class="badge-count">@pendingReports.Count</span>
+                 <div class="badge-text-group">
+                     <span class="badge-title">Offline Reports Pending</span>
+                     <span class="badge-subtitle">Click to view and sync</span>
+                 </div>
+             </div>
+             <span class="badge-arrow">➔</span>
+        </div>
+    }
+
+    <!-- Offline Reports Modal -->
+    @if (showOfflineModal)
+    {
+        <div class="description-modal-overlay" @onclick="CloseOfflineModal" style="z-index: 20002;">
+             <div class="description-modal" @onclick:stopPropagation="true">
+                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #b91c1c;">📡 Offline Reports (@pendingReports.Count)</h3>
+                    <button @onclick="CloseOfflineModal" style="background: none; border: none; font-size: 20px;">✕</button>
+                 </div>
+                 
+                 <div class="offline-list" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                    @foreach (var report in pendingReports)
+                    {
+                        <div class="offline-item" style="padding: 12px; border-bottom: 1px solid #f3f4f6;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #1f2937;">@report.RespondentName</span>
+                                <span style="font-size: 12px; color: #ef4444;">Offline</span>
+                            </div>
+                             <span style="display: block; font-size: 12px; color: #6b7280; margin-top: 2px;">@report.IncidentType</span>
+                             <span style="display: block; font-size: 11px; color: #9ca3af;">@DateTime.Parse(report.DateReported).ToString("MMM dd, hh:mm tt")</span>
+                        </div>
+                    }
+                 </div>
+                 
+                 <div style="border-top: 1px solid #e5e7eb; padding-top: 15px;">
+                     @if (isOnline)
+                     {
+                        <button class="submit-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 100%; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);" @onclick="SyncPendingReports" disabled="@isSyncing">
+                            @(isSyncing ? "⏳ Syncing..." : "☁️ Sync All to Database")
+                        </button>
+                     }
+                     else
+                     {
+                          <div style="text-align: center; color: #6b7280; font-size: 14px; background: #f3f4f6; padding: 10px; border-radius: 8px;">
+                              🔴 No Internet Connection<br>
+                              <small>Connect to Wi-Fi/Data to sync</small>
+                          </div>
+                     }
+                 </div>
+             </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger")" style="margin-bottom: 15px; padding: 10px; border-radius: 8px; font-size: 14px;">
+            @message
+        </div>
+    }
+
+    @if (currentStep == 0)
+    {
+        <!-- Step 1: Teacher Search (Context) -->
+        <div class="search-section">
+            <h2 class="section-title">Teacher Context</h2>
+            <p class="section-subtitle">Search for the adviser to set Grade/Section context</p>
+
+            <div class="search-input-wrapper">
+                <input type="text" 
+                       class="search-input" 
+                       placeholder="Search teacher name..." 
+                       value="@teacherSearchText"
+                       @oninput="OnTeacherSearchInput" 
+                       autocomplete="off"
+                       style="text-transform: uppercase;" />
+                
+                @if (showTeacherSuggestions && teacherSuggestions.Any())
+                {
+                    <div class="suggestions-list">
+                        @foreach (var teacher in teacherSuggestions)
+                        {
+                            <div class="suggestion-item" @onclick="@(() => SelectTeacher(teacher))">
+                                <span class="s-name">@teacher.TeacherName</span>
+                                <span class="s-detail">@teacher.GradeHandle - @teacher.SectionHandle (@teacher.TrackStrand)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            
+            <p style="font-style: italic; color: #6b7280; font-size: 0.85rem; margin-top: 15px; opacity: 0.8;">
+                Tip: Type the teacher's name and select from the list.
+            </p>
+
+            <button class="change-btn" style="background: #e5e7eb; color: #374151; margin-top: 20px; font-weight: 600;" @onclick="SkipTeacherSearch">
+                Skip / No Adviser
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Step 2: Main Form -->
+        
+        <!-- Context Card -->
+        <div class="student-card" style="background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                 <div>
+                    <span class="student-name">@(selectedTeacher?.TeacherName ?? "No Adviser Selected")</span>
+                    @if (selectedTeacher != null)
+                    {
+                        <span class="student-detail">Grade: @selectedTeacher.GradeHandle</span>
+                        <span class="student-detail">Section: @selectedTeacher.SectionHandle</span>
+                        @if(!string.IsNullOrEmpty(selectedTeacher.TrackStrand)) { <span class="student-detail">Strand: @selectedTeacher.TrackStrand</span> }
+                    }
+                    else 
+                    {
+                        <span class="student-detail">Manual Context</span>
+                    }
+                 </div>
+                 <button class="change-btn" style="margin-top: 0; position: relative; z-index: 10;" @onclick="ResetStep">CHANGE</button>
+            </div>
+        </div>
+
+        <EditForm Model="@incidentReportRequest" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+
+            <div class="form-section">
+                 <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; margin-top: 0;">Repondents</h3>
+                 
+                 <!-- Respondent Search/Add -->
+                 <div class="form-group">
+                      <div class="search-input-wrapper" style="margin-top: 0; display: flex; gap: 8px;">
+                        <input type="text" 
+                               class="form-control" 
+                               style="text-transform: uppercase; flex: 1;"
+                               placeholder="LASTNAME, FIRSTNAME (e.g. DELA CRUZ, JUAN)" 
+                               value="@respondentSearchText"
+                               @oninput="OnRespondentSearchInput" 
+                               @onkeyup="OnRespondentInputKeyUp"
+                               autocomplete="off" />
+                        
+                        <!-- ADD Button - Always visible -->
+                        <button type="button" 
+                                @onclick="@(() => AddManualRespondent(respondentSearchText))"
+                                disabled="@(string.IsNullOrWhiteSpace(respondentSearchText))"
+                                style="background: #4f46e5; color: white; border: none; padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;"
+                                onmouseover="this.style.background='#4338ca'"
+                                onmouseout="this.style.background='#4f46e5'">
+                            + ADD
+                        </button>
+
+                        @if (showRespondentSuggestions && filteredRespondents.Any())
+                        {
+                            <div class="suggestions-list">
+                                @foreach (var student in filteredRespondents.Take(10))
+                                {
+                                    <div class="suggestion-item" @onclick="@(() => AddRespondent(student))">
+                                        <span class="s-name">@student.StudentName</span>
+                                        <span class="s-detail">@student.GradeLevel - @student.Section</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    
+                    <p style="font-style: italic; color: #6b7280; font-size: 0.85rem; margin-top: 10px; opacity: 0.8;">
+                        💡 Press <strong>ENTER</strong> or click <strong>+ ADD</strong> button to add respondent
+                    </p>
+                 </div>
+
+                 <!-- Added Respondents List -->
+                 @if (addedRespondents.Any())
+                 {
+                     <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                         @foreach (var resp in addedRespondents)
+                         {
+                             <div style="background: #eef2ff; color: #4338ca; padding: 6px 12px; border-radius: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #c7d2fe;">
+                                 <span style="text-transform: uppercase;">@resp</span>
+                                 <button type="button" @onclick="@(() => RemoveRespondent(resp))" style="background: none; border: none; color: #ef4444; font-weight: 700; cursor: pointer; padding: 0;">×</button>
+                             </div>
+                         }
+                     </div>
+                 }
+                 else
+                 {
+                     <div style="text-align: center; padding: 20px; color: #9ca3af; border: 2px dashed #e5e7eb; border-radius: 8px;">
+                         No respondents added yet
+                     </div>
+                 }
+                 @if (!addedRespondents.Any() && isSubmitAttempted)
+                 {
+                      <div class="validation-message">At least one respondent is required.</div>
+                 }
+            </div>
+
+            <div class="form-section">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; margin-top: 0;">Incident Details</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">Incident Type <span class="required-star">*</span></label>
+                    <div class="search-input-wrapper" style="margin-top: 0; position: relative;">
+                        <!-- Search Icon -->
+                        <span class="search-icon" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #6b7280; z-index: 10;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </span>
+
+                        <input type="text"
+                               class="form-control"
+                               style="padding-left: 40px;"
+                               placeholder="Search or Select Incident Type..."
+                               value="@incidentTypeSearchText"
+                               @oninput="@((e) => OnIncidentTypeInput(e.Value?.ToString() ?? ""))"
+                               @onfocus="() => showIncidentTypeSuggestions = true"
+                               autocomplete="off" />
+                        
+                        @if (showIncidentTypeSuggestions && filteredViolations.Any())
+                        {
+                            <div class="suggestions-list" style="position: absolute; width: 100%; max-height: 250px; overflow-y: auto; z-index: 1000; border: 1px solid #ddd; background: white; border-radius: 0 0 8px 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                @foreach (var violation in filteredViolations)
+                                {
+                                    <div class="suggestion-item" @onclick="() => SelectIncidentType(violation)" style="padding: 10px 15px; border-bottom: 1px solid #f3f4f6; cursor: pointer; transition: background 0.2s; display: flex; flex-direction: column;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
+                                        <div class="s-name" style="font-size: 0.9rem; font-weight: 600; color: #374151;">@violation.ViolationName</div>
+                                        <div class="s-cat" style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase;">@violation.ViolationCategory</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (incidentReportRequest.IncidentType == "Other")
+                    {
+                        <div class="mt-2">
+                            <InputText class="form-control" placeholder="Specify incident..." @bind-Value="incidentReportRequest.OtherIncidentType" />
+                        </div>
+                    }
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description / Remarks <span class="required-star">*</span></label>
+                    <div class="description-input-wrapper" @onclick="OpenDescriptionModal">
+                        <textarea class="form-control clickable-description" rows="3" 
+                                  placeholder="Location, Time, Details..."
+                                  value="@incidentReportRequest.Description" 
+                                  readonly></textarea>
+                        <small style="color: #6366f1; font-weight: 500;">✏️ Click to add details (Date, Time, Location...)</small>
+                    </div>
+                    <ValidationMessage For="@(() => incidentReportRequest.Description)" />
+                </div>
+            </div>
+
+            @if (showVictimField)
+            {
+                <div class="form-section">
+                    <!-- Collapsed Optional Details -->
+                    <div class="form-group">
+                        <label class="form-label">Victim Name (Optional)</label>
+                        <div class="search-input-wrapper" style="margin-top: 0; display: flex; gap: 8px;">
+                            <input type="text" 
+                                   class="form-control" 
+                                   style="text-transform: uppercase; flex: 1;" 
+                                   placeholder="LASTNAME, FIRSTNAME (e.g. SANTOS, MARIA)" 
+                                   value="@victimSearchText"
+                                   @oninput="OnVictimSearchInput" 
+                                   @onkeyup="OnVictimInputKeyUp"
+                                   autocomplete="off" />
+                            
+                            <!-- ADD Button - Always visible -->
+                            <button type="button" 
+                                    @onclick="@(() => SelectVictimManual(victimSearchText))"
+                                    disabled="@(string.IsNullOrWhiteSpace(victimSearchText))"
+                                    style="background: #4f46e5; color: white; border: none; padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s;"
+                                    onmouseover="this.style.background='#4338ca'"
+                                    onmouseout="this.style.background='#4f46e5'">
+                                + ADD
+                            </button>
+                            
+                            @if (showVictimSuggestions && filteredVictims.Any())
+                            {
+                                <div class="suggestions-list">
+                                    @foreach (var student in filteredVictims.Take(10))
+                                    {
+                                        <div class="suggestion-item" @onclick="@(() => SelectVictim(student))">
+                                            <span class="s-name">@student.StudentName</span>
+                                            <span class="s-detail">@student.GradeLevel - @student.Section</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        
+                        <p style="font-style: italic; color: #6b7280; font-size: 0.85rem; margin-top: 10px; opacity: 0.8;">
+                            💡 Press <strong>ENTER</strong> or click <strong>+ ADD</strong> button to add victim
+                        </p>
+                    </div>
+                </div>
+            }
+
+            <div class="form-section">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 15px; margin-top: 0;">Evidence & Authority</h3>
+                
+                <div class="form-group">
+                   <label class="form-label">Evidence Photo</label>
+                   
+                   <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                       <!-- Camera Button -->
+                       <div class="btn-camera" @onclick="OpenCameraModal" style="flex: 1; background: #4f46e5; color: white; padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                           <span>📸 Open Camera</span>
+                       </div>
+
+                       <!-- Gallery Button -->
+                       <InputFile id="fileInput" OnChange="HandleFileSelected" style="display: none;" />
+                       <label for="fileInput" class="btn-gallery" style="flex: 1; background: #fff; border: 2px solid #e5e7eb; color: #374151; padding: 12px; border-radius: 8px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                           <span>📂 Choose File</span>
+                       </label>
+                   </div>
+
+                   @if (!string.IsNullOrEmpty(incidentReportRequest.EvidencePhotoBase64))
+                   {
+                       <div style="margin-top: 10px; text-align: center; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                           <img src="@incidentReportRequest.EvidencePhotoBase64" style="max-height: 200px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);" />
+                           <button type="button" class="btn btn-sm btn-danger" style="margin-top: 8px; background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px;" @onclick="@(() => incidentReportRequest.EvidencePhotoBase64 = null)">Remove Photo</button>
+                       </div>
+                   }
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">POD In-charge</label>
+                    <InputText class="form-control" @bind-Value="incidentReportRequest.PODIncharge" readonly style="background-color: #f3f4f6; color: #6b7280;" />
+                </div>
+            </div>
+
+            <div class="bottom-bar">
+                <button type="submit" class="submit-btn @(!isOnline ? "submit-offline" : "")" disabled="@(isLoading || !IsFormValid)">
+                    @if (isLoading)
+                    {
+                        <span class="spinner"></span> <span>Saving...</span>
+                    }
+                    else
+                    {
+                        if (isOnline) { <span>✓ Submit Report</span> }
+                        else { <span>💾 Save Offline</span> }
+                    }
+                </button>
+            </div>
+        </EditForm>
+    }
+        </div>
+    </div>
+</div>
+
+<!-- Incident Description Modal -->
+@if (showDescriptionModal)
+{
+    <div class="description-modal-overlay" @onclick="CloseDescriptionModal">
+        <div class="description-modal" @onclick:stopPropagation="true">
+            <h3>📝 Incident Details</h3>
+            
+            <div class="form-group">
+                <label class="form-label">Date of Incident</label>
+                <input type="date" class="form-control" @bind="modalIncidentDate" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Time of Incident</label>
+                <input type="time" class="form-control" @bind="modalIncidentTime" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-control" placeholder="e.g. Canteen, Hallway, Room 101" @bind="modalIncidentLocation" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Brief Summary</label>
+                <textarea class="form-control" rows="4" placeholder="What happened?" @bind="modalBriefSummary"></textarea>
+            </div>
+            
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" @onclick="CloseDescriptionModal" style="background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 8px;">Cancel</button>
+                <button type="button" class="btn btn-primary" @onclick="SaveDescriptionModal" style="background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px;">Apply Details</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Camera Modal -->
+@if (showCameraModal)
+{
+    <div class="camera-modal-overlay">
+        <div class="camera-viewfinder">
+            <video id="cameraFeed" autoplay playsinline></video>
+            <div class="camera-controls">
+                <button class="close-camera-btn" @onclick="CloseCameraModal">Close</button>
+                <button class="shutter-btn" @onclick="CapturePhoto"></button>
+            </div>
+        </div>
+    </div>
+}
+
+    <!-- Success Modal with Print Option -->
+    @if (showSuccessPrintModal)
+    {
+        <div class="description-modal-overlay" @onclick="CloseSuccessModal" style="z-index: 20005;">
+            <div class="description-modal" @onclick:stopPropagation="true" style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                     <span style="font-size: 40px;">✅</span>
+                </div>
+                
+                <h3 style="margin-bottom: 10px; justify-content: center;">Report Submitted!</h3>
+                <p style="color: #64748b; margin-bottom: 25px;">A reference slip is printing...</p>
+                
+                <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 30px;">
+                    <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Reference Number</small>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 5px;">@lastReferenceNumber</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="submit-btn" style="background: #4f46e5; justify-content: center;" @onclick="RetryPrint">
+                        <span>🖨️ Re-Print Slip</span>
+                    </button>
+                    <button class="change-btn" style="background: #e5e7eb; color: #374151; width: 100%; border-radius: 12px; padding: 14px;" @onclick="CloseSuccessModal">
+                         New Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    // New Request Model for Simplified Report
+    public class SimplifiedIncidentReportRequestLocal
+    {
+        [Required(ErrorMessage = "Incident Type is required")]
+        public string IncidentType { get; set; } = string.Empty;
+        
+        public string? OtherIncidentType { get; set; }
+
+        [Required(ErrorMessage = "Description is required")]
+        public string Description { get; set; } = string.Empty;
+
+        public string? VictimName { get; set; }
+        public string? EvidencePhotoBase64 { get; set; }
+        public string? PODIncharge { get; set; }
+    }
+
+    private SimplifiedIncidentReportRequestLocal incidentReportRequest = new();
+    
+    // Validation Property
+    private bool IsFormValid => 
+        !string.IsNullOrWhiteSpace(incidentReportRequest.IncidentType) && 
+        !string.IsNullOrWhiteSpace(incidentReportRequest.Description) &&
+        (incidentReportRequest.IncidentType != "Other" || !string.IsNullOrWhiteSpace(incidentReportRequest.OtherIncidentType));
+    
+    // UI State
+    private int currentStep = 0; // 0 = Teacher, 1 = Main Form
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private bool isOnline = true;
+    private bool isSyncing = false;
+    private bool isSubmitAttempted = false; // To show validation for respondents
+    
+    // Teacher Search State
+    private string teacherSearchText = "";
+    private bool showTeacherSuggestions = false;
+    private List<TeacherSearchResult> teacherSuggestions = new();
+    
+    private TeacherSearchResult? selectedTeacher = null;
+
+    // Respondent State
+    private List<string> addedRespondents = new();
+    private string respondentSearchText = string.Empty;
+    private bool showRespondentSuggestions = false;
+    private List<SharedProject.Studentclass> filteredRespondents = new();
+    private List<SharedProject.Studentclass> schoolStudents = new(); // Cached list
+    
+    // Incident Type Search State
+    private string incidentTypeSearchText = "";
+    private bool showIncidentTypeSuggestions = false;
+
+    // Common State
+    private List<OfflineIncidentReport> pendingReports = new();
+    private DotNetObjectReference<Podofflineonlinerounding>? dotNetHelper;
+    private string? userSchoolName = null;
+    
+    // Modals
+    private bool showDescriptionModal = false;
+    private DateTime modalIncidentDate = DateTime.Now;
+    private TimeOnly modalIncidentTime = TimeOnly.FromDateTime(DateTime.Now);
+    private string modalIncidentLocation = "";
+    private string modalBriefSummary = "";
+    
+    private bool showCameraModal = false;
+    private bool showSuccessPrintModal = false;
+    private string lastReferenceNumber = string.Empty;
+    private object lastPrintDetails = null;
+
+    // Data
+    private List<SharedProject.ViolationType> allViolations = new();
+    private List<SharedProject.ViolationType> filteredViolations = new();
+    private bool showVictimField = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            dotNetHelper = DotNetObjectReference.Create(this);
+            await UpdateConnectionStatus();
+            await LoadPODLocation();
+            
+            try {
+                var username = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+                incidentReportRequest.PODIncharge = !string.IsNullOrEmpty(username) ? username : "POD Officer";
+            } catch { incidentReportRequest.PODIncharge = "POD Officer"; }
+
+            // Initialize Offline
+            try {
+                Console.WriteLine("🔄 [Rounding] Initializing Offline Storage (IndexedDB)...");
+                await OfflineStorage.InitializeAsync();
+                Console.WriteLine("✅ [Rounding] Offline Storage Initialized.");
+                await LoadViolationTypes();
+                await LoadPendingReports();
+            } catch (Exception ex) {
+                Console.WriteLine($"❌ [Rounding] Offline Storage Init Error: {ex.Message}");
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"Init Error: {ex.Message}"); }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) {
+            try {
+                await Task.Delay(500);
+                await JSRuntime.InvokeVoidAsync("connectionMonitor.initialize", dotNetHelper);
+            } catch {}
+        }
+    }
+
+    [JSInvokable]
+    public async Task UpdateConnectionFromJS(bool online)
+    {
+        isOnline = online;
+        await InvokeAsync(StateHasChanged);
+    }
+    private async Task UpdateConnectionStatus() => isOnline = await OfflineStorage.IsOnlineAsync();
+
+    private async Task LoadPODLocation()
+    {
+        userSchoolName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "schoolName");
+        string division = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "division");
+        string region = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "region");
+        string district = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "district");
+        
+        if (!string.IsNullOrEmpty(userSchoolName))
+        {
+            await LoadStudentsBySchool(userSchoolName, division, region, district);
+            await LoadCachedTeachers();
+        }
+    }
+
+    private List<TeacherSearchResult> schoolTeachers = new(); // Local cache for faster search
+
+    private async Task LoadCachedTeachers()
+    {
+        try
+        {
+            var cached = await OfflineStorage.GetCachedTeachersAsync<TeacherSearchResult>();
+            if (cached != null && cached.Any())
+            {
+                schoolTeachers = cached;
+                Console.WriteLine($"✅ Loaded {schoolTeachers.Count} teachers from offline cache.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Error loading cached teachers: {ex.Message}");
+        }
+    }
+
+    private async Task LoadStudentsBySchool(string schoolName, string division, string region, string district)
+    {
+        // Try Online
+        try 
+        {
+            var query = $"schoolName={Uri.EscapeDataString(schoolName ?? "")}";
+            var response = await Http.GetAsync($"api/IncidentReport/students-by-location?{query}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("data", out var data))
+                {
+                    schoolStudents.Clear();
+                    foreach (var item in data.EnumerateArray())
+                    {
+                        schoolStudents.Add(new SharedProject.Studentclass {
+                            StudentName = item.GetProperty("studentName").GetString() ?? "",
+                            GradeLevel = item.GetProperty("gradeLevel").GetString() ?? "",
+                            Section = item.GetProperty("section").GetString() ?? ""
+                        });
+                    }
+                    await OfflineStorage.SaveStudentsAsync(schoolStudents);
+                    return;
+                }
+            }
+        } catch {}
+        
+        // Fallback
+        var cached = await OfflineStorage.GetCachedStudentsAsync<SharedProject.Studentclass>();
+        if (cached != null && cached.Any()) schoolStudents = cached;
+    }
+
+    // --- TEACHER SEARCH ---
+    private async Task OnTeacherSearchInput(ChangeEventArgs e)
+    {
+        teacherSearchText = e.Value?.ToString() ?? "";
+        if (string.IsNullOrWhiteSpace(teacherSearchText)) {
+            teacherSuggestions.Clear();
+            showTeacherSuggestions = false;
+        } else {
+            // Search API or Cache
+            if (isOnline) {
+                try {
+                     var url = $"api/StudentProfileCaseRecord/search-teachers?searchTerm={Uri.EscapeDataString(teacherSearchText)}&schoolName={Uri.EscapeDataString(userSchoolName ?? "")}";
+                     var res = await Http.GetAsync(url);
+                     if (res.IsSuccessStatusCode) {
+                         var content = await res.Content.ReadAsStringAsync();
+                         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                         var result = JsonSerializer.Deserialize<JsonElement>(content);
+                         if (result.TryGetProperty("data", out var data)) {
+                             var allFound = JsonSerializer.Deserialize<List<TeacherSearchResult>>(data.GetRawText(), options) ?? new();
+                             
+                             // FILTER: Only show Teachers/Advisers.
+                             teacherSuggestions = allFound.Where(t => {
+                                 var pos = (t.Position ?? "").ToUpper();
+                                 return !pos.Contains("POD") && !pos.Contains("GUIDANCE") && !pos.Contains("OFFICER");
+                             }).ToList();
+                             
+                             // Update local cache if we got results
+                             if (teacherSuggestions.Any())
+                             {
+                                 // Add new teachers to schoolTeachers and save
+                                 foreach (var t in teacherSuggestions)
+                                 {
+                                     if (!schoolTeachers.Any(st => st.TeacherID == t.TeacherID))
+                                         schoolTeachers.Add(t);
+                                 }
+                                 await OfflineStorage.SaveTeachersAsync(schoolTeachers);
+                             }
+                         }
+                     }
+                } catch {
+                    // Fallback to local search on error
+                    PerformLocalTeacherSearch();
+                }
+            } else {
+                PerformLocalTeacherSearch();
+            }
+            showTeacherSuggestions = true;
+        }
+    }
+
+    private void PerformLocalTeacherSearch()
+    {
+        if (string.IsNullOrWhiteSpace(teacherSearchText)) return;
+        
+        teacherSuggestions = schoolTeachers
+            .Where(t => {
+                var nameMatch = t.TeacherName.Contains(teacherSearchText, StringComparison.OrdinalIgnoreCase);
+                var pos = (t.Position ?? "").ToUpper();
+                var isAdviser = !pos.Contains("POD") && !pos.Contains("GUIDANCE") && !pos.Contains("OFFICER");
+                return nameMatch && isAdviser;
+            })
+            .Take(10)
+            .ToList();
+            
+        Console.WriteLine($"🔍 Offline Search: Found {teacherSuggestions.Count} teachers in cache.");
+    }
+
+    private void SelectTeacher(TeacherSearchResult teacher)
+    {
+        selectedTeacher = teacher;
+        teacherSearchText = "";
+        showTeacherSuggestions = false;
+        currentStep = 1;
+    }
+
+    private void SkipTeacherSearch()
+    {
+        selectedTeacher = null;
+        currentStep = 1;
+    }
+
+    private void ResetStep()
+    {
+        currentStep = 0;
+        selectedTeacher = null;
+        addedRespondents.Clear();
+        StateHasChanged();
+    }
+
+    // --- RESPONDENT LOGIC ---
+    private void OnRespondentSearchInput(ChangeEventArgs e)
+    {
+        respondentSearchText = e.Value?.ToString() ?? "";
+        if (string.IsNullOrWhiteSpace(respondentSearchText)) {
+            filteredRespondents.Clear();
+            showRespondentSuggestions = false;
+        } else {
+            var term = respondentSearchText.ToLower();
+            filteredRespondents = schoolStudents
+                .Where(s => s.StudentName.ToLower().Contains(term))
+                .Take(20)
+                .ToList();
+            showRespondentSuggestions = true;
+        }
+    }
+
+    private void OnRespondentInputKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(respondentSearchText))
+        {
+            AddManualRespondent(respondentSearchText);
+        }
+    }
+
+    private void AddRespondent(SharedProject.Studentclass student)
+    {
+        var upperName = student.StudentName.ToUpper();
+        if (!addedRespondents.Contains(upperName))
+            addedRespondents.Add(upperName);
+            
+        respondentSearchText = "";
+        showRespondentSuggestions = false;
+    }
+
+    private void AddManualRespondent(string name)
+    {
+        var upperName = name.ToUpper();
+        if (!string.IsNullOrWhiteSpace(upperName) && !addedRespondents.Contains(upperName))
+        {
+            addedRespondents.Add(upperName);
+            respondentSearchText = "";
+            showRespondentSuggestions = false;
+        }
+    }
+
+    // --- INCIDENT TYPE SEARCH ---
+    private void OnIncidentTypeInput(string input)
+    {
+        incidentReportRequest.IncidentType = input;
+        incidentTypeSearchText = input;
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            filteredViolations = allViolations.Take(10).ToList();
+            showIncidentTypeSuggestions = true;
+        }
+        else
+        {
+            var term = input.ToLower();
+            filteredViolations = allViolations
+                .Where(v => v.ViolationName.ToLower().Contains(term) || v.ViolationCategory.ToLower().Contains(term))
+                .Take(10)
+                .ToList();
+            showIncidentTypeSuggestions = true;
+        }
+        UpdateVictimFieldVisibility();
+    }
+
+    private void SelectIncidentType(SharedProject.ViolationType violation)
+    {
+        incidentReportRequest.IncidentType = violation.ViolationName;
+        incidentTypeSearchText = violation.ViolationName;
+        showIncidentTypeSuggestions = false;
+        
+        // Clear "Other" text if not "Other"
+        if (violation.ViolationName != "Other")
+        {
+            incidentReportRequest.OtherIncidentType = null;
+        }
+        UpdateVictimFieldVisibility();
+    }
+
+    private void UpdateVictimFieldVisibility()
+    {
+        var selected = allViolations.FirstOrDefault(v => v.ViolationName.Equals(incidentReportRequest.IncidentType, StringComparison.OrdinalIgnoreCase));
+        if (selected != null)
+        {
+            showVictimField = selected.HasVictim == "Yes";
+        }
+        else
+        {
+            showVictimField = false;
+        }
+
+        if (!showVictimField)
+        {
+            incidentReportRequest.VictimName = null;
+            victimSearchText = "";
+        }
+    }
+
+
+    private void RemoveRespondent(string name)
+    {
+        addedRespondents.Remove(name);
+    }
+    
+    // --- VICTIM LOGIC ---
+    private string victimSearchText = string.Empty;
+    private bool showVictimSuggestions = false;
+    private List<SharedProject.Studentclass> filteredVictims = new();
+
+    private void OnVictimSearchInput(ChangeEventArgs e)
+    {
+        victimSearchText = e.Value?.ToString() ?? "";
+        incidentReportRequest.VictimName = victimSearchText.ToUpper(); 
+
+        if (string.IsNullOrWhiteSpace(victimSearchText)) {
+            filteredVictims.Clear();
+            showVictimSuggestions = false;
+        } else {
+            var term = victimSearchText.ToLower();
+            filteredVictims = schoolStudents
+                .Where(s => s.StudentName.ToLower().Contains(term))
+                .Take(10)
+                .ToList();
+            showVictimSuggestions = true;
+        }
+    }
+
+    private void SelectVictim(SharedProject.Studentclass student)
+    {
+        victimSearchText = student.StudentName;
+        incidentReportRequest.VictimName = student.StudentName.ToUpper();
+        showVictimSuggestions = false;
+    }
+
+    private void OnVictimInputKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(victimSearchText))
+        {
+            if (showVictimSuggestions && filteredVictims.Any())
+            {
+                SelectVictim(filteredVictims.First());
+            }
+            else
+            {
+                SelectVictimManual(victimSearchText);
+            }
+        }
+    }
+
+    private void SelectVictimManual(string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            incidentReportRequest.VictimName = name.Trim().ToUpper();
+            victimSearchText = name.Trim().ToUpper();
+            showVictimSuggestions = false;
+        }
+    }
+
+    // --- SUBMIT LOGIC ---
+    private async Task HandleSubmit()
+    {
+        isSubmitAttempted = true;
+        if (!addedRespondents.Any()) {
+            message = "⚠️ Please add at least one respondent.";
+            isSuccess = false;
+            return;
+        }
+
+        isLoading = true;
+        if (string.IsNullOrWhiteSpace(incidentReportRequest.VictimName)) incidentReportRequest.VictimName = "N/A";
+
+        if (isOnline) await SubmitToServer();
+        else await SaveOffline();
+
+        isLoading = false;
+    }
+
+    private async Task SubmitToServer()
+    {
+        try
+        {
+            string allRespondents = string.Join(" / ", addedRespondents);
+
+            var payload = new SharedProject.SimplifiedIncidentReportRequest
+            {
+                 FullName = incidentReportRequest.PODIncharge ?? "POD", 
+                 RespondentName = allRespondents,
+                 AdviserName = selectedTeacher?.TeacherName ?? "N/A",
+                 VictimName = incidentReportRequest.VictimName ?? "N/A",
+                 IncidentType = incidentReportRequest.IncidentType,
+                 Description = incidentReportRequest.Description,
+                 EvidencePhotoBase64 = incidentReportRequest.EvidencePhotoBase64,
+                 Status = "Pending",
+                 SchoolName = userSchoolName ?? "",
+                 Division = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "division") ?? "",
+                 ReporterID = null, 
+                 ReporterRole = "POD"
+            };
+
+            var response = await Http.PostAsJsonAsync("api/IncidentReport/simplified", payload);
+            
+            if (response.IsSuccessStatusCode) {
+                var content = await response.Content.ReadAsStringAsync();
+                var refNum = "N/A";
+                try {
+                     var json = JsonSerializer.Deserialize<JsonElement>(content);
+                     if (json.TryGetProperty("referenceNumber", out var r)) refNum = r.GetString() ?? "N/A";
+                } catch { }
+
+                // Print
+                lastReferenceNumber = refNum;
+                lastPrintDetails = new {
+                    date = DateTime.Now.ToString("yyyy-MM-dd"),
+                    time = DateTime.Now.ToShortTimeString(),
+                    type = payload.IncidentType,
+                    complainant = payload.FullName
+                };
+                
+                try {
+                     await JSRuntime.InvokeVoidAsync("bluetoothPrinter.printTicket", refNum, lastPrintDetails);
+                } catch {}
+
+                message = "";
+                isSuccess = true;
+                showSuccessPrintModal = true;
+                
+            } else {
+                message = $"❌ Server Error: {response.StatusCode}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex) {
+            message = $"❌ Error: {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task SaveOffline()
+    {
+        try {
+            string allRespondents = string.Join(" / ", addedRespondents);
+            
+            var offlineReport = new {
+                ComplainantName = incidentReportRequest.PODIncharge ?? "POD",
+                RespondentName = allRespondents,
+                AdviserName = selectedTeacher?.TeacherName ?? "N/A",
+                IncidentType = incidentReportRequest.IncidentType,
+                OtherIncidentType = incidentReportRequest.OtherIncidentType,
+                IncidentDescription = incidentReportRequest.Description,
+                VictimName = incidentReportRequest.VictimName,
+                EvidencePhotoBase64 = incidentReportRequest.EvidencePhotoBase64,
+                SchoolName = userSchoolName ?? "",
+                Division = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "division") ?? "",
+                DateReported = DateTime.Now.ToString("o"),
+                Status = "Pending",
+                ComplainantGrade = "N/A", ComplainantSection = "N/A", ComplainantStrand = "N/A",
+                VictimContact = "N/A", RoomNumber = "N/A", Region="", District=""
+            };
+
+            await OfflineStorage.AddIncidentReportAsync(offlineReport);
+            message = "💾 Saved to device!";
+            isSuccess = true;
+            await LoadPendingReports();
+            await Task.Delay(1000);
+            await ResetForm();
+        } catch (Exception ex) {
+             Console.WriteLine($"Offline Save Error: {ex.Message}");
+             message = "❌ Save failed";
+        }
+    }
+
+    private async Task ResetForm()
+    {
+        addedRespondents.Clear();
+        teacherSearchText = "";
+        incidentTypeSearchText = "";
+        showIncidentTypeSuggestions = false;
+        
+        incidentReportRequest = new SimplifiedIncidentReportRequestLocal { 
+            PODIncharge = incidentReportRequest.PODIncharge 
+        };
+        
+        modalBriefSummary = "";
+        modalIncidentLocation = "";
+        modalIncidentDate = DateTime.Now;
+        modalIncidentTime = TimeOnly.FromDateTime(DateTime.Now);
+
+        message = "";
+        isSubmitAttempted = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadPendingReports()
+    {
+        pendingReports = await OfflineStorage.GetUnsyncedReportsAsync<OfflineIncidentReport>();
+        StateHasChanged();
+    }
+
+    private void OpenOfflineModal() => showOfflineModal = true;
+    private void CloseOfflineModal() => showOfflineModal = false;
+
+    private async Task SyncPendingReports()
+    {
+        if (isSyncing || !isOnline) return;
+        isSyncing = true;
+        int success = 0;
+        
+        foreach(var report in pendingReports.ToList())
+        {
+             try {
+                 var payload = new SharedProject.SimplifiedIncidentReportRequest {
+                     FullName = report.ComplainantName,
+                     RespondentName = report.RespondentName,
+                     AdviserName = report.AdviserName,
+                     VictimName = report.VictimName,
+                     IncidentType = report.IncidentType,
+                     Description = report.IncidentDescription,
+                     EvidencePhotoBase64 = report.EvidencePhotoBase64,
+                     Status = "Pending",
+                     SchoolName = report.SchoolName,
+                     Division = report.Division ?? ""
+                 };
+                 
+                 var res = await Http.PostAsJsonAsync("api/IncidentReport/simplified", payload);
+                 if (res.IsSuccessStatusCode) {
+                     if (report.Id.HasValue) await OfflineStorage.DeleteReportAsync(report.Id.Value);
+                     success++;
+                 }
+             } catch {}
+        }
+        
+        await LoadPendingReports();
+        isSyncing = false;
+        if (success > 0) {
+            message = $"Synced {success} reports!";
+            showOfflineModal = false;
+        }
+    }
+    
+    private async Task LoadViolationTypes()
+    {
+         try {
+             // Try to load from cache first
+             var cached = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "cached_violation_types_full");
+             if (!string.IsNullOrEmpty(cached)) {
+                 allViolations = JsonSerializer.Deserialize<List<SharedProject.ViolationType>>(cached) ?? new();
+             }
+
+             if (isOnline) {
+                 var res = await Http.GetAsync("api/IncidentReport/violation-types");
+                 if (res.IsSuccessStatusCode) {
+                     var content = await res.Content.ReadAsStringAsync();
+                     var result = JsonSerializer.Deserialize<JsonElement>(content);
+                     if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                         result.TryGetProperty("data", out var data)) {
+                         allViolations = JsonSerializer.Deserialize<List<SharedProject.ViolationType>>(data.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                         
+                         // Add "Other" if not present
+                         if (!allViolations.Any(v => v.ViolationName == "Other"))
+                         {
+                             allViolations.Add(new SharedProject.ViolationType { ViolationName = "Other", ViolationCategory = "General", HasVictim = "No" });
+                         }
+                         
+                         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "cached_violation_types_full", JsonSerializer.Serialize(allViolations));
+                     }
+                 }
+             }
+             
+             if (!allViolations.Any())
+             {
+                 // Final fallback or initial state
+                 allViolations.Add(new SharedProject.ViolationType { ViolationName = "Other", ViolationCategory = "General", HasVictim = "No" });
+             }
+         } catch (Exception ex) {
+             Console.WriteLine($"Error loading violation types: {ex.Message}");
+         }
+    }
+
+    private bool showOfflineModal = false;
+
+    // Modal Helpers
+    private void OpenDescriptionModal() {
+        modalBriefSummary = incidentReportRequest.Description; // Pre-fill
+        showDescriptionModal = true;
+    }
+    private void CloseDescriptionModal() => showDescriptionModal = false;
+    private void SaveDescriptionModal() {
+        incidentReportRequest.Description = $"{modalIncidentDate:yyyy-MM-dd} {modalIncidentTime:hh:mm tt} @ {modalIncidentLocation}\n{modalBriefSummary}";
+        CloseDescriptionModal();
+    }
+    
+    private async Task OpenCameraModal()
+    {
+        showCameraModal = true;
+        await Task.Delay(500);
+        await JSRuntime.InvokeVoidAsync("cameraInterop.startCamera", "cameraFeed");
+    }
+    private void CloseCameraModal()
+    {
+        showCameraModal = false;
+        JSRuntime.InvokeVoidAsync("cameraInterop.stopCamera");
+    }
+    private async Task CapturePhoto()
+    {
+        // Require JS helper for canvas capture
+        var base64 = await JSRuntime.InvokeAsync<string>("cameraInterop.captureImage");
+        if (!string.IsNullOrEmpty(base64)) {
+            incidentReportRequest.EvidencePhotoBase64 = base64;
+            CloseCameraModal();
+        }
+    }
+    
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            var resizedFile = await file.RequestImageFileAsync(file.ContentType, 800, 600);
+            var buffer = new byte[resizedFile.Size];
+            await resizedFile.OpenReadStream().ReadAsync(buffer);
+            incidentReportRequest.EvidencePhotoBase64 = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+        }
+    }
+
+    private void CloseSuccessModal() {
+        showSuccessPrintModal = false;
+        ResetForm();
+    }
+    private async Task RetryPrint() {
+        if (lastPrintDetails != null)
+             await JSRuntime.InvokeVoidAsync("bluetoothPrinter.printTicket", lastReferenceNumber, lastPrintDetails);
+    }
+}

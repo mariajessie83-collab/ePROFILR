@@ -1,0 +1,732 @@
+@page "/multiple-case-records"
+@layout Gsystem.Layout.PODLayout
+@using System.Text.Json
+@using SharedProject
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Case Record Details</PageTitle>
+
+@if (isAuthenticated && isPODUser)
+{
+    <div class="multiple-records-container">
+        <div class="review-header">
+            <div class="header-content">
+                <button class="btn-back" @onclick="GoBack">
+                    <span>←</span> Back to Dashboard
+                </button>
+                <div class="header-title">
+                    <h2>Case Record Details</h2>
+                    <span class="records-count-badge">@caseRecords.Count Record@(caseRecords.Count > 1 ? "s" : "")</span>
+                </div>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Loading case records...</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isSuccess ? "alert-success" : "alert-error")">
+                @message
+            </div>
+        }
+
+        @if (caseRecords.Any() && !isLoading)
+        {
+            <div class="records-grid">
+                @foreach (var record in caseRecords)
+                {
+                    <div class="record-card">
+                        <div class="record-card-header">
+                            <h3>@record.StudentOffenderName</h3>
+                            <span class="record-id-badge">Record #@record.RecordID</span>
+                        </div>
+
+                        <div class="record-card-footer">
+                            <button class="btn btn-info" @onclick='() => NavigationManager.NavigateTo($"/case-record-review/{record.RecordID}")'>
+                                <span class="btn-icon">📝</span>
+                                View Full Details
+                            </button>
+
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="access-denied">
+        <h2>Access Denied</h2>
+        <p>You don't have permission to access this page.</p>
+        <a href="/pod-dashboard" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+}
+
+
+
+@code {
+    private List<CaseRecordData> caseRecords = new();
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private bool isAuthenticated = false;
+    private bool isPODUser = false;
+    private string currentUser = string.Empty;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthentication();
+        
+        if (isAuthenticated && isPODUser)
+        {
+            await LoadCaseRecords();
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser))
+            {
+                isAuthenticated = true;
+                isPODUser = userRole?.Equals("teacher", StringComparison.OrdinalIgnoreCase) == true &&
+                           userPosition?.Equals("POD", StringComparison.OrdinalIgnoreCase) == true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Auth Error: {ex.Message}");
+            isAuthenticated = false;
+            isPODUser = false;
+        }
+    }
+
+    private async Task LoadCaseRecords()
+    {
+        isLoading = true;
+        try
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            var idsParam = query["ids"];
+            
+            if (string.IsNullOrEmpty(idsParam))
+            {
+                message = "No record IDs provided.";
+                isSuccess = false;
+                return;
+            }
+
+            var recordIds = idsParam.Split(',').Select(int.Parse).ToList();
+            
+            foreach (var recordId in recordIds)
+            {
+                var response = await Http.GetAsync($"api/StudentProfileCaseRecord/{recordId}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                        result.TryGetProperty("data", out var data))
+                    {
+                        var record = new CaseRecordData();
+                        
+                        // Use recordId from URL if recordID is not in response
+                        record.RecordID = recordId;
+                        
+                        // Try to get recordID from response, but fallback to URL parameter
+                        if (data.TryGetProperty("recordID", out var recId) && recId.TryGetInt32(out var parsedId))
+                        {
+                            record.RecordID = parsedId;
+                            Console.WriteLine($"Loaded RecordID from API: {parsedId}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Using RecordID from URL: {recordId}");
+                        }
+                        
+                        if (data.TryGetProperty("studentOffenderName", out var studentName))
+                            record.StudentOffenderName = studentName.GetString() ?? "";
+                        if (data.TryGetProperty("gradeLevel", out var gradeLevel))
+                            record.GradeLevel = gradeLevel.GetString() ?? "";
+                        if (data.TryGetProperty("trackStrand", out var trackStrand))
+                            record.TrackStrand = trackStrand.GetString() ?? "";
+                        if (data.TryGetProperty("section", out var section))
+                            record.Section = section.GetString() ?? "";
+                        if (data.TryGetProperty("adviserName", out var adviserName))
+                            record.AdviserName = adviserName.GetString() ?? "";
+                        if (data.TryGetProperty("parentGuardianContact", out var contact))
+                            record.ParentGuardianContact = contact.GetString() ?? "";
+                        if (data.TryGetProperty("violationCommitted", out var violation))
+                            record.ViolationCommitted = violation.GetString() ?? "";
+                        if (data.TryGetProperty("levelOfOffense", out var level))
+                            record.LevelOfOffense = level.GetString() ?? "";
+                        if (data.TryGetProperty("dateOfOffense", out var dateOffense))
+                            record.DateOfOffense = DateTime.Parse(dateOffense.GetString() ?? DateTime.Now.ToString());
+                        if (data.TryGetProperty("detailsOfAgreement", out var details))
+                            record.DetailsOfAgreement = details.GetString() ?? "";
+                        
+                        Console.WriteLine($"Added record: {record.StudentOffenderName} with RecordID: {record.RecordID}");
+                        caseRecords.Add(record);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading case records: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/pod-dashboard");
+    }
+
+
+
+    private string GetLevelBadgeClass(string level)
+    {
+        return level?.ToLower() switch
+        {
+            "minor" => "badge-minor",
+            "major" => "badge-major",
+            "severe" => "badge-severe",
+            _ => "badge-default"
+        };
+    }
+
+    private string ConvertMarkdownToBold(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+        
+        // First, escape any existing HTML
+        text = text.Replace("<", "&lt;").Replace(">", "&gt;");
+        
+        // Convert **text** to <strong>text</strong>
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"\*\*(.+?)\*\*",
+            "<strong>$1</strong>"
+        );
+        
+        // Preserve line breaks and spaces
+        text = text.Replace("\n", "<br/>");
+        
+        return text;
+    }
+
+    private class CaseRecordData
+    {
+        public int RecordID { get; set; }
+        public string StudentOffenderName { get; set; } = "";
+        public string GradeLevel { get; set; } = "";
+        public string TrackStrand { get; set; } = "";
+        public string Section { get; set; } = "";
+        public string AdviserName { get; set; } = "";
+        public string ParentGuardianContact { get; set; } = "";
+        public string ViolationCommitted { get; set; } = "";
+        public string LevelOfOffense { get; set; } = "";
+        public DateTime DateOfOffense { get; set; }
+        public string DetailsOfAgreement { get; set; } = "";
+    }
+}
+
+<style>
+    .multiple-records-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .review-header {
+        background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .btn-back {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-back:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateX(-2px);
+    }
+
+    .header-title {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex: 1;
+    }
+
+    .header-title h2 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+
+    .records-count-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #003d82;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .alert {
+        padding: 16px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-weight: 500;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .alert-error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .records-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 24px;
+    }
+
+    .record-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .record-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .record-card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 16px 20px;
+        border-bottom: 2px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .record-card-header h3 {
+        margin: 0;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #003d82;
+    }
+
+    .record-id-badge {
+        background: #003d82;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .record-card-body {
+        padding: 20px;
+    }
+
+    .info-section {
+        margin-bottom: 20px;
+    }
+
+    .info-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .info-section h4 {
+        margin: 0 0 12px 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #495057;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .section-icon {
+        font-size: 1.2rem;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-item.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .info-item label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-item span {
+        color: #212529;
+        font-size: 1rem;
+        display: block;
+        line-height: 1.8;
+        text-align: justify;
+    }
+
+    .info-item span strong {
+        color: #003d82;
+        font-weight: 700;
+        background: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .record-card-footer {
+        padding: 16px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        justify-content: center;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #003d82;
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #002a5c;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #5a6268;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+        background: #218838;
+    }
+
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .btn-info:hover:not(:disabled) {
+        background: #138496;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-minor {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .badge-major {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .badge-severe {
+        background: #d1345b;
+        color: white;
+    }
+
+    .badge-default {
+        background: #e9ecef;
+        color: #495057;
+    }
+
+    .access-denied {
+        max-width: 600px;
+        margin: 100px auto;
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* SMS Modal */
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+
+    .sms-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 600px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        z-index: 1001;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 2px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+        color: white;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        color: white;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .sms-info-section {
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .info-value {
+        color: #212529;
+    }
+
+    .sms-message-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .message-header label {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .btn-link {
+        background: none;
+        border: none;
+        color: #003d82;
+        cursor: pointer;
+        text-decoration: underline;
+        font-size: 0.9rem;
+    }
+
+    .sms-textarea {
+        min-height: 150px;
+        padding: 12px;
+        border: 2px solid #ced4da;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 1rem;
+        resize: vertical;
+    }
+
+    .sms-textarea:focus {
+        outline: none;
+        border-color: #003d82;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 2px solid #e9ecef;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    @@media (max-width: 768px) {
+        .records-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .record-card-footer {
+            flex-direction: column;
+        }
+        
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

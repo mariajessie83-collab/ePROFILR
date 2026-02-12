@@ -1,0 +1,1562 @@
+@page "/admin-dashboard"
+@layout Gsystem.Layout.AdminLayout
+@using System.Text.Json
+@using System.Linq
+@using System.Collections.Generic
+@using SharedProject
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin Dashboard - Account Management</PageTitle>
+
+@if (isAuthenticated && isAdminUser)
+{
+    <div class="admin-dashboard-container">
+        <div class="admin-dashboard-header">
+            <h2>Admin Dashboard</h2>
+            <p>Manage admin, school head, and division accounts</p>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Loading accounts...</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="snackbar @(isSuccess ? "snackbar-success" : "snackbar-error") @(showSnackbar ? "show" : "")">
+                <span class="snackbar-icon">@(isSuccess ? "✓" : "✕")</span>
+                <span class="snackbar-message">@message</span>
+            </div>
+        }
+
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>@totalAccounts</h3>
+                <p>Total Accounts</p>
+            </div>
+            <div class="stat-card admin">
+                <h3>@adminCount</h3>
+                <p>Admins</p>
+            </div>
+            <div class="stat-card schoolhead">
+                <h3>@schoolHeadCount</h3>
+                <p>School Heads</p>
+            </div>
+            <div class="stat-card division">
+                <h3>@divisionCount</h3>
+                <p>Divisions</p>
+            </div>
+        </div>
+
+        <div class="accounts-section">
+            <div class="section-header">
+                <h3>Account Management</h3>
+                <div class="filter-controls">
+                    <input type="text"
+                           class="form-control search-input"
+                           placeholder="Search accounts..."
+                           value="@searchTerm"
+                           @oninput="OnSearchChanged" />
+                    <select @onchange="OnAccountTypeFilterChanged" class="form-control">
+                        <option value="">All Types</option>
+                        <option value="admin">Admin</option>
+                        <option value="schoolhead">School Head</option>
+                        <option value="division">Division</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="OpenCreateAccountModal">
+                        <span style="margin-right: 8px;">+</span> Create Account
+                    </button>
+                    <button class="btn btn-secondary" @onclick="RefreshAccounts">Refresh</button>
+                </div>
+            </div>
+
+            @if (filteredAccounts != null && filteredAccounts.Count > 0)
+            {
+                <div class="accounts-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Password</th>
+                                <th>Full Name</th>
+                                <th>Account Type</th>
+                                <th>School/Division</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var account in filteredAccounts)
+                            {
+                                <tr class="account-type-@(account.AccountType?.ToLower())">
+                                    <td>#@account.AdminAccountID</td>
+                                    <td>@(string.IsNullOrEmpty(account.Username) ? "-" : account.Username)</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(account.UserPassword))
+                                        {
+                                            <div class="account-password-display">
+                                                <span class="password-value">
+                                                    @if (IsAccountPasswordVisible(account.AdminAccountID))
+                                                    {
+                                                        @account.UserPassword
+                                                    }
+                                                    else
+                                                    {
+                                                        @((account.UserPassword.Length > 0) ? new string('•', Math.Min(account.UserPassword.Length, 12)) : "-")
+                                                    }
+                                                </span>
+                                                <button type="button"
+                                                        class="password-toggle icon-button"
+                                                        @onclick="() => ToggleAccountPasswordVisibility(account.AdminAccountID)"
+                                                        aria-label="Toggle password visibility">
+                                                    @if (IsAccountPasswordVisible(account.AdminAccountID))
+                                                    {
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path d="M12 5C6.5 5 2 9 1 12c1 3 5.5 7 11 7s10-4 11-7c-1-3-5.5-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                                                            <path d="M4.3 3l16.7 16.7-1.3 1.3L3 4.3 4.3 3z"/>
+                                                        </svg>
+                                                    }
+                                                    else
+                                                    {
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path d="M12 5C6.5 5 2 9 1 12c1 3 5.5 7 11 7s10-4 11-7c-1-3-5.5-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                                                        </svg>
+                                                    }
+                                                </button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td>@account.FullName</td>
+                                    <td>
+                                        <span class="account-type-badge account-type-@(account.AccountType?.ToLower())">
+                                            @(account.AccountType?.ToUpper() ?? "N/A")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (account.AccountType?.ToLower() == "schoolhead")
+                                        {
+                                            <text>@(account.SchoolName ?? "N/A")</text>
+                                        }
+                                        else if (account.AccountType?.ToLower() == "division")
+                                        {
+                                            <text>@(account.DivisionName ?? "N/A")</text>
+                                        }
+                                        else
+                                        {
+                                            <text>-</text>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (account.AccountType?.ToLower() == "schoolhead")
+                                        {
+                                            <text>@(account.Division ?? "") @(account.Region ?? "") @(account.District ?? "")</text>
+                                        }
+                                        else if (account.AccountType?.ToLower() == "division")
+                                        {
+                                            <text>@(account.DivisionName ?? "")</text>
+                                        }
+                                        else
+                                        {
+                                            <text>-</text>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="status-badge @(account.IsActive ? "status-active" : "status-inactive")">
+                                            @(account.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </td>
+                                    <td>@(account.CreatorName ?? "System")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" @onclick="() => OpenEditAccountModal(account)">
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteAccount(account.AdminAccountID)">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="no-accounts">
+                    <p>No accounts found.</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Create Account Modal *@
+    @if (showCreateModal)
+    {
+        <div class="modal-backdrop" @onclick="CloseCreateModal">
+            <div class="modal-window" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>Create New Account</h3>
+                    <button class="btn-close" @onclick="CloseCreateModal">×</button>
+                </div>
+                <div class="modal-content">
+                    <div class="form-group">
+                        <label>Account Type *</label>
+                        <select class="form-control" @bind="newAccount.AccountType" @bind:after="OnAccountTypeChangedAfterBind">
+                            <option value="">Select Account Type</option>
+                            <option value="admin">Admin</option>
+                            <option value="schoolhead">School Head</option>
+                            <option value="division">Division</option>
+                        </select>
+                    </div>
+                     
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" class="form-control" @bind="newAccount.Username" placeholder="Enter username" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <div class="password-field">
+                            <input type="@(showPassword ? "text" : "password")"
+                                   class="form-control"
+                                   @bind="newAccount.Password"
+                                   placeholder="Enter password" />
+                            <button type="button"
+                                    class="password-toggle icon-button"
+                                    @onclick="TogglePasswordVisibility"
+                                    aria-label="Toggle password visibility">
+                                @if (showPassword)
+                                {
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 5C6.5 5 2 9 1 12c1 3 5.5 7 11 7s10-4 11-7c-1-3-5.5-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                                        <path d="M4.3 3l16.7 16.7-1.3 1.3L3 4.3 4.3 3z"/>
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 5C6.5 5 2 9 1 12c1 3 5.5 7 11 7s10-4 11-7c-1-3-5.5-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                                    </svg>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Full Name * (Format: LAST NAME, FIRST NAME MIDDLE NAME)</label>
+                        <input type="text" 
+                               class="form-control" 
+                               value="@newAccount.FullName" 
+                               @oninput="OnFullNameInput"
+                               placeholder="LAST NAME, FIRST NAME MIDDLE NAME" 
+                               style="text-transform: uppercase;" />
+                        <small class="form-hint">Example: DELA CRUZ, JUAN CARLOS SANTOS</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="form-control" @bind="newAccount.Email" placeholder="Enter email" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Phone Number (Philippine Format: 09XXXXXXXXX)</label>
+                        <input type="text" 
+                               class="form-control" 
+                               value="@newAccount.PhoneNumber" 
+                               @oninput="OnPhoneNumberInput"
+                               placeholder="09XXXXXXXXX (11 digits)" 
+                               maxlength="11" />
+                        @if (!string.IsNullOrEmpty(phoneError))
+                        {
+                            <small class="phone-error">@phoneError</small>
+                        }
+                        else
+                        {
+                            <small class="form-hint">Format: 09XXXXXXXXX (11 digits starting with 09)</small>
+                        }
+                    </div>
+
+                    @* School Head Specific Fields *@
+                    @if (newAccount.AccountType?.ToLower() == "schoolhead")
+                    {
+                        <div class="form-group">
+                            <label>School Name *</label>
+                            <div class="autocomplete-container">
+                                <input type="text" 
+                                       class="form-control" 
+                                       value="@schoolSearchText" 
+                                       @oninput="OnSchoolSearchInput"
+                                       placeholder="Type to search school name..." 
+                                       autocomplete="off"
+                                       style="text-transform: uppercase;" />
+                                @if (showSchoolDropdown && filteredSchools.Any())
+                                {
+                                    <div class="autocomplete-dropdown">
+                                        @foreach (var school in filteredSchools.Take(10))
+                                        {
+                                            <div class="autocomplete-item" @onclick="() => SelectSchool(school)">
+                                                <strong>@school.SchoolName</strong>
+                                                <small>@school.School_ID | @school.Division, @school.Region</small>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>School ID</label>
+                            <input type="text" class="form-control" @bind="newAccount.School_ID" placeholder="Auto-filled from school selection" readonly />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Division *</label>
+                            <input type="text" class="form-control" @bind="newAccount.Division" placeholder="Auto-filled from school selection" readonly />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Region *</label>
+                            <input type="text" class="form-control" @bind="newAccount.Region" placeholder="Auto-filled from school selection" readonly />
+                        </div>
+
+                        <div class="form-group">
+                            <label>District *</label>
+                            <input type="text" class="form-control" @bind="newAccount.District" placeholder="Auto-filled from school selection" readonly />
+                        </div>
+                    }
+
+                    @* Division Specific Fields *@
+                    @if (newAccount.AccountType?.ToLower() == "division")
+                    {
+                        <div class="form-group">
+                            <label>Division Name *</label>
+                            <div class="autocomplete-container">
+                                <input type="text" 
+                                       class="form-control" 
+                                       value="@divisionSearchText" 
+                                       @oninput="OnDivisionSearchInput"
+                                       placeholder="Type to search division name..." 
+                                       autocomplete="off"
+                                       style="text-transform: uppercase;" />
+                                @if (showDivisionDropdown && filteredDivisions.Any())
+                                {
+                                    <div class="autocomplete-dropdown">
+                                        @foreach (var division in filteredDivisions.Take(10))
+                                        {
+                                            <div class="autocomplete-item" @onclick="() => SelectDivision(division)">
+                                                <strong>@division</strong>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @onclick="CloseCreateModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="CreateAccount" disabled="@isCreating">
+                        @if (isCreating) { <span>Creating...</span> } else { <span>Create Account</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Edit Account Modal *@
+    @if (showEditModal && selectedAccount != null)
+    {
+        <div class="modal-backdrop" @onclick="CloseEditModal">
+            <div class="modal-window" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>Edit Account</h3>
+                    <button class="btn-close" @onclick="CloseEditModal">×</button>
+                </div>
+                <div class="modal-content">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" class="form-control" @bind="editAccount.FullName" placeholder="Enter full name" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" class="form-control" @bind="editAccount.Email" placeholder="Enter email" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="text" class="form-control" @bind="editAccount.PhoneNumber" placeholder="Enter phone number" />
+                    </div>
+
+                    @* School Head Specific Fields *@
+                    @if (selectedAccount.AccountType?.ToLower() == "schoolhead")
+                    {
+                        <div class="form-group">
+                            <label>School Name *</label>
+                            <input type="text" class="form-control" @bind="editAccount.SchoolName" placeholder="Enter school name" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>School ID</label>
+                            <input type="text" class="form-control" @bind="editAccount.School_ID" placeholder="Enter school ID" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Division *</label>
+                            <input type="text" class="form-control" @bind="editAccount.Division" placeholder="Enter division" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>Region *</label>
+                            <input type="text" class="form-control" @bind="editAccount.Region" placeholder="Enter region" />
+                        </div>
+
+                        <div class="form-group">
+                            <label>District *</label>
+                            <input type="text" class="form-control" @bind="editAccount.District" placeholder="Enter district" />
+                        </div>
+                    }
+
+                    @* Division Specific Fields *@
+                    @if (selectedAccount.AccountType?.ToLower() == "division")
+                    {
+                        <div class="form-group">
+                            <label>Division Name *</label>
+                            <input type="text" class="form-control" @bind="editAccount.DivisionName" placeholder="Enter division name" />
+                        </div>
+                    }
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" @bind="editAccount.IsActive" />
+                            Active
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" @onclick="CloseEditModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="UpdateAccount" disabled="@isUpdating">
+                        @if (isUpdating) { <span>Updating...</span> } else { <span>Update Account</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+else if (isAuthenticated && !isAdminUser)
+{
+    <div class="access-denied">
+        <h2>Access Denied</h2>
+        <p>You do not have permission to access the admin dashboard.</p>
+        <a href="/pod-dashboard" class="btn btn-primary">Return to Dashboard</a>
+    </div>
+}
+else
+{
+    <div class="center-message">
+        <h2>Authentication Required</h2>
+        <p>Please log in to access the system.</p>
+        <a href="/login/teacher" class="btn btn-primary">Login</a>
+    </div>
+}
+
+@code {
+    private List<AdminAccount>? adminAccounts;
+    private List<AdminAccount> filteredAccounts = new();
+    private string searchTerm = string.Empty;
+    private HashSet<int> visiblePasswordAccounts = new();
+    private bool isLoading = false;
+    private bool isAuthenticated = false;
+    private bool isAdminUser = false;
+    private string message = string.Empty;
+    private bool isSuccess = false;
+    private bool showSnackbar = false;
+    private string currentUser = string.Empty;
+    private string currentUserRole = string.Empty;
+    private int? currentAdminAccountId = null;
+
+    // Stats
+    private int totalAccounts = 0;
+    private int adminCount = 0;
+    private int schoolHeadCount = 0;
+    private int divisionCount = 0;
+
+    // Filter
+    private string selectedAccountType = string.Empty;
+
+    // Create Account Modal
+    private bool showCreateModal = false;
+    private bool isCreating = false;
+    private AdminAccountRequest newAccount = new AdminAccountRequest();
+    private bool showPassword = false;
+
+    // Edit Account Modal
+    private bool showEditModal = false;
+    private bool isUpdating = false;
+    private AdminAccount? selectedAccount = null;
+    private AdminAccountUpdateRequest editAccount = new AdminAccountUpdateRequest();
+
+    // School/Division Search
+    private List<School> allSchools = new();
+    private List<School> filteredSchools = new();
+    private string schoolSearchText = string.Empty;
+    private bool showSchoolDropdown = false;
+    
+    private List<string> allDivisions = new();
+    private List<string> filteredDivisions = new();
+    private string divisionSearchText = string.Empty;
+    private bool showDivisionDropdown = false;
+
+    // Phone number validation state
+    private string phoneError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthentication();
+        
+        if (isAuthenticated && isAdminUser)
+        {
+            await LoadAccounts();
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            currentUserRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var adminAccountIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "adminAccountID");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser))
+            {
+                isAuthenticated = true;
+                // Allow only admin users to access admin dashboard
+                var role = currentUserRole?.ToLower() ?? string.Empty;
+                isAdminUser = role == "admin";
+                
+                if (int.TryParse(adminAccountIdStr, out var adminId))
+                {
+                    currentAdminAccountId = adminId;
+                }
+            }
+        }
+        catch
+        {
+            isAuthenticated = false;
+            isAdminUser = false;
+        }
+    }
+
+    private async Task LoadAccounts()
+    {
+        isLoading = true;
+        try
+        {
+            var url = "api/Admin/accounts";
+            if (!string.IsNullOrEmpty(selectedAccountType))
+            {
+                url += $"?accountType={Uri.EscapeDataString(selectedAccountType)}";
+            }
+
+            var response = await Http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<ApiResponse<List<AdminAccount>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result?.Success == true && result.Data != null)
+                {
+                    adminAccounts = result.Data;
+                }
+                else
+                {
+                    adminAccounts = new List<AdminAccount>();
+                }
+
+                visiblePasswordAccounts.Clear();
+                ApplySearchFilter();
+                UpdateStats();
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error loading accounts: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void UpdateStats()
+    {
+        if (adminAccounts == null) return;
+
+        totalAccounts = adminAccounts.Count;
+        adminCount = adminAccounts.Count(a => a.AccountType?.ToLower() == "admin");
+        schoolHeadCount = adminAccounts.Count(a => a.AccountType?.ToLower() == "schoolhead");
+        divisionCount = adminAccounts.Count(a => a.AccountType?.ToLower() == "division");
+    }
+
+    private void ApplySearchFilter()
+    {
+        if (adminAccounts == null)
+        {
+            filteredAccounts = new List<AdminAccount>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredAccounts = adminAccounts.ToList();
+            return;
+        }
+
+        var term = searchTerm.ToLowerInvariant();
+        filteredAccounts = adminAccounts
+            .Where(account =>
+                (!string.IsNullOrEmpty(account.Username) && account.Username.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.FullName) && account.FullName.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.AccountType) && account.AccountType.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.SchoolName) && account.SchoolName.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.DivisionName) && account.DivisionName.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.Division) && account.Division.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.Region) && account.Region.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(account.UserPassword) && account.UserPassword.ToLowerInvariant().Contains(term)))
+            .ToList();
+    }
+
+    private async Task OnAccountTypeFilterChanged(ChangeEventArgs e)
+    {
+        selectedAccountType = e.Value?.ToString() ?? string.Empty;
+        await LoadAccounts();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        ApplySearchFilter();
+    }
+
+    private async Task RefreshAccounts()
+    {
+        await LoadAccounts();
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        showPassword = !showPassword;
+    }
+
+    private void ToggleAccountPasswordVisibility(int accountId)
+    {
+        if (visiblePasswordAccounts.Contains(accountId))
+        {
+            visiblePasswordAccounts.Remove(accountId);
+        }
+        else
+        {
+            visiblePasswordAccounts.Add(accountId);
+        }
+    }
+
+    private bool IsAccountPasswordVisible(int accountId) => visiblePasswordAccounts.Contains(accountId);
+
+    private async Task OpenCreateAccountModal()
+    {
+        newAccount = new AdminAccountRequest();
+        schoolSearchText = string.Empty;
+        divisionSearchText = string.Empty;
+        showSchoolDropdown = false;
+        showDivisionDropdown = false;
+        filteredSchools.Clear();
+        filteredDivisions.Clear();
+        
+        // Load schools and divisions when opening modal
+        await LoadSchools();
+        await LoadDivisions();
+        
+        showCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateModal = false;
+        newAccount = new AdminAccountRequest();
+        schoolSearchText = string.Empty;
+        divisionSearchText = string.Empty;
+        showSchoolDropdown = false;
+        showDivisionDropdown = false;
+        filteredSchools.Clear();
+        filteredDivisions.Clear();
+        phoneError = string.Empty;
+    }
+
+    private void OnAccountTypeChangedAfterBind()
+    {
+        // Clear specific fields when type changes
+        if (newAccount.AccountType?.ToLower() != "schoolhead")
+        {
+            newAccount.SchoolName = null;
+            newAccount.Division = null;
+            newAccount.Region = null;
+            newAccount.District = null;
+        }
+        if (newAccount.AccountType?.ToLower() != "division")
+        {
+            newAccount.DivisionName = null;
+        }
+    }
+
+    private async Task CreateAccount()
+    {
+        if (string.IsNullOrWhiteSpace(newAccount.Username) || 
+            string.IsNullOrWhiteSpace(newAccount.Password) ||
+            string.IsNullOrWhiteSpace(newAccount.FullName) ||
+            string.IsNullOrWhiteSpace(newAccount.AccountType))
+        {
+            ShowMessage("Please fill in all required fields", false);
+            return;
+        }
+
+        // Validate phone number if provided
+        if (!string.IsNullOrWhiteSpace(newAccount.PhoneNumber) && !IsValidPhilippinePhoneNumber(newAccount.PhoneNumber))
+        {
+            ShowMessage("Phone number must be 11 digits starting with 09", false);
+            return;
+        }
+
+        isCreating = true;
+        try
+        {
+            var json = JsonSerializer.Serialize(newAccount);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PostAsync("api/Admin/create-account", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            ApiResponse<int>? result = null;
+
+            if (!string.IsNullOrWhiteSpace(responseContent))
+            {
+                try
+                {
+                    result = JsonSerializer.Deserialize<ApiResponse<int>>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch
+                {
+                    // Ignore deserialization errors; we'll fall back to generic message.
+                }
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                if (result?.Success == true)
+                {
+                    var successMessage = result?.Message ?? $"{newAccount.AccountType} account created successfully";
+                    ShowMessage(successMessage, true);
+                    CloseCreateModal();
+                    await LoadAccounts();
+                }
+                else
+                {
+                    ShowMessage(result?.Message ?? "Failed to create account", false);
+                }
+            }
+            else
+            {
+                var errorMessage = result?.Message ?? "Failed to create account";
+                if (result?.Errors != null && result.Errors.Any())
+                {
+                    errorMessage += $": {string.Join(", ", result.Errors)}";
+                }
+
+                ShowMessage(errorMessage, false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error: {ex.Message}", false);
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private void OpenEditAccountModal(AdminAccount account)
+    {
+        selectedAccount = account;
+        editAccount = new AdminAccountUpdateRequest
+        {
+            AdminAccountID = account.AdminAccountID,
+            FullName = account.FullName,
+            Email = account.Email,
+            PhoneNumber = account.PhoneNumber,
+            SchoolID = account.SchoolID,
+            SchoolName = account.SchoolName,
+            School_ID = account.School_ID,
+            Division = account.Division,
+            Region = account.Region,
+            District = account.District,
+            DivisionName = account.DivisionName,
+            IsActive = account.IsActive
+        };
+        showEditModal = true;
+    }
+
+    private void CloseEditModal()
+    {
+        showEditModal = false;
+        selectedAccount = null;
+        editAccount = new AdminAccountUpdateRequest();
+    }
+
+    private async Task UpdateAccount()
+    {
+        if (selectedAccount == null) return;
+
+        isUpdating = true;
+        try
+        {
+            var json = JsonSerializer.Serialize(editAccount);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PutAsync($"api/Admin/accounts/{selectedAccount.AdminAccountID}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<ApiResponse<bool>>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result?.Success == true)
+                {
+                    ShowMessage("Account updated successfully", true);
+                    CloseEditModal();
+                    await LoadAccounts();
+                }
+                else
+                {
+                    ShowMessage(result?.Message ?? "Failed to update account", false);
+                }
+            }
+            else
+            {
+                ShowMessage("Failed to update account", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error: {ex.Message}", false);
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+
+    private async Task DeleteAccount(int adminAccountId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this account?"))
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/Admin/accounts/{adminAccountId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                ShowMessage("Account deleted successfully", true);
+                await LoadAccounts();
+            }
+            else
+            {
+                ShowMessage("Failed to delete account", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Error: {ex.Message}", false);
+        }
+    }
+
+    private void ShowMessage(string msg, bool success)
+    {
+        message = msg;
+        isSuccess = success;
+        showSnackbar = true;
+        Task.Delay(3000).ContinueWith(_ => {
+            showSnackbar = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    // Load schools from API
+    private async Task LoadSchools()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result?.Success == true && result.Data != null)
+                {
+                    allSchools = result.Data;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading schools: {ex.Message}");
+        }
+    }
+
+    // Load unique divisions from schools
+    private async Task LoadDivisions()
+    {
+        try
+        {
+            if (allSchools.Count == 0)
+            {
+                await LoadSchools();
+            }
+
+            // Get unique divisions by trimming and normalizing, then use case-insensitive distinct
+            allDivisions = allSchools
+                .Where(s => !string.IsNullOrWhiteSpace(s.Division))
+                .Select(s => s.Division!.Trim())
+                .Where(d => !string.IsNullOrWhiteSpace(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(d => d)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading divisions: {ex.Message}");
+        }
+    }
+
+    // School search input handler
+    private void OnSchoolSearchInput(ChangeEventArgs e)
+    {
+        schoolSearchText = (e.Value?.ToString() ?? string.Empty).ToUpperInvariant();
+        newAccount.SchoolName = string.IsNullOrWhiteSpace(schoolSearchText) ? null : schoolSearchText;
+
+        if (string.IsNullOrWhiteSpace(schoolSearchText))
+        {
+            newAccount.School_ID = null;
+            newAccount.Division = null;
+            newAccount.Region = null;
+            newAccount.District = null;
+            newAccount.SchoolID = null;
+            filteredSchools.Clear();
+            showSchoolDropdown = false;
+        }
+        else
+        {
+            filteredSchools = allSchools
+                .Where(s => s.SchoolName.Contains(schoolSearchText, StringComparison.OrdinalIgnoreCase) ||
+                           (s.School_ID != null && s.School_ID.Contains(schoolSearchText, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            showSchoolDropdown = filteredSchools.Any();
+        }
+        
+        StateHasChanged();
+    }
+
+    // Select school and auto-fill fields
+    private void SelectSchool(School school)
+    {
+        newAccount.SchoolName = school.SchoolName;
+        newAccount.School_ID = school.School_ID;
+        newAccount.Division = school.Division ?? string.Empty;
+        newAccount.Region = school.Region ?? string.Empty;
+        newAccount.District = school.District ?? string.Empty;
+        newAccount.SchoolID = school.SchoolID;
+        
+        schoolSearchText = school.SchoolName;
+        showSchoolDropdown = false;
+        StateHasChanged();
+    }
+
+    // Division search input handler
+    private void OnDivisionSearchInput(ChangeEventArgs e)
+    {
+        divisionSearchText = (e.Value?.ToString() ?? string.Empty).ToUpperInvariant();
+        var division = string.IsNullOrWhiteSpace(divisionSearchText) ? null : divisionSearchText;
+        newAccount.DivisionName = division;
+        newAccount.Division = division; // Synchronize with Division column
+        
+        if (string.IsNullOrWhiteSpace(divisionSearchText))
+        {
+            filteredDivisions.Clear();
+            showDivisionDropdown = false;
+        }
+        else
+        {
+            filteredDivisions = allDivisions
+                .Where(d => d.Contains(divisionSearchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            showDivisionDropdown = filteredDivisions.Any();
+        }
+        
+        StateHasChanged();
+    }
+
+    // Select division
+    private void SelectDivision(string division)
+    {
+        newAccount.DivisionName = division;
+        newAccount.Division = division; // Synchronize with Division column
+        divisionSearchText = division;
+        showDivisionDropdown = false;
+        StateHasChanged();
+    }
+
+    // Full Name input handler - auto uppercase
+    private void OnFullNameInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        newAccount.FullName = value.ToUpper();
+        StateHasChanged();
+    }
+
+    // Phone number input handler - validate and format
+    private void OnPhoneNumberInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        
+        // Remove any non-digit characters
+        var digitsOnly = new string(value.Where(char.IsDigit).ToArray());
+        
+        // Limit to 11 digits
+        if (digitsOnly.Length > 11)
+        {
+            digitsOnly = digitsOnly.Substring(0, 11);
+        }
+        
+        // Validate format
+        if (string.IsNullOrEmpty(digitsOnly))
+        {
+            newAccount.PhoneNumber = string.Empty;
+            phoneError = string.Empty;
+        }
+        else if (digitsOnly.Length < 11)
+        {
+            newAccount.PhoneNumber = digitsOnly;
+            if (digitsOnly.Length > 0 && !digitsOnly.StartsWith("09"))
+            {
+                phoneError = "Phone number must start with 09";
+            }
+            else
+            {
+                phoneError = string.Empty;
+            }
+        }
+        else if (digitsOnly.Length == 11)
+        {
+            if (digitsOnly.StartsWith("09"))
+            {
+                newAccount.PhoneNumber = digitsOnly;
+                phoneError = string.Empty;
+            }
+            else
+            {
+                phoneError = "Phone number must start with 09";
+                newAccount.PhoneNumber = digitsOnly;
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    // Validate phone number format
+    private bool IsValidPhilippinePhoneNumber(string phoneNumber)
+    {
+        if (string.IsNullOrEmpty(phoneNumber))
+            return true; // Allow empty phone numbers
+
+        // Remove any non-digit characters
+        phoneNumber = new string(phoneNumber.Where(char.IsDigit).ToArray());
+
+        // Check if it's exactly 11 digits and starts with 09
+        return phoneNumber.Length == 11 && phoneNumber.StartsWith("09");
+    }
+}
+
+<style>
+    .admin-dashboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .admin-dashboard-header {
+        margin-bottom: 32px;
+    }
+
+    .admin-dashboard-header h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0 0 8px 0;
+        color: #2d3748;
+    }
+
+    .admin-dashboard-header p {
+        color: #718096;
+        margin: 0;
+    }
+
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .stat-card h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0 0 8px 0;
+        color: #2d3748;
+    }
+
+    .stat-card p {
+        color: #718096;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .stat-card.admin { border-left: 4px solid #667eea; }
+    .stat-card.schoolhead { border-left: 4px solid #f093fb; }
+    .stat-card.division { border-left: 4px solid #4facfe; }
+
+    .accounts-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .section-header h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+        color: #2d3748;
+    }
+
+    .filter-controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .filter-controls .search-input {
+        min-width: 220px;
+    }
+
+    .password-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .password-field .form-control {
+        flex: 1;
+    }
+
+    .password-toggle {
+        border: none;
+        background: none;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .password-toggle svg {
+        width: 20px;
+        height: 20px;
+        fill: #4a5568;
+    }
+
+    .password-toggle:hover svg {
+        fill: #2d3748;
+    }
+
+    .account-password-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .account-password-display .password-value {
+        font-family: Consolas, "Courier New", monospace;
+    }
+
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #2d3748;
+    }
+
+    .btn-secondary:hover {
+        background: #cbd5e0;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    .btn-danger {
+        background: #f56565;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #e53e3e;
+    }
+
+    .accounts-table {
+        overflow-x: auto;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table thead {
+        background: #f7fafc;
+    }
+
+    .table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #4a5568;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .table td {
+        padding: 12px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table tbody tr:hover {
+        background: #f7fafc;
+    }
+
+    .account-type-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .account-type-badge.account-type-admin {
+        background: #e6f3ff;
+        color: #667eea;
+    }
+
+    .account-type-badge.account-type-schoolhead {
+        background: #fce7f3;
+        color: #f093fb;
+    }
+
+    .account-type-badge.account-type-division {
+        background: #e0f2fe;
+        color: #4facfe;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-badge.status-active {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-badge.status-inactive {
+        background: #fed7d7;
+        color: #742a2a;
+    }
+
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-window {
+        background: white;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #718096;
+    }
+
+    .modal-content {
+        padding: 24px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="password"],
+    .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .modal-actions {
+        padding: 20px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .snackbar {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+        align-items: center;
+        gap: 12px;
+        z-index: 10000;
+    }
+
+    .snackbar.show {
+        display: flex;
+    }
+
+    .snackbar-success {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .snackbar-error {
+        background: #fed7d7;
+        color: #742a2a;
+    }
+
+    .no-accounts {
+        text-align: center;
+        padding: 40px;
+        color: #718096;
+    }
+
+    /* Autocomplete Styles */
+    .autocomplete-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 4px;
+    }
+
+    .autocomplete-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #f7fafc;
+        transition: background-color 0.2s;
+    }
+
+    .autocomplete-item:hover {
+        background-color: #f7fafc;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item strong {
+        display: block;
+        color: #2d3748;
+        font-size: 0.95rem;
+        margin-bottom: 4px;
+    }
+
+    .autocomplete-item small {
+        display: block;
+        color: #718096;
+        font-size: 0.85rem;
+    }
+
+    .form-hint {
+        display: block;
+        color: #718096;
+        font-size: 0.8rem;
+        margin-top: 4px;
+    }
+
+    .phone-error {
+        display: block;
+        color: #f44336;
+        font-size: 0.8rem;
+        margin-top: 4px;
+    }
+</style>
+

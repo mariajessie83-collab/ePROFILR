@@ -1,0 +1,557 @@
+@page "/guidance-dashboard"
+@layout Gsystem.Layout.PODLayout
+@using System.Text.Json
+@using System.Linq
+@using SharedProject
+@using Gsystem.Services
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Guidance Dashboard - Incident Reports</PageTitle>
+
+@if (isCheckingAuth)
+{
+    <div class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Verifying access...</p>
+    </div>
+}
+else if (isAuthenticated && isGuidanceUser)
+{
+    <div class="guidance-dashboard-container">
+        <div class="guidance-dashboard-header">      
+            <h2>Guidance Dashboard</h2>
+            <p>View and manage incident reports and student case records</p>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Loading incident reports...</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="snackbar @(isSuccess ? "snackbar-success" : "snackbar-error") @(showSnackbar ? "show" : "")">
+                <span class="snackbar-icon">@(isSuccess ? "✓" : "✕")</span>
+                <span class="snackbar-message">@message</span>
+            </div>
+        }
+
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>@totalReports</h3>
+                <p>Total Reports</p>
+            </div>
+            <div class="stat-card pending">
+                <h3>@pendingReports</h3>
+                <p>Pending</p>
+            </div>
+            <div class="stat-card reviewing">
+                <h3>@reviewingReports</h3>
+                <p>Under Review</p>
+            </div>
+            <div class="stat-card resolved">
+                <h3>@resolvedReports</h3>
+                <p>Resolved</p>
+            </div>
+        </div>
+
+        <div class="incident-reports-section">
+            <div class="section-header">
+                <h3>Incident Reports</h3>
+                <div class="filter-controls">
+                    <select @onchange="OnStatusFilterChanged" class="form-control">
+                        <option value="">All Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Calling">Calling</option>
+                        <option value="Called">Called</option>
+                        <option value="Arrived">Arrived</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="RefreshReports">Refresh</button>
+                </div>
+            </div>
+
+            @if (incidentReports != null && incidentReports.Count > 0)
+            {
+                <div class="reports-table">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr class="text-center">
+                                <th>Incident Type</th>
+                                <th>Complainant</th>
+                                <th>Respondent</th>
+                                <th class="text-nowrap">Date Reported</th>
+                                <th>Status</th>
+                                <th style="min-width: 130px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var report in incidentReports)
+                            {
+                                <tr class="status-@(report.Status?.ToLower().Replace(" ", "-"))">
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span style="font-weight: 600; white-space: nowrap;">
+                                                @(report.IncidentType == "Others" ? report.OtherIncidentType : report.IncidentType)
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(report.LevelOfOffense))
+                                            {
+                                                <span class="badge @(report.LevelOfOffense == "Minor" ? "bg-warning text-dark" : 
+                                                                    report.LevelOfOffense == "Major" ? "bg-danger" : 
+                                                                    "bg-secondary")" 
+                                                      style="font-size: 0.75rem; width: fit-content; margin-top: 4px;">
+                                                    @report.LevelOfOffense
+                                                </span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="truncate-cell" title="@report.ComplainantName">
+                                            @report.ComplainantName
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (string.IsNullOrEmpty(report.RespondentName))
+                                        {
+                                            <text>N/A</text>
+                                        }
+                                        else
+                                        {
+                                            var respondents = report.RespondentName.Split(new[] { "; ", ";" }, StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(r => r.Trim())
+                                                .Where(r => !string.IsNullOrEmpty(r))
+                                                .ToArray();
+                                            if (respondents.Length > 1)
+                                            {
+                                                <span title="@report.RespondentName">
+                                                    @respondents[0] <span style="color: #007bff; font-weight: 600;">+@(respondents.Length - 1) more</span>
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <div class="truncate-cell" title="@report.RespondentName">
+                                                    @report.RespondentName
+                                                </div>
+                                            }
+                                        }
+                                    </td>
+                                    <td class="text-nowrap">@report.DateReported.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        <span class="status-badge @GetStatusCssClass(report.Status)">
+                                            @FormatStatus(report.Status)
+                                        </span>
+                                    </td>
+                                    <td style="white-space: nowrap;">
+                                        <div class="d-flex gap-1 justify-content-center flex-nowrap">
+                                            <button class="btn btn-sm btn-info" @onclick="() => ViewReportDetails(report)">
+                                                View
+                                            </button>
+                                            @if (incidentIdsWithCaseRecords.Contains(report.IncidentID))
+                                            {
+                                                <button class="btn btn-sm btn-secondary" @onclick="() => OpenFormsModal(report.IncidentID, false)">
+                                                    Forms
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="no-reports">
+                    <p>No incident reports found.</p>
+                </div>
+            }
+        </div>
+
+        <!-- Forms Modal -->
+        <Gsystem.Pages.Components.FormsModal 
+            IsVisible="@showFormsModal" 
+            IsVisibleChanged="@(val => showFormsModal = val)"
+            IncidentId="@selectedIncidentIdForForms"
+            IsEscalation="@isEscalationForForms"
+            SimplifiedRecordId="@selectedSimplifiedRecordId"
+            CurrentMeetingDate="@selectedMeetingDate"
+            OnRescheduleSuccess="@RefreshReports" />
+    </div>
+}
+else if (isAuthenticated && !isGuidanceUser)
+{
+    <div class="access-denied">
+        <h2>Access Denied</h2>
+        <p>You don't have permission to access the Guidance Dashboard.</p>
+        <a href="/" class="btn btn-primary">Back to Home</a>
+    </div>
+}
+else
+{
+    <div class="login-required">
+        <h2>Login Required</h2>
+        <p>Please log in to access the Guidance Dashboard.</p>
+        <a href="/login/teacher" class="btn btn-primary">Teacher Login</a>
+    </div>
+}
+
+@code {
+    private List<IncidentReportSummary> incidentReports = new();
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private bool showSnackbar = false;
+    private System.Threading.Timer? snackbarTimer;
+    private bool isAuthenticated = false;
+    private bool isGuidanceUser = false;
+    private bool isCheckingAuth = true;
+    private string currentUser = string.Empty;
+    private string userRole = string.Empty;
+    private string statusFilter = string.Empty;
+    
+    // Forms Modal State
+    private bool showFormsModal = false;
+    private int selectedIncidentIdForForms = 0;
+    private bool isEscalationForForms = false;
+    private int? selectedSimplifiedRecordId = null;
+    private DateTime? selectedMeetingDate = null;
+    private HashSet<int> incidentIdsWithCaseRecords = new();
+
+    // Statistics
+    private int totalReports = 0;
+    private int pendingReports = 0;
+    private int reviewingReports = 0;
+    private int resolvedReports = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(100);
+        
+        int retryCount = 0;
+        const int maxRetries = 3;
+        
+        while (retryCount < maxRetries && !isAuthenticated)
+        {
+            await CheckAuthentication();
+            
+            if (isAuthenticated && isGuidanceUser)
+            {
+                break;
+            }
+            
+            if (!isAuthenticated && retryCount < maxRetries - 1)
+            {
+                await Task.Delay(200);
+            }
+            
+            retryCount++;
+        }
+        
+        if (isAuthenticated && isGuidanceUser)
+        {
+            await LoadIncidentReports();
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            
+            var normalizedPosition = userPosition?.Trim() ?? string.Empty;
+            var normalizedRole = userRole?.Trim() ?? string.Empty;
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser))
+            {
+                isAuthenticated = true;
+                
+                bool isTeacherRole = normalizedRole.Equals("teacher", StringComparison.OrdinalIgnoreCase);
+                bool isGuidancePosition = normalizedPosition.Equals("Guidance Counselor", StringComparison.OrdinalIgnoreCase);
+                
+                isGuidanceUser = isTeacherRole && isGuidancePosition;
+            }
+            else
+            {
+                isAuthenticated = false;
+                isGuidanceUser = false;
+            }
+        }
+        catch
+        {
+            isAuthenticated = false;
+            isGuidanceUser = false;
+        }
+        finally
+        {
+            isCheckingAuth = false;
+        }
+    }
+
+    private async Task LoadIncidentReports()
+    {
+        isLoading = true;
+        try
+        {
+            string? schoolName = null, division = null, region = null, district = null;
+            
+            if (!string.IsNullOrEmpty(currentUser))
+            {
+                try
+                {
+                    var locationResponse = await Http.GetAsync($"api/IncidentReport/pod-location/{currentUser}");
+                    if (locationResponse.IsSuccessStatusCode)
+                    {
+                        var locationContent = await locationResponse.Content.ReadAsStringAsync();
+                        var locationResult = JsonSerializer.Deserialize<JsonElement>(locationContent);
+                        
+                        if (locationResult.TryGetProperty("success", out var locSuccess) && locSuccess.GetBoolean() &&
+                            locationResult.TryGetProperty("data", out var locData))
+                        {
+                            schoolName = locData.TryGetProperty("schoolName", out var sn) ? sn.GetString() : null;
+                            division = locData.TryGetProperty("division", out var div) ? div.GetString() : null;
+                            region = locData.TryGetProperty("region", out var reg) ? reg.GetString() : null;
+                            district = locData.TryGetProperty("district", out var dist) ? dist.GetString() : null;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Silently handle location fetch error
+                }
+            }
+            
+            var apiUrl = "api/IncidentReport";
+            var queryParams = new List<string>();
+            
+            if (!string.IsNullOrEmpty(statusFilter))
+                queryParams.Add($"status={Uri.EscapeDataString(statusFilter)}");
+                
+            if (!string.IsNullOrEmpty(schoolName))
+            {
+                queryParams.Add($"schoolName={Uri.EscapeDataString(schoolName)}");
+            }
+                
+            if (queryParams.Count > 0)
+            {
+                apiUrl += "?" + string.Join("&", queryParams);
+            }
+            
+            var response = await Http.GetAsync(apiUrl);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    incidentReports = new List<IncidentReportSummary>();
+                    
+                    if (data.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var reportElement in data.EnumerateArray())
+                        {
+                            var report = new IncidentReportSummary();
+                            
+                            if (reportElement.TryGetProperty("incidentID", out var incidentId))
+                                report.IncidentID = incidentId.GetInt32();
+                            if (reportElement.TryGetProperty("complainantName", out var complainantName))
+                                report.ComplainantName = complainantName.GetString() ?? "";
+                            if (reportElement.TryGetProperty("victimName", out var victimName))
+                                report.VictimName = victimName.GetString() ?? "";
+                            if (reportElement.TryGetProperty("respondentName", out var respondentName))
+                                report.RespondentName = respondentName.GetString() ?? "";
+                            if (reportElement.TryGetProperty("dateReported", out var dateReported))
+                                report.DateReported = DateTime.Parse(dateReported.GetString() ?? "");
+                            if (reportElement.TryGetProperty("status", out var status))
+                                report.Status = status.GetString() ?? "";
+                            if (reportElement.TryGetProperty("incidentType", out var incType))
+                                report.IncidentType = incType.GetString() ?? "";
+                            if (reportElement.TryGetProperty("otherIncidentType", out var otherType))
+                                report.OtherIncidentType = otherType.GetString() ?? "";
+                            if (reportElement.TryGetProperty("levelOfOffense", out var level))
+                                report.LevelOfOffense = level.GetString() ?? "";
+                            if (reportElement.TryGetProperty("schoolName", out var school))
+                                report.SchoolName = school.GetString() ?? "";
+                            if (reportElement.TryGetProperty("division", out var div))
+                                report.Division = div.GetString() ?? "";
+                            if (reportElement.TryGetProperty("region", out var reg))
+                                report.Region = reg.GetString() ?? "";
+                            if (reportElement.TryGetProperty("district", out var dist))
+                                report.District = dist.GetString() ?? "";
+                            if (reportElement.TryGetProperty("incidentDescription", out var incidentDesc))
+                                report.IncidentDescription = incidentDesc.GetString() ?? "";
+                            if (reportElement.TryGetProperty("evidencePhotoBase64", out var evidencePhoto))
+                                report.EvidencePhotoBase64 = evidencePhoto.GetString();
+                            
+                            incidentReports.Add(report);
+                        }
+                    }
+                    
+                    incidentReports = incidentReports
+                        .OrderBy(r => GetStatusSortOrder(r.Status))
+                        .ThenByDescending(r => r.DateReported)
+                        .ToList();
+                    
+                    CalculateStatistics();
+                    await LoadIncidentIdsWithCaseRecords();
+                }
+            }
+            else
+            {
+                message = $"Error loading incident reports: {response.StatusCode}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading incident reports: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadIncidentIdsWithCaseRecords()
+    {
+        try
+        {
+            var response = await Http.GetAsync("api/StudentProfileCaseRecord/incident-ids");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                {
+                    incidentIdsWithCaseRecords = data.EnumerateArray()
+                        .Select(x => x.GetInt32())
+                        .ToHashSet();
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading incident IDs with case records: {ex.Message}");
+        }
+    }
+
+    private void CalculateStatistics()
+    {
+        totalReports = incidentReports.Count;
+        pendingReports = incidentReports.Count(r => r.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase));
+        reviewingReports = incidentReports.Count(r => 
+            r.Status.Equals("Under Review", StringComparison.OrdinalIgnoreCase) || 
+            r.Status.Equals("UnderReview", StringComparison.OrdinalIgnoreCase) ||
+            r.Status.Equals("ParentOnHold", StringComparison.OrdinalIgnoreCase));
+        resolvedReports = incidentReports.Count(r => r.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) || r.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private int GetStatusSortOrder(string? status)
+    {
+        return status?.ToLower() switch
+        {
+            "pending" => 1,
+            "calling" => 2,
+            "arrived" => 3,
+            "parentonhold" => 4,
+            "underreview" => 5,
+            "under review" => 5,
+            "resolved" => 6,
+            "closed" => 7,
+            _ => 99
+        };
+    }
+
+    private string FormatStatus(string? status)
+    {
+        if (string.IsNullOrEmpty(status)) return "Unknown";
+        
+        return status.ToLower() switch
+        {
+            "underreview" => "Under Review",
+            "parentonhold" => "Parent On Hold",
+            "under review" => "Under Review",
+            "parent on hold" => "Parent On Hold",
+            _ => status
+        };
+    }
+
+    private string GetStatusCssClass(string? status)
+    {
+        if (string.IsNullOrEmpty(status)) return "status-unknown";
+        
+        return status.ToLower() switch
+        {
+            "underreview" => "status-under-review",
+            "parentonhold" => "status-parent-on-hold",
+            _ => $"status-{status.ToLower().Replace(" ", "-")}"
+        };
+    }
+
+    private async Task OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? string.Empty;
+        await LoadIncidentReports();
+    }
+
+    private async Task RefreshReports()
+    {
+        await LoadIncidentReports();
+        ShowSnackbar("Reports refreshed successfully", true);
+    }
+
+    private void ViewReportDetails(IncidentReportSummary report)
+    {
+        // Navigate to a detailed view or show a modal
+        // For now, we'll just show an alert with basic info
+        var details = $"Incident Type: {report.IncidentType}\\n" +
+                     $"Complainant: {report.ComplainantName}\\n" +
+                     $"Respondent: {report.RespondentName}\\n" +
+                     $"Date: {report.DateReported:MMM dd, yyyy}\\n" +
+                     $"Status: {report.Status}\\n" +
+                     $"Description: {report.IncidentDescription}";
+        JSRuntime.InvokeVoidAsync("alert", details);
+    }
+
+    private void OpenFormsModal(int incidentId, bool isEscalation)
+    {
+        selectedIncidentIdForForms = incidentId;
+        isEscalationForForms = isEscalation;
+        selectedSimplifiedRecordId = null;
+        selectedMeetingDate = null;
+        showFormsModal = true;
+        StateHasChanged();
+    }
+
+    private void ShowSnackbar(string msg, bool success)
+    {
+        message = msg;
+        isSuccess = success;
+        showSnackbar = true;
+        StateHasChanged();
+
+        snackbarTimer?.Dispose();
+        snackbarTimer = new System.Threading.Timer(_ =>
+        {
+            showSnackbar = false;
+            InvokeAsync(StateHasChanged);
+        }, null, 3000, Timeout.Infinite);
+    }
+}

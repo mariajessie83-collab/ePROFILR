@@ -1,0 +1,1506 @@
+@page "/student-case-records"
+@layout Gsystem.Layout.TeacherLayout
+@using System.Text.Json
+@using System.Net.Http.Headers
+@using SharedProject
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Student Case Records</PageTitle>
+
+@if (isCheckingAuth)
+{
+    <div class="login-required-container">
+        <div class="login-required-card">
+            <div class="login-required-header">
+                <h2>Loading...</h2>
+                <p>Checking authentication...</p>
+                <div class="spinner-border text-primary" role="status" style="margin: 20px auto; display: block;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (isAuthenticated)
+{
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h2>Student Case Records</h2>
+            <p>View all case records for your students</p>
+            @if (studentsWithCases.Any())
+            {
+                <div class="notification-badge-container">
+                    <span class="notification-badge">
+                        @studentsWithCases.Count Student@(studentsWithCases.Count > 1 ? "s" : "") with Case@(studentsWithCases.Count > 1 ? "s" : "")
+                    </span>
+                </div>
+            }
+        </div>
+
+        <div class="dashboard-controls">
+            <div class="filter-controls">
+                <label for="statusFilter">Filter by Status:</label>
+                <select id="statusFilter" class="form-control" @onchange="OnStatusFilterChanged">
+                    <option value="">All Records</option>
+                    <option value="Active">Active</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading case records...</p>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="alert @(isSuccess ? "alert-success" : "alert-error")">
+                    @message
+                </div>
+            }
+
+            @* Students with Cases Summary *@
+            @if (studentsWithCases.Any())
+            {
+                <div class="students-summary-container">
+                    <h3 class="summary-title">
+                        <span>📋 Students with Cases</span>
+                        <span class="badge-count">@studentsWithCases.Count</span>
+                    </h3>
+                    <div class="students-grid">
+                        @foreach (var student in studentsWithCases)
+                        {
+                            <div class="student-card">
+                                <div class="student-header">
+                                    <h4>@student.StudentName</h4>
+                                    <span class="case-count-badge">@student.CaseCount Case@(student.CaseCount > 1 ? "s" : "")</span>
+                                </div>
+                                <div class="student-status">
+                                    @if (student.ActiveCases > 0)
+                                    {
+                                        <span class="status-badge active">@student.ActiveCases Active</span>
+                                    }
+                                    @if (student.ResolvedCases > 0)
+                                    {
+                                        <span class="status-badge resolved">@student.ResolvedCases Resolved</span>
+                                    }
+                                    @if (student.ClosedCases > 0)
+                                    {
+                                        <span class="status-badge closed">@student.ClosedCases Closed</span>
+                                    }
+                                </div>
+                                <div class="student-actions">
+                                    <button class="btn btn-sm btn-primary" @onclick="@(() => NavigationManager.NavigateTo("/student-case-records"))">
+                                        View Case Records
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="records-table-container">
+                @if (allRecords.Any())
+                {
+                    <table class="records-table">
+                        <thead>
+                            <tr>
+                                <th>Record ID</th>
+                                <th>Student Name</th>
+                                <th>Violation</th>
+                                <th>Level</th>
+                                <th>Date of Offense</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var record in allRecords)
+                            {
+                                <tr class="@GetRowClass(record.Status)">
+                                    <td>@(record.RecordID < 0 && incidentReportReferences.ContainsKey(record.RecordID) ? incidentReportReferences[record.RecordID] : (record.RecordID < 0 ? Math.Abs(record.RecordID).ToString() : record.RecordID.ToString()))</td>
+                                    <td>@record.StudentOffenderName</td>
+                                    <td>@record.ViolationCommitted</td>
+                                    <td>
+                                        <span class="badge @GetLevelBadgeClass(record.LevelOfOffense)">
+                                            @record.LevelOfOffense
+                                        </span>
+                                    </td>
+                                    <td>@record.DateOfOffense.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(record.Status)">
+                                            @record.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons-group">
+                                            <button class="btn btn-sm btn-info" @onclick="@(() => ViewRecord(record.RecordID))">
+                                                View Details
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (allRecords.Count == pageSize)
+                    {
+                        <div class="pagination">
+                            <button class="btn btn-outline" @onclick="LoadMoreRecords" disabled="@isLoading">
+                                Load More Records
+                            </button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="no-records">
+                        <div class="no-records-icon">📋</div>
+                        <h3>No Case Records Found</h3>
+                        <p>There are no case records for your students matching your current filter criteria.</p>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="login-required-container">
+        <div class="login-required-card">
+            <div class="login-required-header">
+                <h2>🔒 Login Required</h2>
+                <p>You need to be logged in to access the student case records.</p>
+                <p class="filipino-text">Kailangan mong mag-login upang ma-access ang student case records.</p>
+            </div>
+            
+            <div class="login-required-actions">
+                <a href="/login/teacher" class="btn btn-primary">Teacher Login</a>
+                <a href="/" class="btn btn-secondary">Back to Home</a>
+            </div>
+        </div>
+    </div>
+}
+
+@* Details Modal *@
+@if (showDetailsModal)
+{
+    <div class="modal-backdrop" @onclick="CloseDetailsModal"></div>
+    <div class="details-modal" @onclick:stopPropagation>
+        <div class="modal-header">
+            <div class="header-content">
+                <h3>Case Record Details</h3>
+                @if (selectedRecordId > 0)
+                {
+                    <span class="record-id-header">#@selectedRecordId</span>
+                }
+            </div>
+            <button class="modal-close" @onclick="CloseDetailsModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            @if (isLoadingDetails)
+            {
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p>Loading record details...</p>
+                </div>
+            }
+            else if (selectedRecord != null)
+            {
+                <div class="details-sections">
+                    <div class="details-section">
+                        <h4>📋 Student Information</h4>
+                        <div class="details-grid">
+                            <div class="detail-field">
+                                <label>Student Name</label>
+                                <div class="detail-value">@selectedRecord.StudentOffenderName</div>
+                            </div>
+                            <div class="detail-field">
+                                <label>Grade Level</label>
+                                <div class="detail-value">@selectedRecord.GradeLevel</div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(selectedRecord.TrackStrand))
+                            {
+                                <div class="detail-field">
+                                    <label>Track/Strand</label>
+                                    <div class="detail-value">@selectedRecord.TrackStrand</div>
+                                </div>
+                            }
+                            <div class="detail-field">
+                                <label>Section</label>
+                                <div class="detail-value">@selectedRecord.Section</div>
+                            </div>
+                            <div class="detail-field">
+                                <label>Adviser Name</label>
+                                <div class="detail-value">@selectedRecord.AdviserName</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="details-section">
+                        <h4>👨‍👩‍👧 Parent/Guardian Information</h4>
+                        <div class="details-grid">
+                            @if (!string.IsNullOrEmpty(selectedRecord.FathersName))
+                            {
+                                <div class="detail-field">
+                                    <label>Father's Name</label>
+                                    <div class="detail-value">@selectedRecord.FathersName</div>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(selectedRecord.MothersName))
+                            {
+                                <div class="detail-field">
+                                    <label>Mother's Name</label>
+                                    <div class="detail-value">@selectedRecord.MothersName</div>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(selectedRecord.GuardianName))
+                            {
+                                <div class="detail-field">
+                                    <label>Guardian Name</label>
+                                    <div class="detail-value">@selectedRecord.GuardianName</div>
+                                </div>
+                            }
+                            <div class="detail-field">
+                                <label>Contact Number</label>
+                                <div class="detail-value">@selectedRecord.ParentGuardianContact</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="details-section">
+                        <h4>⚠️ Offense Information</h4>
+                        <div class="details-grid">
+                            <div class="detail-field">
+                                <label>Violation Committed</label>
+                                <div class="detail-value">@selectedRecord.ViolationCommitted</div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(selectedRecord.OtherViolationDescription))
+                            {
+                                <div class="detail-field full-width">
+                                    <label>Other Violation Description</label>
+                                    <div class="detail-value">@selectedRecord.OtherViolationDescription</div>
+                                </div>
+                            }
+                            <div class="detail-field">
+                                <label>Level of Offense</label>
+                                <div class="detail-value">
+                                    <span class="badge @GetLevelBadgeClass(selectedRecord.LevelOfOffense)">
+                                        @selectedRecord.LevelOfOffense
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="detail-field">
+                                <label>Number of Offense</label>
+                                <div class="detail-value">@selectedRecord.NumberOfOffense</div>
+                            </div>
+                            <div class="detail-field">
+                                <label>Date of Offense</label>
+                                <div class="detail-value">@selectedRecord.DateOfOffense.ToString("MMM dd, yyyy")</div>
+                            </div>
+                            <div class="detail-field full-width">
+                                <label>Details of Agreement</label>
+                                <div class="detail-value text-area">@selectedRecord.DetailsOfAgreement</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="details-section">
+                        <h4>📝 Additional Information</h4>
+                        <div class="details-grid">
+                            @if (!string.IsNullOrEmpty(selectedRecord.PODInCharge))
+                            {
+                                <div class="detail-field">
+                                    <label>POD In-Charge</label>
+                                    <div class="detail-value">@selectedRecord.PODInCharge</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" @onclick="CloseDetailsModal">Close</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StudentProfileCaseRecordSummary> caseRecords = new();
+    private List<StudentProfileCaseRecordSummary> incidentReports = new();
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private bool isAuthenticated = false;
+    private bool isCheckingAuth = true; // Start as true to show loading initially
+    private string statusFilter = "";
+    private int currentPage = 1;
+    private int pageSize = 20;
+    private int currentTeacherId = 0;
+    
+    // Students with cases summary
+    private List<StudentCaseSummary> studentsWithCases = new();
+    
+    // Dictionary to store reference numbers for incident reports (key: RecordID, value: ReferenceNumber)
+    private Dictionary<int, string> incidentReportReferences = new();
+    
+    // Combined records (case records + incident reports)
+    private List<StudentProfileCaseRecordSummary> allRecords => caseRecords.Concat(incidentReports).OrderByDescending(r => r.DateOfOffense).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthentication();
+        if (isAuthenticated)
+        {
+            await LoadCurrentTeacher();
+            if (currentTeacherId > 0)
+            {
+                await LoadCaseRecords();
+                await LoadIncidentReports();
+            }
+            else
+            {
+                message = "Error: Teacher information not found. Please logout and login again.";
+                isSuccess = false;
+            }
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        isCheckingAuth = true;
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var username = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(username))
+            {
+                isAuthenticated = true;
+            }
+            else
+            {
+                isAuthenticated = false;
+            }
+        }
+        catch
+        {
+            isAuthenticated = false;
+        }
+        finally
+        {
+            isCheckingAuth = false; // Authentication check is complete
+            StateHasChanged(); // Update UI
+        }
+    }
+
+    private async Task LoadCurrentTeacher()
+    {
+        try
+        {
+            var teacherIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "teacherId");
+            
+            if (int.TryParse(teacherIdStr, out int teacherId))
+            {
+                currentTeacherId = teacherId;
+                
+                // Try to get actual TeacherID from API
+                var response = await Http.GetAsync($"api/Auth/teachers/{currentTeacherId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var apiResponse = JsonSerializer.Deserialize<ApiResponse<Teacherclass>>(content, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    if (apiResponse?.Success == true && apiResponse.Data != null && apiResponse.Data.TeacherID > 0)
+                    {
+                        currentTeacherId = apiResponse.Data.TeacherID;
+                    }
+                }
+                else
+                {
+                    // Try fallback: Load by UserID
+                    var fallbackResponse = await Http.GetAsync($"api/Auth/teachers/by-user/{currentTeacherId}");
+                    if (fallbackResponse.IsSuccessStatusCode)
+                    {
+                        var fallbackContent = await fallbackResponse.Content.ReadAsStringAsync();
+                        var fallbackApiResponse = JsonSerializer.Deserialize<ApiResponse<Teacherclass>>(fallbackContent, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                        
+                        if (fallbackApiResponse?.Success == true && fallbackApiResponse.Data != null)
+                        {
+                            currentTeacherId = fallbackApiResponse.Data.TeacherID;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading teacher ID: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCaseRecords()
+    {
+        if (currentTeacherId <= 0)
+        {
+            message = "Error: Invalid teacher ID. Please logout and login again.";
+            isSuccess = false;
+            return;
+        }
+
+        isLoading = true;
+        message = string.Empty;
+
+        try
+        {
+            var url = $"api/StudentProfileCaseRecord/teacher/{currentTeacherId}?page={currentPage}&pageSize={pageSize}";
+            if (!string.IsNullOrEmpty(statusFilter))
+            {
+                url += $"&status={Uri.EscapeDataString(statusFilter)}";
+            }
+
+            var response = await Http.GetAsync(url);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                {
+                    var newRecords = new List<StudentProfileCaseRecordSummary>();
+                    foreach (var recordElement in data.EnumerateArray())
+                    {
+                        var record = new StudentProfileCaseRecordSummary();
+                        
+                        if (recordElement.TryGetProperty("recordID", out var recordId))
+                            record.RecordID = recordId.GetInt32();
+                        if (recordElement.TryGetProperty("studentOffenderName", out var studentName))
+                            record.StudentOffenderName = studentName.GetString() ?? "";
+                        if (recordElement.TryGetProperty("gradeLevel", out var gradeLevel))
+                            record.GradeLevel = gradeLevel.GetString() ?? "";
+                        if (recordElement.TryGetProperty("section", out var section))
+                            record.Section = section.GetString() ?? "";
+                        if (recordElement.TryGetProperty("violationCommitted", out var violation))
+                            record.ViolationCommitted = violation.GetString() ?? "";
+                        if (recordElement.TryGetProperty("levelOfOffense", out var level))
+                            record.LevelOfOffense = level.GetString() ?? "";
+                        if (recordElement.TryGetProperty("dateOfOffense", out var date))
+                            record.DateOfOffense = DateTime.Parse(date.GetString() ?? DateTime.Now.ToString());
+                        if (recordElement.TryGetProperty("status", out var status))
+                            record.Status = status.GetString() ?? "";
+                        
+                        newRecords.Add(record);
+                    }
+                    
+                    if (currentPage == 1)
+                    {
+                        caseRecords = newRecords;
+                    }
+                    else
+                    {
+                        caseRecords.AddRange(newRecords);
+                    }
+                    
+                    // Update students with cases summary
+                    UpdateStudentsWithCases();
+                    
+                    isSuccess = true;
+                }
+                else
+                {
+                    message = "Failed to load case records.";
+                    isSuccess = false;
+                }
+            }
+            else
+            {
+                message = $"Error loading case records: {response.StatusCode}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading case records: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? "";
+        currentPage = 1;
+        await LoadCaseRecords();
+        await LoadIncidentReports();
+        // UpdateStudentsWithCases is already called in LoadCaseRecords
+    }
+    
+    private async Task LoadIncidentReports()
+    {
+        if (currentTeacherId <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var url = $"api/IncidentReport/teacher/{currentTeacherId}?page={currentPage}&pageSize={pageSize}";
+            if (!string.IsNullOrEmpty(statusFilter))
+            {
+                url += $"&status={Uri.EscapeDataString(statusFilter)}";
+            }
+
+            var response = await Http.GetAsync(url);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                {
+                    var newReports = new List<StudentProfileCaseRecordSummary>();
+                    foreach (var reportElement in data.EnumerateArray())
+                    {
+                        // Convert incident report to case record format
+                        var record = new StudentProfileCaseRecordSummary();
+                        
+                        // Use IncidentID as RecordID (with negative to distinguish from case records)
+                        int incidentIdValue = 0;
+                        if (reportElement.TryGetProperty("incidentID", out var incidentId))
+                        {
+                            incidentIdValue = incidentId.GetInt32();
+                            record.RecordID = -incidentIdValue; // Negative to indicate incident report
+                        }
+                        
+                        // Get reference number and store it
+                        string? referenceNumber = null;
+                        if (reportElement.TryGetProperty("referenceNumber", out var refNum))
+                        {
+                            referenceNumber = refNum.GetString();
+                            if (!string.IsNullOrEmpty(referenceNumber))
+                            {
+                                incidentReportReferences[record.RecordID] = referenceNumber;
+                            }
+                        }
+                        
+                        // Get student name (could be complainant, victim, or respondent)
+                        string studentName = "";
+                        if (reportElement.TryGetProperty("respondentName", out var respondentName))
+                            studentName = respondentName.GetString() ?? "";
+                        else if (reportElement.TryGetProperty("victimName", out var victimName))
+                            studentName = victimName.GetString() ?? "";
+                        else if (reportElement.TryGetProperty("complainantName", out var complainantName))
+                            studentName = complainantName.GetString() ?? "";
+                        
+                        record.StudentOffenderName = studentName;
+                        
+                        // Get incident type as violation
+                        if (reportElement.TryGetProperty("incidentType", out var incidentType))
+                            record.ViolationCommitted = incidentType.GetString() ?? "";
+                        if (reportElement.TryGetProperty("otherIncidentType", out var otherType) && !string.IsNullOrEmpty(otherType.GetString()))
+                            record.ViolationCommitted += (string.IsNullOrEmpty(record.ViolationCommitted) ? "" : " - ") + otherType.GetString();
+                        
+                        // Get level of offense from ViolationTypes table (ViolationCategory)
+                        if (reportElement.TryGetProperty("levelOfOffense", out var levelOfOffense))
+                            record.LevelOfOffense = levelOfOffense.GetString() ?? "Incident Report";
+                        else
+                            record.LevelOfOffense = "Incident Report";
+                        
+                        // Get date reported
+                        if (reportElement.TryGetProperty("dateReported", out var date))
+                            record.DateOfOffense = DateTime.Parse(date.GetString() ?? DateTime.Now.ToString());
+                        
+                        // Get status
+                        if (reportElement.TryGetProperty("status", out var status))
+                            record.Status = status.GetString() ?? "";
+                        
+                        // GradeLevel and Section - we don't have these in incident report summary
+                        // But we can try to get from the student if needed
+                        record.GradeLevel = ""; // Will be filled if we can match with student
+                        record.Section = ""; // Will be filled if we can match with student
+                        
+                        newReports.Add(record);
+                    }
+                    
+                    if (currentPage == 1)
+                    {
+                        incidentReports = newReports;
+                        // Clear references when resetting
+                        incidentReportReferences.Clear();
+                    }
+                    else
+                    {
+                        incidentReports.AddRange(newReports);
+                    }
+                    
+                    // Reference numbers are already stored in the loop above
+                    
+                    // Update students with cases summary
+                    UpdateStudentsWithCases();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Don't show error for incident reports, just log it
+            Console.WriteLine($"Error loading incident reports: {ex.Message}");
+        }
+    }
+
+    private async Task LoadMoreRecords()
+    {
+        currentPage++;
+        await LoadCaseRecords();
+        await LoadIncidentReports();
+    }
+
+    private async Task ViewRecord(int recordId)
+    {
+        // If recordId is negative, it's an incident report
+        if (recordId < 0)
+        {
+            // For incident reports, we'll show a message or redirect to incident report page
+            message = "Incident report details can be viewed from the Incident Reports page.";
+            isSuccess = false;
+            return;
+        }
+        await LoadCaseRecordDetails(recordId);
+        showDetailsModal = true;
+    }
+
+    // Details Modal state
+    private bool showDetailsModal = false;
+    private StudentProfileCaseRecordModel? selectedRecord = null;
+    private bool isLoadingDetails = false;
+    private int selectedRecordId = 0;
+
+    private async Task LoadCaseRecordDetails(int recordId)
+    {
+        selectedRecordId = recordId;
+        isLoadingDetails = true;
+        try
+        {
+            var response = await Http.GetAsync($"api/StudentProfileCaseRecord/{recordId}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    selectedRecord = new StudentProfileCaseRecordModel();
+                    
+                    if (data.TryGetProperty("studentOffenderName", out var studentName))
+                        selectedRecord.StudentOffenderName = studentName.GetString() ?? "";
+                    if (data.TryGetProperty("gradeLevel", out var gradeLevel))
+                        selectedRecord.GradeLevel = gradeLevel.GetString() ?? "";
+                    if (data.TryGetProperty("trackStrand", out var trackStrand))
+                        selectedRecord.TrackStrand = trackStrand.GetString() ?? "";
+                    if (data.TryGetProperty("section", out var section))
+                        selectedRecord.Section = section.GetString() ?? "";
+                    if (data.TryGetProperty("adviserName", out var adviserName))
+                        selectedRecord.AdviserName = adviserName.GetString() ?? "";
+                    if (data.TryGetProperty("fathersName", out var fathersName))
+                        selectedRecord.FathersName = fathersName.GetString();
+                    if (data.TryGetProperty("mothersName", out var mothersName))
+                        selectedRecord.MothersName = mothersName.GetString();
+                    if (data.TryGetProperty("guardianName", out var guardianName))
+                        selectedRecord.GuardianName = guardianName.GetString();
+                    if (data.TryGetProperty("parentGuardianContact", out var contact))
+                        selectedRecord.ParentGuardianContact = contact.GetString() ?? "";
+                    if (data.TryGetProperty("dateOfOffense", out var dateOfOffense))
+                        selectedRecord.DateOfOffense = DateTime.Parse(dateOfOffense.GetString() ?? DateTime.Now.ToString());
+                    if (data.TryGetProperty("levelOfOffense", out var levelOfOffense))
+                        selectedRecord.LevelOfOffense = levelOfOffense.GetString() ?? "";
+                    if (data.TryGetProperty("violationCommitted", out var violation))
+                        selectedRecord.ViolationCommitted = violation.GetString() ?? "";
+                    if (data.TryGetProperty("otherViolationDescription", out var otherViolation))
+                        selectedRecord.OtherViolationDescription = otherViolation.GetString();
+                    if (data.TryGetProperty("numberOfOffense", out var numberOfOffense))
+                        selectedRecord.NumberOfOffense = numberOfOffense.GetString() ?? "";
+                    if (data.TryGetProperty("detailsOfAgreement", out var details))
+                        selectedRecord.DetailsOfAgreement = details.GetString() ?? "";
+                    if (data.TryGetProperty("podInCharge", out var podInCharge))
+                        selectedRecord.PODInCharge = podInCharge.GetString();
+                    if (data.TryGetProperty("dateCreated", out var dateCreated))
+                        selectedRecord.DateCreated = DateTime.Parse(dateCreated.GetString() ?? DateTime.Now.ToString());
+                    if (data.TryGetProperty("status", out var status))
+                        selectedRecord.Status = status.GetString() ?? "";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error loading record details: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isLoadingDetails = false;
+        }
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedRecord = null;
+        selectedRecordId = 0;
+    }
+
+    private string GetRowClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "active" => "row-active",
+            "resolved" => "row-resolved",
+            "closed" => "row-closed",
+            _ => ""
+        };
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "active" => "badge-warning",
+            "resolved" => "badge-success",
+            "closed" => "badge-secondary",
+            _ => "badge-default"
+        };
+    }
+
+    private string GetLevelBadgeClass(string level)
+    {
+        return level.ToLower() switch
+        {
+            "prohibited acts" => "badge-info",
+            "minor" => "badge-warning",
+            "major" => "badge-danger",
+            _ => "badge-default"
+        };
+    }
+
+    private void UpdateStudentsWithCases()
+    {
+        studentsWithCases = allRecords
+            .GroupBy(r => new { r.StudentOffenderName, r.GradeLevel, r.Section })
+            .Select(g => new StudentCaseSummary
+            {
+                StudentName = g.Key.StudentOffenderName,
+                GradeLevel = g.Key.GradeLevel,
+                Section = g.Key.Section,
+                CaseCount = g.Count(),
+                ActiveCases = g.Count(r => r.Status.Equals("Active", StringComparison.OrdinalIgnoreCase)),
+                ResolvedCases = g.Count(r => r.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase)),
+                ClosedCases = g.Count(r => r.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase))
+            })
+            .OrderByDescending(s => s.CaseCount)
+            .ThenBy(s => s.StudentName)
+            .ToList();
+    }
+
+    // Student case summary class
+    private class StudentCaseSummary
+    {
+        public string StudentName { get; set; } = string.Empty;
+        public string GradeLevel { get; set; } = string.Empty;
+        public string Section { get; set; } = string.Empty;
+        public int CaseCount { get; set; }
+        public int ActiveCases { get; set; }
+        public int ResolvedCases { get; set; }
+        public int ClosedCases { get; set; }
+    }
+}
+
+@* CSS Styles - Same as CaseRecordsDashboard *@
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    
+    .dashboard-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .dashboard-header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 30px;
+        background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+        color: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .dashboard-header h2 {
+        margin: 0 0 10px 0;
+        font-size: 2.5rem;
+        font-weight: 600;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .dashboard-header p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 1.2rem;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .notification-badge-container {
+        margin-top: 15px;
+    }
+
+    .notification-badge {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: #ffc107;
+        color: #212529;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    .students-summary-container {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0 0 20px 0;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #003d82;
+    }
+
+    .badge-count {
+        background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 1rem;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(0, 61, 130, 0.3);
+    }
+
+    .students-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .student-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .student-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 16px rgba(0, 61, 130, 0.2);
+        border-color: #00a8e8;
+    }
+
+    .student-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        gap: 10px;
+    }
+
+    .student-header h4 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #003d82;
+        font-family: 'Poppins', sans-serif !important;
+        flex: 1;
+    }
+
+    .case-count-badge {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+    }
+
+    .student-info {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+
+    .student-detail {
+        background: #e9ecef;
+        color: #495057;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .student-status {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .student-actions {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .status-badge.active {
+        background-color: #ffc107;
+        color: #212529;
+    }
+
+    .status-badge.resolved {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .status-badge.closed {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .dashboard-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .filter-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .filter-controls label {
+        font-weight: 500;
+        margin: 0;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .btn-primary {
+        background-color: #00a8e8;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #003d82;
+        color: white;
+    }
+
+    .btn-outline {
+        background-color: transparent;
+        color: #00a8e8;
+        border: 2px solid #00a8e8;
+    }
+
+    .btn-outline:hover {
+        background-color: #00a8e8;
+        color: white;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background-color: #545b62;
+    }
+
+    .btn-info {
+        background-color: #00a8e8;
+        color: white;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .btn-info:hover {
+        background-color: #003d82;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .action-buttons-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .loading-container {
+        text-align: center;
+        padding: 40px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .records-table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .records-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+
+    .records-table th {
+        background-color: #003d82;
+        color: white;
+        padding: 15px 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #002855;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 1rem;
+    }
+
+    .records-table td {
+        padding: 15px 12px;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: middle;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 1rem;
+    }
+
+    .records-table tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .row-active {
+        border-left: 4px solid #ffc107;
+    }
+
+    .row-resolved {
+        border-left: 4px solid #28a745;
+    }
+
+    .row-closed {
+        border-left: 4px solid #6c757d;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        border-radius: 4px;
+    }
+
+    .badge-warning {
+        background-color: #ffc107;
+        color: #212529;
+    }
+
+    .badge-success {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .badge-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .badge-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+
+    .badge-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .badge-default {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+
+    .pagination {
+        text-align: center;
+        padding: 20px;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .no-records {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+
+    .no-records-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+
+    .no-records h3 {
+        margin-bottom: 10px;
+        color: #495057;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .no-records p {
+        margin-bottom: 20px;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+
+    .alert-error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+
+    .filipino-text {
+        font-style: italic;
+        opacity: 0.8;
+    }
+
+    .login-required-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+    }
+
+    .login-required-card {
+        text-align: center;
+        padding: 40px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        max-width: 400px;
+    }
+
+    .login-required-header h2 {
+        color: #dc3545;
+        margin-bottom: 15px;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .login-required-actions {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Modal Styles */
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .details-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 900px;
+        max-height: 90vh;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+        color: white;
+        border-bottom: none;
+    }
+
+    .modal-header .header-content {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .record-id-header {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        font-weight: 500;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 2rem;
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .modal-close:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .modal-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .details-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .details-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+    }
+
+    .details-section h4 {
+        margin: 0 0 16px 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #003d82;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #00a8e8;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+
+    .detail-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .detail-field.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .detail-field label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .detail-value {
+        font-size: 14px;
+        color: #212529;
+        font-weight: 500;
+        padding: 8px 12px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+        font-family: 'Poppins', sans-serif !important;
+    }
+
+    .detail-value.text-area {
+        min-height: 80px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    @@media (max-width: 768px) {
+        .records-table-container {
+            overflow-x: auto;
+        }
+
+        .records-table {
+            font-size: 14px;
+        }
+
+        .records-table th,
+        .records-table td {
+            padding: 10px 8px;
+        }
+
+        .details-modal {
+            width: 95%;
+            max-height: 95vh;
+        }
+
+        .details-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .modal-header h3 {
+            font-size: 1.2rem;
+        }
+    }
+</style>
+

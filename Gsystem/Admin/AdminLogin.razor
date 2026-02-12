@@ -1,0 +1,855 @@
+@page "/login/admin"
+@layout Gsystem.Layout.SimpleLayout
+@using System.Text.Json
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using SharedProject
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin/School Head/Division Login</PageTitle>
+
+<!-- Fluid Tech Background -->
+<div class="fluid-background">
+    <!-- Fundo com ondas -->
+    <div class="wave-effect"></div>
+    
+    <!-- Formas flutuantes grandes -->
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+    
+    <!-- Partículas flutuantes -->
+    <div class="floating-particles" id="particles"></div>
+    
+    <!-- Linhas de fluxo -->
+    <div class="flowing-lines">
+        <div class="flow-line"></div>
+        <div class="flow-line"></div>
+        <div class="flow-line"></div>
+    </div>
+    
+    <!-- Rede neural -->
+    <div class="neural-network" id="network"></div>
+</div>
+
+@if (isUnauthorizedUser)
+{
+    <div class="unauthorized-warning" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    ">
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        ">
+            <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
+            <h3 style="color: #d32f2f; margin-bottom: 15px;">Access Restricted</h3>
+            <p style="color: #666; margin-bottom: 20px;">
+                This page is only for Admin, School Head, and Division accounts. You will be redirected to the appropriate login page.
+            </p>
+            <div style="color: #999; font-size: 14px;">
+                Redirecting in 3 seconds...
+            </div>
+        </div>
+    </div>
+}
+
+<div class="login-container">
+    <div class="login-card @(isRegisterMode ? "register-mode" : "")">
+        <div class="login-header">
+            <h2>@(isRegisterMode ? "Admin/School Head/Division Registration" : "Admin/School Head/Division Login")</h2>
+            <p>@(isRegisterMode ? "Fill out the form below to register an administrative account" : "Enter your credentials to access your administrative account")</p>
+        </div>
+
+        <div class="login-toggle">
+            <button class="toggle-btn @(!isRegisterMode ? "active" : "")" @onclick="() => ToggleMode(false)">Login</button>
+            <button class="toggle-btn @(isRegisterMode ? "active" : "")" @onclick="() => ToggleMode(true)">Register</button>
+        </div>
+        
+        @if (isLoading)
+        {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Logging in...</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isSuccess ? "alert-success" : "alert-error")">
+                @message
+            </div>
+        }
+
+        <!-- Snackbar -->
+        @if (showSnackbar)
+        {
+            <div class="snackbar @snackbarType" style="position: fixed; bottom: 20px; right: 20px; background: @(snackbarType == "success" ? "#4CAF50" : "#f44336"); color: white; padding: 16px; border-radius: 4px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                @snackbarMessage
+            </div>
+        }
+
+        @if (isRegisterMode)
+        {
+            <!-- Registration Form -->
+            <EditForm Model="@registrationRequest" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fullName">Full Name *</label>
+                        <InputText id="fullName" class="form-control" placeholder="Enter full name" @bind-Value="registrationRequest.FullName" />
+                        <ValidationMessage For="@(() => registrationRequest.FullName)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <InputText id="email" type="email" class="form-control" placeholder="Enter email address" @bind-Value="registrationRequest.Email" />
+                        <ValidationMessage For="@(() => registrationRequest.Email)" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="regUsername">Username *</label>
+                        <InputText id="regUsername" class="form-control" placeholder="Choose a username" @bind-Value="registrationRequest.Username" />
+                        <ValidationMessage For="@(() => registrationRequest.Username)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number</label>
+                        <InputText id="phoneNumber" class="form-control" placeholder="e.g., 09123456789" @bind-Value="registrationRequest.PhoneNumber" />
+                        <ValidationMessage For="@(() => registrationRequest.PhoneNumber)" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="regPassword">Password *</label>
+                        <div class="password-input-wrapper">
+                            <InputText id="regPassword" type="@(showRegPassword ? "text" : "password")" class="form-control" placeholder="Create a password" @bind-Value="registrationRequest.Password" />
+                            <button type="button" class="password-toggle-btn" @onclick="() => showRegPassword = !showRegPassword">
+                                @(showRegPassword ? "👁️" : "👁️‍🗨️")
+                            </button>
+                        </div>
+                        <ValidationMessage For="@(() => registrationRequest.Password)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password *</label>
+                        <div class="password-input-wrapper">
+                            <InputText id="confirmPassword" type="@(showConfirmPassword ? "text" : "password")" class="form-control" placeholder="Confirm your password" @bind-Value="confirmPassword" />
+                            <button type="button" class="password-toggle-btn" @onclick="() => showConfirmPassword = !showConfirmPassword">
+                                @(showConfirmPassword ? "👁️" : "👁️‍🗨️")
+                            </button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(passwordError))
+                        {
+                            <small class="phone-error">@passwordError</small>
+                        }
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="accountType">Account Type *</label>
+                    <InputSelect id="accountType" class="form-control" @bind-Value="registrationRequest.AccountType">
+                        <option value="">Select Account Type</option>
+                        <option value="admin">Administrator (System-wide)</option>
+                        <option value="schoolhead">School Head (Principal/School Admin)</option>
+                        <option value="division">Division Officer</option>
+                    </InputSelect>
+                    <ValidationMessage For="@(() => registrationRequest.AccountType)" />
+                </div>
+
+                @if (registrationRequest.AccountType == "schoolhead")
+                {
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="region">Region *</label>
+                            <InputSelect id="region" class="form-control" TValue="string" Value="@selectedRegion" ValueChanged="@OnRegionChanged" ValueExpression="@(() => selectedRegion)">
+                                <option value="">Select Region</option>
+                                @foreach (var region in regions)
+                                {
+                                    <option value="@region.Region">@region.Region</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label for="division">Division *</label>
+                            <InputSelect id="division" class="form-control" TValue="string" Value="@selectedDivision" ValueChanged="@OnDivisionChanged" ValueExpression="@(() => selectedDivision)" disabled="@(string.IsNullOrEmpty(selectedRegion))">
+                                <option value="">Select Division</option>
+                                @foreach (var div in divisions)
+                                {
+                                    <option value="@div.Division">@div.Division</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="district">District *</label>
+                            <InputSelect id="district" class="form-control" TValue="string" Value="@selectedDistrict" ValueChanged="@OnDistrictChanged" ValueExpression="@(() => selectedDistrict)" disabled="@(string.IsNullOrEmpty(selectedDivision))">
+                                <option value="">Select District</option>
+                                @foreach (var dist in districts)
+                                {
+                                    <option value="@dist.District">@dist.District</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label for="school">School *</label>
+                            <InputSelect id="school" class="form-control" TValue="string" Value="@selectedSchool" ValueChanged="@OnSchoolChanged" ValueExpression="@(() => selectedSchool)" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
+                                <option value="">Select School</option>
+                                @for (int i = 0; i < schools.Count; i++)
+                                {
+                                    <option value="@i">@schools[i].SchoolName</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                }
+                else if (registrationRequest.AccountType == "division")
+                {
+                    <div class="form-group">
+                        <label for="divisionName">Division Name *</label>
+                        <InputText id="divisionName" class="form-control" placeholder="Enter division name" @bind-Value="registrationRequest.DivisionName" />
+                        <ValidationMessage For="@(() => registrationRequest.DivisionName)" />
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="agreeTerms" />
+                        <span class="checkmark"></span>
+                        I agree to the terms and conditions *
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-login" disabled="@isLoading">
+                    @(isLoading ? "Registering..." : "REGISTER")
+                </button>
+            </EditForm>
+        }
+        else
+        {
+            <!-- Login Form -->
+            <form class="login-form" @onsubmit="HandleLogin">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" class="form-control" placeholder="Enter your username" @bind="loginRequest.Username" required />
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="@(showPassword ? "text" : "password")" id="password" class="form-control" placeholder="Enter your password" @bind="loginRequest.Password" required />
+                        <button type="button" class="password-toggle-btn" @onclick="() => showPassword = !showPassword">
+                            @(showPassword ? "👁️" : "👁️‍🗨️")
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="rememberMe" />
+                        <span class="checkmark"></span>
+                        Remember me
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-login" disabled="@isLoading">@(isLoading ? "Logging in..." : "Login")</button>
+            </form>
+        }
+            
+        <div class="login-footer">
+            <p class="register-link">
+                Not an admin? 
+                <a href="/login/teacher">Teacher Login</a> | 
+                <a href="/login/student">Student Login</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isUnauthorizedUser = false;
+    private LoginRequest loginRequest = new();
+    private bool rememberMe = false;
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    
+    // Snackbar variables
+    private bool showSnackbar = false;
+    private string snackbarMessage = string.Empty;
+    private string snackbarType = "success";
+    private bool showPassword = false;
+    private bool showRegPassword = false;
+    private bool showConfirmPassword = false;
+    private bool isRegisterMode = false;
+    private AdminAccountRequest registrationRequest = new();
+    private string confirmPassword = string.Empty;
+    private string passwordError = string.Empty;
+    private bool agreeTerms = false;
+
+    // Location selection variables
+    private List<School> regions = new();
+    private List<School> divisions = new();
+    private List<School> districts = new();
+    private List<School> schools = new List<School>();
+    
+    private string selectedRegion = string.Empty;
+    private string selectedDivision = string.Empty;
+    private string selectedDistrict = string.Empty;
+    private string selectedSchool = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUnauthorizedAccess();
+        await SetupBrowserCloseListener();
+        await LoadRegions();
+    }
+
+    private void ToggleMode(bool register)
+    {
+        isRegisterMode = register;
+        message = string.Empty;
+        passwordError = string.Empty;
+    }
+
+    private async Task LoadRegions()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    regions = apiResponse.Data
+                        .Where(s => !string.IsNullOrEmpty(s.Region))
+                        .GroupBy(s => s.Region?.Trim())
+                        .Select(g => new School { Region = g.Key, RegionName = g.Key })
+                        .ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading regions: {ex.Message}");
+        }
+    }
+
+    private async Task OnRegionChanged(string newValue)
+    {
+        selectedRegion = newValue ?? string.Empty;
+        selectedDivision = string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        divisions.Clear();
+        districts.Clear();
+        schools.Clear();
+
+        if (!string.IsNullOrEmpty(selectedRegion))
+        {
+            await LoadDivisions();
+        }
+    }
+
+    private async Task LoadDivisions()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    divisions = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion?.Trim() && !string.IsNullOrEmpty(s.Division))
+                        .GroupBy(s => s.Division?.Trim())
+                        .Select(g => new School { Division = g.Key, DivisionName = g.Key })
+                        .ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading divisions: {ex.Message}");
+        }
+    }
+
+    private async Task OnDivisionChanged(string newValue)
+    {
+        selectedDivision = newValue ?? string.Empty;
+        selectedDistrict = string.Empty;
+        selectedSchool = string.Empty;
+        districts.Clear();
+        schools.Clear();
+
+        if (!string.IsNullOrEmpty(selectedDivision))
+        {
+            await LoadDistricts();
+        }
+    }
+
+    private async Task LoadDistricts()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    districts = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion?.Trim() && s.Division?.Trim() == selectedDivision?.Trim() && !string.IsNullOrEmpty(s.District))
+                        .GroupBy(s => s.District?.Trim())
+                        .Select(g => new School { District = g.Key, DistrictName = g.Key })
+                        .ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading districts: {ex.Message}");
+        }
+    }
+
+    private async Task OnDistrictChanged(string newValue)
+    {
+        selectedDistrict = newValue ?? string.Empty;
+        selectedSchool = string.Empty;
+        schools.Clear();
+
+        if (!string.IsNullOrEmpty(selectedDistrict))
+        {
+            await LoadSchools();
+        }
+    }
+
+    private async Task LoadSchools()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/api/Auth/schools");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (apiResponse?.Success == true && apiResponse.Data != null)
+                {
+                    schools = apiResponse.Data
+                        .Where(s => s.Region?.Trim() == selectedRegion?.Trim() && 
+                                   s.Division?.Trim() == selectedDivision?.Trim() && 
+                                   s.District?.Trim() == selectedDistrict?.Trim())
+                        .ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading schools: {ex.Message}");
+        }
+    }
+
+    private void OnSchoolChanged(string newValue)
+    {
+        selectedSchool = newValue ?? string.Empty;
+        if (int.TryParse(selectedSchool, out int index) && index < schools.Count)
+        {
+            var school = schools[index];
+            registrationRequest.SchoolID = school.SchoolID;
+            registrationRequest.SchoolName = school.SchoolName;
+            registrationRequest.School_ID = school.School_ID;
+            registrationRequest.Region = school.Region;
+            registrationRequest.Division = school.Division;
+            registrationRequest.District = school.District;
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        if (!agreeTerms)
+        {
+            ShowMessage("You must agree to the terms and conditions", false);
+            return;
+        }
+
+        if (registrationRequest.Password != confirmPassword)
+        {
+            passwordError = "Passwords do not match";
+            return;
+        }
+        passwordError = string.Empty;
+
+        isLoading = true;
+        message = string.Empty;
+
+        try
+        {
+            // Set division for division accounts if needed
+            if (registrationRequest.AccountType == "division" && !string.IsNullOrEmpty(registrationRequest.DivisionName))
+            {
+                registrationRequest.Division = registrationRequest.DivisionName;
+            }
+
+            var json = JsonSerializer.Serialize(registrationRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+            var response = await Http.PostAsync("/api/Admin/create-account", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                ShowSnackbar("Account registered successfully! Please login.", "success");
+                ToggleMode(false);
+                registrationRequest = new();
+                confirmPassword = string.Empty;
+                agreeTerms = false;
+            }
+            else
+            {
+                var errorResponse = JsonSerializer.Deserialize<ApiResponse<int>>(responseContent);
+                ShowMessage(errorResponse?.Message ?? "Registration failed", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"An error occurred: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+    private async Task CheckUnauthorizedAccess()
+    {
+        try
+        {
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var lastLoginType = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastLoginType");
+            
+            // Check if user is currently logged in as teacher or student
+            if (!string.IsNullOrEmpty(authToken))
+            {
+                if (userRole == "teacher" || userRole == "student")
+                {
+                    isUnauthorizedUser = true;
+                    StateHasChanged();
+                    
+                    // Redirect to appropriate login page after showing message
+                    await Task.Delay(3000);
+                    if (userRole == "teacher")
+                    {
+                        NavigationManager.NavigateTo("/login/teacher");
+                    }
+                    else
+                    {
+                        NavigationManager.NavigateTo("/login/student");
+                    }
+                }
+            }
+            // Check if last login type was teacher or student
+            else if (!string.IsNullOrEmpty(lastLoginType) && (lastLoginType == "teacher" || lastLoginType == "student"))
+            {
+                isUnauthorizedUser = true;
+                StateHasChanged();
+                
+                // Clear the last login type and redirect
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+                await Task.Delay(3000);
+                NavigationManager.NavigateTo(lastLoginType == "teacher" ? "/login/teacher" : "/login/student");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking user role: {ex.Message}");
+        }
+    }
+
+    private async Task SetupBrowserCloseListener()
+    {
+        // Set up listener to clear localStorage ONLY when browser is actually closed (not during navigation)
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            window.addEventListener('beforeunload', function() {
+                var isNavigating = sessionStorage.getItem('isNavigating');
+                if (!isNavigating) {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userRole');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('userFullName');
+                    localStorage.removeItem('userPosition');
+                    localStorage.removeItem('teacherName');
+                    localStorage.removeItem('lastLoginType');
+                    localStorage.removeItem('teacherId');
+                    localStorage.removeItem('adminAccountID');
+                    localStorage.removeItem('fullName');
+                }
+            });
+            
+            window.addEventListener('unload', function() {
+                var isNavigating = sessionStorage.getItem('isNavigating');
+                if (!isNavigating) {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('userRole');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('userFullName');
+                    localStorage.removeItem('userPosition');
+                    localStorage.removeItem('teacherName');
+                    localStorage.removeItem('lastLoginType');
+                    localStorage.removeItem('teacherId');
+                    localStorage.removeItem('adminAccountID');
+                    localStorage.removeItem('fullName');
+                }
+                sessionStorage.removeItem('isNavigating');
+            });
+        ");
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        message = string.Empty;
+
+        try
+        {
+            Console.WriteLine($"Admin Login Attempt - Username: {loginRequest.Username}");
+            
+            var json = JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+            var response = await Http.PostAsync("/api/Auth/login", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            Console.WriteLine($"Login Response Status: {response.StatusCode}");
+            Console.WriteLine($"Login Response Content: {responseContent}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                
+                // Check if response has success property
+                if (result.TryGetProperty("success", out var success))
+                {
+                    if (success.GetBoolean() && result.TryGetProperty("data", out var data))
+                    {
+                        // Check user role
+                        if (data.TryGetProperty("userRole", out var userRole))
+                        {
+                            var role = userRole.GetString();
+                            Console.WriteLine($"User Role from API: {role}");
+                            
+                            // Only allow admin, schoolhead, and division roles
+                            if (role == "admin" || role == "schoolhead" || role == "division")
+                            {
+                                // Store authentication data
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", "admin_token_" + DateTime.Now.Ticks);
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", role);
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", data.GetProperty("username").GetString());
+                                
+                                // Store AdminAccountID
+                                if (data.TryGetProperty("adminAccountID", out var adminAccountIdProp))
+                                {
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "adminAccountID", adminAccountIdProp.GetInt32().ToString());
+                                    Console.WriteLine($"Stored AdminAccountID: {adminAccountIdProp.GetInt32()}");
+                                }
+                                else if (data.TryGetProperty("AdminAccountID", out var adminAccountIdProp2))
+                                {
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "adminAccountID", adminAccountIdProp2.GetInt32().ToString());
+                                    Console.WriteLine($"Stored AdminAccountID (capital): {adminAccountIdProp2.GetInt32()}");
+                                }
+                                
+                                // Store full name
+                                if (data.TryGetProperty("fullName", out var fullNameProp))
+                                {
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "fullName", fullNameProp.GetString());
+                                }
+                                else if (data.TryGetProperty("FullName", out var fullNameProp2))
+                                {
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "fullName", fullNameProp2.GetString());
+                                }
+                                
+                                // Store School/Location Details (for School Heads)
+                                if (data.TryGetProperty("schoolName", out var sn) && sn.ValueKind != JsonValueKind.Null) 
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "schoolName", sn.GetString());
+                                    
+                                if (data.TryGetProperty("region", out var r) && r.ValueKind != JsonValueKind.Null) 
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "region", r.GetString());
+
+                                if (data.TryGetProperty("division", out var div) && div.ValueKind != JsonValueKind.Null) 
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "division", div.GetString());
+
+                                if (data.TryGetProperty("district", out var dist) && dist.ValueKind != JsonValueKind.Null) 
+                                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "district", dist.GetString());
+
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", role);
+                                
+                                ShowMessage("Login successful!", true);
+                                
+                                // Small delay to ensure localStorage is fully saved
+                                await Task.Delay(200);
+                                
+                                // Set navigation flag
+                                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+                                
+                                var targetRoute = role switch
+                                {
+                                    "schoolhead" => "/schoolhead-dashboard",
+                                    "division" => "/division-dashboard",
+                                    _ => "/admin-dashboard"
+                                };
+
+                                Console.WriteLine($"✓ {role} user detected! Redirecting to {targetRoute}...");
+                                NavigationManager.NavigateTo(targetRoute, forceLoad: false);
+                                
+                                // Fallback redirect after a delay
+                                await Task.Delay(500);
+                                if (!NavigationManager.Uri.Contains(targetRoute.TrimStart('/'), StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Console.WriteLine("Fallback redirect ...");
+                                    NavigationManager.NavigateTo(targetRoute, forceLoad: false);
+                                }
+                                
+                                // Clear navigation flag after delay
+                                _ = Task.Run(async () =>
+                                {
+                                    await Task.Delay(2000);
+                                    await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating");
+                                });
+                            }
+                            else
+                            {
+                                // User is not admin, schoolhead, or division - redirect them
+                                ShowMessage($"Access denied. This page is only for Admin, School Head, and Division accounts. Please use the {(role == "teacher" ? "teacher" : "student")} login page.", false);
+                                
+                                await Task.Delay(2000);
+                                
+                                if (role == "teacher")
+                                {
+                                    NavigationManager.NavigateTo("/login/teacher");
+                                }
+                                else if (role == "student")
+                                {
+                                    NavigationManager.NavigateTo("/login/student");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("No userRole property in response data");
+                            ShowMessage("Login failed. Invalid response from server - missing user role.", false);
+                        }
+                    }
+                    else
+                    {
+                        // API returned success: false
+                        string errorMessage = "Login failed. Please check your credentials.";
+                        if (result.TryGetProperty("message", out var msg))
+                        {
+                            errorMessage = msg.GetString() ?? errorMessage;
+                        }
+                        Console.WriteLine($"Login failed: {errorMessage}");
+                        ShowMessage(errorMessage, false);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No success property in response");
+                    ShowMessage("Login failed. Invalid response format from server.", false);
+                }
+            }
+            else
+            {
+                // HTTP error status
+                try
+                {
+                    var errorResult = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    string errorMessage = "Login failed. Please check your credentials.";
+                    
+                    if (errorResult.TryGetProperty("message", out var msg))
+                    {
+                        errorMessage = msg.GetString() ?? errorMessage;
+                    }
+                    else if (errorResult.TryGetProperty("errors", out var errors) && errors.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        var errorList = errors.EnumerateArray().Select(e => e.GetString()).Where(s => !string.IsNullOrEmpty(s));
+                        if (errorList.Any())
+                        {
+                            errorMessage = string.Join(", ", errorList);
+                        }
+                    }
+                    
+                    Console.WriteLine($"HTTP Error {response.StatusCode}: {errorMessage}");
+                    ShowMessage(errorMessage, false);
+                }
+                catch
+                {
+                    Console.WriteLine($"HTTP Error {response.StatusCode}: {responseContent}");
+                    ShowMessage($"Login failed. Server returned error: {response.StatusCode}", false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in HandleLogin: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            ShowMessage($"An error occurred: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowMessage(string msg, bool success)
+    {
+        message = msg;
+        isSuccess = success;
+    }
+
+    private void ShowSnackbar(string message, string type)
+    {
+        snackbarMessage = message;
+        snackbarType = type;
+        showSnackbar = true;
+        StateHasChanged();
+
+        // Auto-hide after 5 seconds
+        Task.Run(async () =>
+        {
+            await Task.Delay(5000);
+            await InvokeAsync(() =>
+            {
+                showSnackbar = false;
+                StateHasChanged();
+            });
+        });
+    }
+}
+
+

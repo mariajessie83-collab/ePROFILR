@@ -1,0 +1,201 @@
+@page "/forms/parent-conference-request/{RecordIds}"
+@using SharedProject
+@layout Gsystem.Shared.EmptyLayout
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<div class="print-container">
+    @if (isLoading)
+    {
+        <div>Loading...</div>
+    }
+    else if (!records.Any())
+    {
+        <div>Records not found.</div>
+    }
+    else
+    {
+        @foreach (var record in records)
+        {
+            <div class="page-break" style="position:relative; min-height:90vh;">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <h3 style="margin:0; font-weight:bold;">Senior High School</h3>
+                    <div>Prefect of Discipline</div>
+                    <h2 style="margin-top:10px; text-decoration:underline;">PARENT CONFERENCE REQUEST FORM</h2>
+                </div>
+
+                <div style="margin-bottom:20px; display:flex; justify-content:space-between;">
+                    <div>
+                        Dear
+                        <span style="text-decoration:underline; min-width:180px; display:inline-block;">
+                            @(string.IsNullOrWhiteSpace(record.ParentContactName)
+                                ? "__________________________"
+                                : record.ParentContactName)
+                        </span>
+                    </div>
+                    <div>Date: @((record.ParentMeetingDate ?? DateTime.Now).ToString("MM/dd/yyyy"))</div>
+                </div>
+
+                <div style="margin-bottom:20px; line-height:1.6;">
+                    <p>Good day!</p>
+                    <p>
+                        We would like to invite you for a conference on
+                        <span style="text-decoration:underline; min-width:120px; display:inline-block;">
+                            @((record.ParentMeetingDate ?? DateTime.Now).ToString("MMMM dd, yyyy hh:mm tt"))
+                        </span>
+                        at the Prefect of Discipline Office to discuss the academic/behavioral/personal concerns
+                        of your child/ward
+                        <span style="text-decoration:underline; min-width:120px; display:inline-block;">
+                            @record.RespondentName
+                        </span>
+                        in the school.
+                    </p>
+                    <p>We are hoping to see you. Thank you and God bless.</p>
+                </div>
+
+                <div style="margin-top:40px; text-align:center;">
+                    <div style="margin-bottom:60px;">&nbsp;</div>
+                    <div style="border-top:1px solid #000; display:inline-block; padding-top:4px; min-width:220px;">
+                        @(string.IsNullOrWhiteSpace(podName) ? "PREFECT OF DISCIPLINE" : podName)
+                    </div>
+                    <div style="font-size:0.9em; margin-top:2px;">
+                        Prefect of Discipline In-Charge
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .print-container {
+        font-family: Arial, sans-serif;
+        padding: 30px;
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        font-size: 14px;
+    }
+
+    .page-break { page-break-after: always; }
+    .page-break:last-child { page-break-after: auto; }
+
+    @@media print {
+        @@page { margin: 0; }
+        .print-container { width: 100%; max-width: none; padding: 30px; margin: 0; }
+        .page-break { page-break-after: always; }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string RecordIds { get; set; } = ""; // Comma separated IDs e.g. "1,2,3"
+
+    private List<SimplifiedStudentProfileCaseRecordModel> records = new();
+    private bool isLoading = true;
+    private string? podName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            records.Clear();
+            if (!string.IsNullOrEmpty(RecordIds))
+            {
+                var ids = RecordIds.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var idStr in ids)
+                {
+                    if (int.TryParse(idStr, out var rid))
+                    {
+                        var res = await Http.GetFromJsonAsync<ApiResponse<SimplifiedStudentProfileCaseRecordModel>>($"api/StudentProfileCaseRecord/simplified/{rid}");
+                        if (res?.Success == true && res.Data != null)
+                        {
+                            records.Add(res.Data);
+                        }
+                    }
+                }
+            }
+
+            // Try to read the current POD's full name from localStorage (saved as userFullName)
+            try
+            {
+                podName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userFullName");
+            }
+            catch
+            {
+                podName = null;
+            }
+        }
+        catch
+        {
+            // err
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool hasPdfDownloaded = false;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading && records.Any() && !hasPdfDownloaded)
+        {
+            hasPdfDownloaded = true;
+            
+            // Delay to ensure content is fully rendered and script is loaded
+            await Task.Delay(1500);
+            
+            // Trigger direct PDF download using html2pdf
+            try {
+                await JSRuntime.InvokeVoidAsync("downloadPdf");
+            } catch {
+                // Fallback to print if script fails
+                await JSRuntime.InvokeVoidAsync("window.print");
+            }
+        }
+    }
+
+    public class ApiResponse<T>
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+        public T? Data { get; set; }
+    }
+}
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    window.downloadPdf = function() {
+        // Wait for html2pdf to be available
+        if (typeof html2pdf === 'undefined') {
+            console.log('html2pdf not loaded yet, retrying...');
+            setTimeout(window.downloadPdf, 500);
+            return;
+        }
+        
+        var element = document.querySelector('.print-container');
+        if (!element) {
+            console.log('Print container not found');
+            return;
+        }
+        
+        var opt = {
+          margin:       0.5,
+          filename:     'ParentConferenceRequest.pdf',
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2 },
+          jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+          pagebreak:    { mode: ['css', 'legacy'] }
+        };
+        
+        html2pdf().set(opt).from(element).save().then(function() {
+            console.log('PDF downloaded successfully');
+        }).catch(function(err) {
+            console.error('PDF download failed:', err);
+            window.print();
+        });
+    };
+</script>

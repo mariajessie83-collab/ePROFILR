@@ -1,0 +1,179 @@
+@using Gsystem.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner"></div>
+        <p>Checking authentication...</p>
+    </div>
+}
+else if (!isAuthenticated)
+{
+    <div class="auth-required">
+        <div class="auth-card">
+            <h2>🔒 Authentication Required</h2>
+            <p>You need to be logged in to access this page.</p>
+            <div class="auth-actions">
+                <a href="/login/student" class="btn btn-primary">Student Login</a>
+                <a href="/login/teacher" class="btn btn-secondary">Teacher/Admin Login</a>
+            </div>
+            <p class="auth-note">
+                <small>Please log in with your credentials to continue.</small>
+            </p>
+        </div>
+    </div>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string[]? AllowedRoles { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private string? userRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            
+            if (isAuthenticated)
+            {
+                userRole = await AuthService.GetUserRoleAsync();
+                
+                // Check if user role is allowed
+                if (AllowedRoles != null && AllowedRoles.Length > 0)
+                {
+                    isAuthenticated = AllowedRoles.Contains(userRole);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Authentication check failed: {ex.Message}");
+            isAuthenticated = false;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
+
+<style>
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 50vh;
+        text-align: center;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #7a0019;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .auth-required {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        padding: 20px;
+    }
+
+    .auth-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        padding: 40px;
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+    }
+
+    .auth-card h2 {
+        color: #7a0019;
+        margin-bottom: 16px;
+        font-size: 1.8rem;
+    }
+
+    .auth-card p {
+        color: #666;
+        margin-bottom: 24px;
+        line-height: 1.6;
+    }
+
+    .auth-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-block;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #7a0019;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #5d0013;
+        transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #545b62;
+        transform: translateY(-2px);
+    }
+
+    .auth-note {
+        color: #999;    
+        font-size: 0.9rem;
+    }
+
+    @@media (max-width: 768px) {
+        .auth-actions {
+            flex-direction: column;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+    }
+</style>

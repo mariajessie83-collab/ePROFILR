@@ -1,0 +1,222 @@
+@page "/guidance"
+@layout Gsystem.Layout.SimpleLayout
+@using System.Text.Json
+@using SharedProject
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Guidance Services - Incident Reports</PageTitle>
+
+<div class="guidance-page-container">
+    <div class="guidance-header">
+        <h2>Guidance Services</h2>
+        <p>Manage student case records and official documentation</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-overlay">
+            <div class="spinner"></div>
+            <p>Loading incident reports...</p>
+        </div>
+    }
+    else
+    {
+        <div class="incident-reports-section">
+            <div class="section-header">
+                <h3>Incident Reports</h3>
+                <div class="filter-controls">
+                    <button class="btn btn-sm btn-primary" @onclick="RefreshReports">Refresh</button>
+                    <button class="btn btn-sm btn-success" @onclick="OpenAnnexADateModal" style="margin-left: 8px;">Download Annex A</button>
+                </div>
+            </div>
+
+            @if (incidentReports != null && incidentReports.Count > 0)
+            {
+                <div class="reports-table">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Incident Type</th>
+                                <th>Respondent</th>
+                                <th>Date Reported</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var report in incidentReports)
+                            {
+                                <tr>
+                                    <td>@(report.IncidentType == "Others" ? report.OtherIncidentType : report.IncidentType)</td>
+                                    <td>@report.RespondentName</td>
+                                    <td>@report.DateReported.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        <span class="status-badge status-@(report.Status?.ToLower().Replace(" ", "-"))">
+                                            @report.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary" @onclick="() => OpenFormsModal(report.IncidentID)">
+                                            Forms
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <p>No incident reports found.</p>
+                </div>
+            }
+        </div>
+    }
+
+    <Gsystem.Pages.Components.FormsModal 
+        IsVisible="@showFormsModal" 
+        IsVisibleChanged="@(val => showFormsModal = val)"
+        IncidentId="@selectedIncidentId"
+        OnRescheduleSuccess="@RefreshReports" />
+
+    <!-- Annex A Date Selection Modal -->
+    @if (showAnnexADateModal)
+    {
+        <div class="modal-backdrop">
+            <div class="modal-content date-selection-modal">
+                <div class="modal-header">
+                    <h3>Download Annex A</h3>
+                    <p>Select the period you want to cover in the report</p>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label>Start Date</label>
+                        <input type="date" class="form-control" @bind="annexAStartDate" />
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>End Date</label>
+                        <input type="date" class="form-control" @bind="annexAEndDate" />
+                    </div>
+                </div>
+                <div class="modal-footer d-flex gap-2 justify-content-end mt-4">
+                    <button class="btn btn-secondary" @onclick="CloseAnnexADateModal">Cancel</button>
+                    <button class="btn btn-success" @onclick="DownloadAnnexA">Confirm & Download</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<IncidentReportSummary> incidentReports = new();
+    private bool isLoading = true;
+    private bool showFormsModal = false;
+    private int selectedIncidentId = 0;
+    
+    // Annex A Date Filter Modal
+    private bool showAnnexADateModal = false;
+    private DateTime annexAStartDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private DateTime annexAEndDate = DateTime.Now;
+    
+    private void OpenAnnexADateModal()
+    {
+        showAnnexADateModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseAnnexADateModal()
+    {
+        showAnnexADateModal = false;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIncidentReports();
+    }
+
+    private async Task LoadIncidentReports()
+    {
+        isLoading = true;
+        try
+        {
+            // Fetch for guidance (all reports or filtered by school if needed)
+            var response = await Http.GetAsync("api/IncidentReport");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+                {
+                    incidentReports = JsonSerializer.Deserialize<List<IncidentReportSummary>>(
+                        result.GetProperty("data").GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    
+                    incidentReports = incidentReports.OrderByDescending(r => r.DateReported).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading reports: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshReports()
+    {
+        await LoadIncidentReports();
+    }
+
+    private string message = "";
+    private bool isSuccess = true;
+
+    private async Task DownloadAnnexA()
+    {
+        try
+        {
+            showAnnexADateModal = false;
+            StateHasChanged();
+
+            var startStr = annexAStartDate.ToString("yyyy-MM-dd");
+            var endStr = annexAEndDate.ToString("yyyy-MM-dd");
+            var url = $"api/StudentProfileCaseRecord/annex-a-pdf?startDate={startStr}&endDate={endStr}";
+            var fileName = $"AnnexA_Report_{DateTime.Now:yyyyMMdd}.pdf";
+            
+            var response = await Http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(bytes);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64);
+                
+                message = "Annex A Downloaded successfully";
+                isSuccess = true;
+            }
+            else
+            {
+                message = $"Failed to download Annex A: {response.StatusCode}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error downloading Annex A: {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private void OpenFormsModal(int incidentId)
+    {
+        selectedIncidentId = incidentId;
+        showFormsModal = true;
+    }
+
+    // Model classes if not globally available, but they seem to be in SharedProject
+}

@@ -1,0 +1,17 @@
+**/.bin
+**/.obj
+**/.vs
+**/.vscode
+**/.git
+**/.gitignore
+**/bin
+**/obj
+**/*.user
+**/*.lock.json
+.factory
+Forms
+CallSlip_Preview.html
+*.sql
+*.md
+Gsystem.sln
+Gsystem.slnLaunch.user

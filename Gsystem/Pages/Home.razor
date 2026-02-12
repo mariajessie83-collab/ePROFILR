@@ -1,0 +1,657 @@
+﻿@page "/"
+@layout Gsystem.Layout.SimpleLayout
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+<PageTitle>ePROFILER - Digital Student Profiling System</PageTitle>
+
+<!-- Modern Landing Page -->
+<div class="landing-page">
+    <!-- Hero Section with Gradient Background -->
+    <div class="hero-section">
+        <!-- Flying Paper Airplanes -->
+        <div class="paper-plane plane-1"></div>
+        <div class="paper-plane plane-2"></div>
+        <div class="paper-plane plane-3"></div>
+        <div class="paper-plane plane-4"></div>
+        <div class="paper-plane plane-5"></div>
+        
+        <div class="hero-container">
+            <!-- Left Content -->
+            <div class="hero-left">
+                <img src="q12png.png" alt="Logo" class="landing-logo" />
+                <h1 class="hero-main-title">ePROFILR</h1>
+                <h2 class="hero-main-subtitle">Digital Student Profiling System</h2>
+                <p class="hero-description">
+                    Track student behavior, document incidents, and guide learners toward positive growth. 
+                    A digital platform designed to support discipline management with empathy and care.
+                </p>
+                <button class="btn btn-hero" @onclick="ScrollToContent">More Info</button>
+            </div>
+            
+            <!-- Right Illustration -->
+            <div class="hero-right">
+                <img src="/guidance.png" alt="Guidance Illustration" class="hero-illustration" />
+            </div>
+        </div>
+        
+        <!-- Scroll Indicator -->
+        <div class="scroll-indicator" @onclick="ScrollToContent">
+            <span class="scroll-arrow"></span>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <section class="about-section" id="welcome-section">
+        <div class="container">
+            <h2 class="section-title">Welcome to ePROFILER</h2>
+            <div class="about-content">
+                <p class="about-text">
+                    The Electronic Profiling, Reporting, and Organization of Filed Incidents, Logs, and Referrals (ePROFILER) is a comprehensive digital platform designed to support Philippine schools in managing learner-related cases involving discipline, protection, and behavioral concerns.
+                </p>
+                <p class="about-text">
+                    It integrates key functions that enable educators, Child Protection Committees (CPCs), and administrators to document, monitor, and respond to incidents in a structured, policy-aligned manner.
+                </p>
+                <p class="about-text-tagalog">
+                    Malugod na pagtanggap! Narito kami upang gumabay at maglingkod sa mga mag-aaral. Kung may insidente o alalahanin, maaari kayong mag-ulat gamit ang mga button sa itaas.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="container">
+            <h2 class="section-title animate-on-scroll">Our Core Values</h2>
+                        <!-- Mobile Carousel Wrapper -->
+            <div class="features-mobile-carousel">
+                <div class="carousel-nav-btn prev" @onclick="() => PrevFeature()">‹</div>
+                <div class="features-grid" style="transform: translateX(@(-activeFeatureIndex * 100)%)">
+                    <div class="feature-card @(activeFeatureIndex == 0 ? "active" : "") animate-on-scroll">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                            </svg>
+                        </div>
+                        <h3>Track</h3>
+                        <p>Monitor student behavior through structured incident reporting and infraction profiling, ensuring accurate documentation and real-time visibility across roles.</p>
+                    </div>
+                    
+                    <div class="feature-card @(activeFeatureIndex == 1 ? "active" : "") animate-on-scroll" style="animation-delay: 0.2s;">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 11 12 14 22 4"></polyline>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                            </svg>
+                        </div>
+                        <h3>Act</h3>
+                        <p>Enable timely, policy-aligned interventions through automated workflows, classification tools, and referral pathways that support ethical decision-making.</p>
+                    </div>
+                    
+                    <div class="feature-card @(activeFeatureIndex == 2 ? "active" : "") animate-on-scroll" style="animation-delay: 0.4s;">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                        <h3>Restore</h3>
+                        <p>Promote learner well-being through counseling, care center review, and restorative practices that prioritize support over punishment.</p>
+                    </div>
+                </div>
+                <div class="carousel-nav-btn next" @onclick="() => NextFeature()">‹</div>
+
+                <!-- Carousel Indicators -->
+                <div class="carousel-dots">
+                    <span class="dot @(activeFeatureIndex == 0 ? "active" : "")" @onclick="() => SetActiveFeature(0)"></span>
+                    <span class="dot @(activeFeatureIndex == 1 ? "active" : "")" @onclick="() => SetActiveFeature(1)"></span>
+                    <span class="dot @(activeFeatureIndex == 2 ? "active" : "")" @onclick="() => SetActiveFeature(2)"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How to Use Section -->
+    <section class="how-to-section">
+        <div class="container">
+            <h2 class="section-title animate-on-scroll">How to Report an Incident</h2>
+            <p class="section-subtitle animate-on-scroll">Click a step number to reveal more instructions</p>
+            
+            <!-- Mobile Report Carousel Wrapper -->
+            <div class="report-mobile-carousel">
+                <div class="carousel-nav-btn prev" @onclick="() => PrevStep()">‹</div>
+                <div class="steps-grid" style="transform: translateX(@(-(activeStepIndex - 1) * 100)%)">
+                    <div class="step-card @(activeStepIndex == 1 ? "active" : "") animate-on-scroll">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3>Click Incident Report</h3>
+                            </div>
+                        </div>
+                        <div class="step-detail">
+                            <p>Go to the navigation menu and click on "Incident Report" button at the top of the page. This will open the reporting portal.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-card @(activeStepIndex == 2 ? "active" : "") animate-on-scroll" style="animation-delay: 0.2s;">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3>Fill Out the Form</h3>
+                            </div>
+                        </div>
+                        <div class="step-detail">
+                            <p>Provide details about the incident including date, time, location, and description of what happened. Be as specific as possible.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-card @(activeStepIndex == 3 ? "active" : "") animate-on-scroll" style="animation-delay: 0.4s;">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3>Review Your Report</h3>
+                            </div>
+                        </div>
+                        <div class="step-detail">
+                            <p>Double-check all information to ensure accuracy. Make sure all required fields are filled out correctly before proceeding.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-card @(activeStepIndex == 4 ? "active" : "") animate-on-scroll" style="animation-delay: 0.6s;">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h3>Submit & Get Reference</h3>
+                            </div>
+                        </div>
+                        <div class="step-detail">
+                            <p>Click submit and you'll receive a reference number. Keep this number safe to track the progress of your report status.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="carousel-nav-btn next" @onclick="() => NextStep()">‹</div>
+
+                <!-- Report Carousel Indicators -->
+                <div class="carousel-dots">
+                    <span class="dot @(activeStepIndex == 1 ? "active" : "")" @onclick="() => SetActiveStep(1)"></span>
+                    <span class="dot @(activeStepIndex == 2 ? "active" : "")" @onclick="() => SetActiveStep(2)"></span>
+                    <span class="dot @(activeStepIndex == 3 ? "active" : "")" @onclick="() => SetActiveStep(3)"></span>
+                    <span class="dot @(activeStepIndex == 4 ? "active" : "")" @onclick="() => SetActiveStep(4)"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Process Section -->
+    <section class="workflow-section">
+        <div class="container">
+            <h2 class="section-title animate-on-scroll">Incident Management Workflow</h2>
+            <p class="section-subtitle animate-on-scroll">Our 8-phase process for handling student incidents with care and professionalism</p>
+            
+            <!-- Mobile Workflow Carousel Wrapper -->
+            <div class="workflow-mobile-carousel">
+                <div class="carousel-nav-btn prev" @onclick="() => PrevWorkflow()">‹</div>
+                <div class="workflow-grid" style="transform: translateX(@(-activeWorkflowIndex * 100)%)">
+                    <div class="workflow-card @(activeWorkflowIndex == 0 ? "active" : "") animate-on-scroll">
+                        <div class="workflow-number">1</div>
+                        <div class="workflow-icon">📝</div>
+                        <h3>Reporting Phase</h3>
+                        <p>Initial incident documentation by students, teachers, or staff through the digital platform.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 1 ? "active" : "") animate-on-scroll" style="animation-delay: 0.1s;">
+                        <div class="workflow-number">2</div>
+                        <div class="workflow-icon">✅</div>
+                        <h3>Validation Phase</h3>
+                        <p>Verification of incident details and assessment of report accuracy by designated personnel.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 2 ? "active" : "") animate-on-scroll" style="animation-delay: 0.2s;">
+                        <div class="workflow-number">3</div>
+                        <div class="workflow-icon">👤</div>
+                        <h3>Student Appearance</h3>
+                        <p>Meeting with the student to gather their perspective and ensure fair hearing.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 3 ? "active" : "") animate-on-scroll" style="animation-delay: 0.3s;">
+                        <div class="workflow-number">4</div>
+                        <div class="workflow-icon">🔍</div>
+                        <h3>Classification Phase</h3>
+                        <p>Categorization of the incident based on severity and policy guidelines (Minor, Major, or Prohibited Acts).</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 4 ? "active" : "") animate-on-scroll" style="animation-delay: 0.4s;">
+                        <div class="workflow-number">5</div>
+                        <div class="workflow-icon">👨‍👩‍👧</div>
+                        <h3>Parent Conference</h3>
+                        <p>Engagement with parents/guardians when applicable, ensuring transparency and partnership.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 5 ? "active" : "") animate-on-scroll" style="animation-delay: 0.5s;">
+                        <div class="workflow-number">6</div>
+                        <div class="workflow-icon">💬</div>
+                        <h3>Counseling Phase</h3>
+                        <p>Provision of guidance and support to help students reflect and develop positive behavior.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 6 ? "active" : "") animate-on-scroll" style="animation-delay: 0.6s;">
+                        <div class="workflow-number">7</div>
+                        <div class="workflow-icon">📋</div>
+                        <h3>Guidance Review</h3>
+                        <p>Comprehensive evaluation by guidance personnel to ensure appropriate intervention.</p>
+                    </div>
+                    
+                    <div class="workflow-card @(activeWorkflowIndex == 7 ? "active" : "") animate-on-scroll" style="animation-delay: 0.7s;">
+                        <div class="workflow-number">8</div>
+                        <div class="workflow-icon">📊</div>
+                        <h3>Monitoring Reporting</h3>
+                        <p>Ongoing tracking of student progress and documentation of behavioral improvements.</p>
+                    </div>
+                </div>
+                <div class="carousel-nav-btn next" @onclick="() => NextWorkflow()">‹</div>
+
+                <!-- Workflow Carousel Indicators -->
+                <div class="carousel-dots workflow-dots">
+                    @for (int i = 0; i < 8; i++)
+                    {
+                        var index = i;
+                        <span class="dot @(activeWorkflowIndex == index ? "active" : "")" @onclick="() => SetActiveWorkflow(index)"></span>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Success message for incident report submission -->
+@if (showIncidentSuccessMessage)
+{
+    <div class="incident-success-message" style="position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: 600px; width: 90%; margin: 0 auto;">
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="font-size: 24px;">✅</div>
+                <div style="flex: 1;">
+                    <strong style="font-size: 16px; display: block; margin-bottom: 4px;">Incident Report Submitted Successfully!</strong>
+                    @if (!string.IsNullOrEmpty(incidentReferenceNumber))
+                    {
+                        <div style="font-size: 14px; margin-top: 4px;">
+                            Reference No.: <strong>@incidentReferenceNumber</strong>
+                        </div>
+                    }
+                    <div style="font-size: 13px; margin-top: 4px; color: #155724;">
+                        The school administration will review your report.
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn-close" @onclick="() => { showIncidentSuccessMessage = false; incidentReferenceNumber = string.Empty; }" aria-label="Close" style="position: absolute; top: 8px; right: 8px;"></button>
+        </div>
+    </div>
+}
+
+<!-- Snackbar for welcome message -->
+@if (showWelcomeSnackbar)
+{
+    <div class="welcome-snackbar">
+        <div class="snackbar-flex">
+            <div class="snackbar-main">
+                <div class="snackbar-title">
+                    Welcome back, @currentUser!
+                </div>
+                <div class="snackbar-role-info">
+                    @if (isPODUser)
+                    {
+                        <span>POD Dashboard Access</span>
+                    }
+                    else if (userRole == "student")
+                    {
+                        <span>Student Access</span>
+                    }
+                    else
+                    {
+                        <span>@userRole - @userPosition</span>
+                    }
+                </div>
+            </div>
+            <button class="snackbar-dismiss" @onclick="HideWelcomeSnackbar">×</button>
+        </div>
+    </div>
+}
+
+
+@code {
+    private bool isAuthenticated = false;
+    private bool isPODUser = false;
+    private string currentUser = string.Empty;
+    private string userRole = string.Empty;
+    private string userPosition = string.Empty;
+    private bool showWelcomeSnackbar = false;
+    private bool showIncidentSuccessMessage = false;
+    private string incidentReferenceNumber = string.Empty;
+    
+    // Mobile Interaction State
+    private int activeFeatureIndex = 0;
+    private int activeStepIndex = 1;
+    private int activeWorkflowIndex = 0;
+
+    private void SetActiveFeature(int index)
+    {
+        activeFeatureIndex = index;
+        StateHasChanged();
+    }
+
+    private void SetActiveWorkflow(int index)
+    {
+        activeWorkflowIndex = index;
+        StateHasChanged();
+    }
+
+    private void NextFeature()
+    {
+        activeFeatureIndex = (activeFeatureIndex + 1) % 3;
+        StateHasChanged();
+    }
+
+    private void PrevFeature()
+    {
+        activeFeatureIndex = (activeFeatureIndex - 1 + 3) % 3;
+        StateHasChanged();
+    }
+
+    private void NextWorkflow()
+    {
+        activeWorkflowIndex = (activeWorkflowIndex + 1) % 8;
+        StateHasChanged();
+    }
+
+    private void PrevWorkflow()
+    {
+        activeWorkflowIndex = (activeWorkflowIndex - 1 + 8) % 8;
+        StateHasChanged();
+    }
+
+    private void SetActiveStep(int index)
+    {
+        activeStepIndex = index;
+        StateHasChanged();
+    }
+
+    private void NextStep()
+    {
+        activeStepIndex = (activeStepIndex % 4) + 1;
+        StateHasChanged();
+    }
+
+    private void PrevStep()
+    {
+        activeStepIndex = (activeStepIndex == 1) ? 4 : activeStepIndex - 1;
+        StateHasChanged();
+    }
+
+    private void ToggleStep(int index)
+    {
+        if (activeStepIndex == index)
+            activeStepIndex = 0; // Collapse all
+        else
+            activeStepIndex = index;
+        
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckIncidentSubmissionSuccess();
+            await CheckUserStatus();
+            // Constellation removed - using animated gradient instead
+        }
+        // ALWAYS run fade-in per render for Blazor client
+        await JSRuntime.InvokeVoidAsync("triggerFadeInForBlazor");
+    }
+
+    private async Task CheckIncidentSubmissionSuccess()
+    {
+        try
+        {
+            var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+            var query = uri.Query;
+            
+            if (!string.IsNullOrEmpty(query))
+            {
+                // Parse query parameters manually
+                var queryParams = ParseQueryString(query);
+                
+                if (queryParams.TryGetValue("incidentSubmitted", out var submitted))
+                {
+                    if (submitted == "true")
+                    {
+                        showIncidentSuccessMessage = true;
+                        
+                        if (queryParams.TryGetValue("refNumber", out var refNum))
+                        {
+                            incidentReferenceNumber = Uri.UnescapeDataString(refNum);
+                        }
+                        
+                        // Remove query parameters from URL
+                        NavigationManager.NavigateTo("/", forceLoad: false);
+                        
+                        // Auto-hide success message after 8 seconds
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(8000);
+                            await InvokeAsync(() =>
+                            {
+                                showIncidentSuccessMessage = false;
+                                incidentReferenceNumber = string.Empty;
+                                StateHasChanged();
+                            });
+                        });
+                        
+                        StateHasChanged();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking incident submission success: {ex.Message}");
+        }
+    }
+
+    private Dictionary<string, string> ParseQueryString(string query)
+    {
+        var result = new Dictionary<string, string>();
+        
+        if (string.IsNullOrEmpty(query) || query.Length <= 1)
+            return result;
+        
+        // Remove the '?' at the start
+        if (query.StartsWith("?"))
+            query = query.Substring(1);
+        
+        var pairs = query.Split('&');
+        foreach (var pair in pairs)
+        {
+            var parts = pair.Split('=');
+            if (parts.Length == 2)
+            {
+                var key = Uri.UnescapeDataString(parts[0]);
+                var value = Uri.UnescapeDataString(parts[1]);
+                result[key] = value;
+            }
+        }
+        
+        return result;
+    }
+
+    private async Task CheckUserStatus()
+    {
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            
+            Console.WriteLine($"Home Page - AuthToken: {authToken}");
+            Console.WriteLine($"Home Page - CurrentUser: {currentUser}");
+            Console.WriteLine($"Home Page - UserRole: {userRole}");
+            Console.WriteLine($"Home Page - UserPosition: {userPosition}");
+            Console.WriteLine($"Home Page - IsAuthenticated: {!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser)}");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser))
+            {
+                isAuthenticated = true;
+                isPODUser = userRole == "teacher" && userPosition == "POD";
+                var isAdminRole = userRole == "admin" || userRole == "schoolhead" || userRole == "division";
+                
+                Console.WriteLine($"Home Page - IsAuthenticated: {isAuthenticated}");
+                Console.WriteLine($"Home Page - IsPODUser: {isPODUser}");
+                
+                // Show welcome snackbar for authenticated users
+                showWelcomeSnackbar = true;
+                StateHasChanged();
+                
+                // Auto-hide snackbar after 5 seconds
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(5000);
+                    await InvokeAsync(() =>
+                    {
+                        showWelcomeSnackbar = false;
+                        StateHasChanged();
+                    });
+                });
+                
+                // If admin user, go to admin dashboard
+                if (userRole == "admin")
+                {
+                    Console.WriteLine("Home Page - Admin user detected, redirecting to Admin Dashboard...");
+                    await Task.Delay(1500);
+                    NavigationManager.NavigateTo("/admin-dashboard", forceLoad: false);
+                }
+                // If School Head user, go to School Head Dashboard
+                else if (userRole == "schoolhead")
+                {
+                    Console.WriteLine("Home Page - School Head user detected, redirecting to School Head Dashboard...");
+                    await Task.Delay(1500);
+                    NavigationManager.NavigateTo("/schoolhead-dashboard", forceLoad: false);
+                }
+                // If Division user, go to Division Dashboard
+                else if (userRole == "division")
+                {
+                    Console.WriteLine("Home Page - Division user detected, redirecting to Division Dashboard...");
+                    await Task.Delay(1500);
+                    NavigationManager.NavigateTo("/division-dashboard", forceLoad: false);
+                }
+                // If POD user is logged in, redirect to POD Dashboard
+                else if (isPODUser)
+                {
+                    Console.WriteLine("Home Page - POD user detected, redirecting to POD Dashboard...");
+                    await Task.Delay(2000); // Show welcome message for 2 seconds
+                    NavigationManager.NavigateTo("/pod-dashboard");
+                }
+                // If teacher/adviser user is logged in, redirect to Adviser Dashboard
+                else if (userRole == "teacher" && !string.IsNullOrEmpty(userPosition))
+                {
+                    Console.WriteLine($"Home Page - Teacher user detected (Position: {userPosition}), redirecting to Adviser Dashboard...");
+                    await Task.Delay(2000); // Show welcome message for 2 seconds
+                    NavigationManager.NavigateTo("/adviser-dashboard");
+                }
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Home Page - Error checking user status: {ex.Message}");
+            isAuthenticated = false;
+            isPODUser = false;
+        }
+    }
+
+    private void HideWelcomeSnackbar()
+    {
+        showWelcomeSnackbar = false;
+        StateHasChanged();
+    }
+
+    private void NavigateToLogin()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+
+    private async Task ScrollToContent()
+    {
+        await JSRuntime.InvokeVoidAsync("eval", @"
+            const aboutSection = document.querySelector('.about-section');
+            if (aboutSection) {
+                const navHeader = document.querySelector('.nav-container') || document.querySelector('header');
+                const headerHeight = navHeader ? navHeader.offsetHeight : 80;
+                const elementPosition = aboutSection.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerHeight - 20;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            } else {
+                window.scrollTo({
+                    top: window.innerHeight,
+                    behavior: 'smooth'
+                }); 
+            }
+        ");
+    }
+}
+
+<script>
+// Scroll Animation Observer
+function initScrollAnimations() {
+    const animatedElements = document.querySelectorAll('.animate-on-scroll');
+    
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { 
+            threshold: 0.15,
+            rootMargin: '0px 0px -50px 0px'
+        });
+        
+        animatedElements.forEach(function(el) {
+            observer.observe(el);
+        });
+    } else {
+        animatedElements.forEach(function(el) { 
+            el.classList.add('visible'); 
+        });
+    }
+}
+
+// Backward compatibility function
+window.triggerFadeInForBlazor = function(animationOnButtonClick = false) {
+    // Re-initialize scroll animations when called
+    initScrollAnimations();
+};
+
+// Initialize on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initScrollAnimations);
+} else {
+    initScrollAnimations();
+}
+
+// Re-initialize after Blazor navigation
+window.addEventListener('load', function() {
+    setTimeout(initScrollAnimations, 100);
+});
+</script>
+
+<!-- styles moved to Home.razor.css -->

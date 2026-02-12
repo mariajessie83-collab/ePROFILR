@@ -1,0 +1,487 @@
+@page "/forms/student-profile-case-record-print/{IncidentId:int}"
+@page "/forms/student-profile-case-record-print/record/{RecordId:int}"
+@using SharedProject
+@using System.Text.Json
+@layout Gsystem.Shared.EmptyLayout
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="print-container">
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Loading...</div>
+    }
+    else if (incident == null && escalation == null && simplifiedRecord == null)
+    {
+        <div class="error-message">Record not found.</div>
+    }
+    else
+    {
+        <div class="form-header text-center">
+            <h4 class="mb-0" style="font-size: 1.1em;">Republic of the Philippines</h4>
+            <h3 class="mb-0" style="font-size: 1.3em;">Department of Education</h3>
+            <div class="school-info mt-1">
+                <p class="mb-0 font-weight-bold" style="font-size: 1.1em;">@(school?.SchoolName ?? "KAUSWAGAN NATIONAL HIGH SCHOOL")</p>
+                <p class="mb-0">@(school?.Region ?? "__________")</p>
+                <p class="mb-0">@(school?.Division ?? "__________")</p>
+                <p class="mb-0">@(school?.District ?? "__________")</p>
+            </div>
+        </div>
+
+        <div class="form-title text-center mt-3">
+            <h3 style="text-decoration: underline; font-size: 1.2em;">STUDENT PROFILE AND CASE RECORD</h3>
+        </div>
+
+        <div class="form-body mt-2">
+            <!-- Student Profile Section -->
+            <div class="section mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="section-title" style="font-size: 1em; margin-bottom: 5px;">I. STUDENT PROFILE</h5>
+                    @if (!string.IsNullOrEmpty(GetEvidencePhoto()))
+                    {
+                        <div class="evidence-photo" style="margin-bottom: 5px;">
+                            <img src="data:image/png;base64,@GetEvidencePhoto()" alt="Evidence Photo" style="width: 100px; height: 100px; border: 1px solid #000; object-fit: cover;" />
+                            <div class="text-center" style="font-size: 9px; margin-top: 1px;">IDENTIFICATION PHOTO</div>
+                        </div>
+                    }
+                </div>
+                <!-- Compressed Rows -->
+                <div class="row narrow-row">
+                    <div class="col-6"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Name:</label><div class="col-sm-8 border-bottom">@GetStudentName()</div></div></div>
+                    <div class="col-6"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Date:</label><div class="col-sm-8 border-bottom">@DateTime.Now.ToShortDateString()</div></div></div>
+                </div>
+                <div class="row narrow-row">
+                    <div class="col-6"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Date of Birth:</label><div class="col-sm-8 border-bottom">@GetDateOfBirth()</div></div></div>
+                    <div class="col-3"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Age:</label><div class="col-sm-8 border-bottom">@GetAge()</div></div></div>
+                     <div class="col-3"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Sex:</label><div class="col-sm-8 border-bottom">@GetSex()</div></div></div>
+                </div>
+                 <div class="row narrow-row">
+                    <div class="col-12"><div class="form-group row narrow-group"><label class="col-sm-2 col-form-label">Address:</label><div class="col-sm-10 border-bottom">@GetAddress()</div></div></div>
+                </div>
+                 <div class="row narrow-row">
+                    <div class="col-6"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Grade & Section:</label><div class="col-sm-8 border-bottom">@GetGradeLevel() - @GetSection()</div></div></div>
+                     <div class="col-6"><div class="form-group row narrow-group"><label class="col-sm-4 col-form-label">Adviser:</label><div class="col-sm-8 border-bottom">@GetAdviserName()</div></div></div>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(GetFathersName()))
+                {
+                    <div class="row narrow-row">
+                        <div class="col-12"><div class="form-group row narrow-group"><label class="col-sm-2 col-form-label">Father's Name:</label><div class="col-sm-10 border-bottom">@GetFathersName()</div></div></div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(GetMothersName()))
+                {
+                    <div class="row narrow-row">
+                        <div class="col-12"><div class="form-group row narrow-group"><label class="col-sm-2 col-form-label">Mother's Name:</label><div class="col-sm-10 border-bottom">@GetMothersName()</div></div></div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(GetGuardianName()))
+                {
+                    <div class="row narrow-row">
+                        <div class="col-12"><div class="form-group row narrow-group"><label class="col-sm-2 col-form-label">Guardian:</label><div class="col-sm-10 border-bottom">@GetGuardianName()</div></div></div>
+                    </div>
+                }
+            </div>
+
+            <!-- Case Record Section -->
+            <div class="section mb-2">
+                <h5 class="section-title" style="font-size: 1em; margin-bottom: 5px;">II. CASE RECORD</h5>
+                 <div class="row narrow-row">
+                    <div class="col-6">
+                         <div class="form-group row narrow-group">
+                            <label class="col-sm-4 col-form-label">Case No.:</label>
+                            <div class="col-sm-8 border-bottom">@studentCaseCount</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-group row narrow-group">
+                            <label class="col-sm-4 col-form-label">Offense No.:</label>
+                            <div class="col-sm-8">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" checked="@IsOffenseNumber("First Offense")" disabled>
+                                    <label class="form-check-label">1st</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" checked="@IsOffenseNumber("Second Offense")" disabled>
+                                    <label class="form-check-label">2nd</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" checked="@IsOffenseNumber("Third Offense")" disabled>
+                                    <label class="form-check-label">3rd</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="row narrow-row">
+                    <div class="col-12">
+                         <div class="form-group row narrow-group">
+                            <label class="col-auto col-form-label" style="padding-right: 5px; font-weight: bold;">Nature of Complaint/Violation:</label>
+                            <div class="col border-bottom" style="padding-left: 5px;">@GetIncidentType()</div>
+                        </div>
+                    </div>
+                </div>
+                   <div class="row narrow-row mt-1">
+                    <div class="col-12">
+                        <label class="font-weight-bold" style="margin-bottom: 2px;">Brief Description of the Case:</label>
+                        <div class="border p-2 case-description" style="min-height: 50px; font-size: 0.9em;">
+                            @GetDescription()
+                        </div>
+                    </div>
+                </div>
+                   <div class="row narrow-row mt-1">
+                    <div class="col-12">
+                        <label class="font-weight-bold" style="margin-bottom: 2px;">Action Taken / Penalty / Agreement:</label>
+                        <div class="border p-2 case-agreement" style="min-height: 50px; font-size: 0.9em;">
+                           @GetDetailsOfAgreement()
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Signatories Section -->
+            <div class="section mt-3">
+                <div class="row text-center" style="margin-top: 10px;">
+                     <div class="col-4">
+                        <div class="signature-space" style="height: 40px; display: flex; align-items: flex-end; justify-content: center;">
+                             @if (!string.IsNullOrEmpty(GetSignature()))
+                             {
+                                 <img src="data:image/png;base64,@GetSignature()" alt="Student Signature" style="max-height: 100%; max-width: 100%; transform: scale(1.1);" />
+                             }
+                        </div>
+                        <div class="border-top border-dark mx-2 pt-1" style="font-size: 0.85em;">
+                             Student's Signature (Pirma)
+                        </div>
+                     </div>
+                      <div class="col-4">
+                        <div class="signature-space" style="height: 40px;">&nbsp;</div>
+                        <div class="border-top border-dark mx-2 pt-1" style="font-size: 0.85em;">
+                             Parent/Guardian's Signature
+                        </div>
+                     </div>
+                      <div class="col-4">
+                        <div class="signature-space" style="height: 40px;">&nbsp;</div>
+                        <div class="border-top border-dark mx-2 pt-1" style="font-size: 0.85em;">
+                             Adviser's Signature
+                        </div>
+                     </div>
+                </div>
+                 <div class="row text-center" style="margin-top: 20px;">
+                     <div class="col-6 offset-3">
+                        <div class="signature-space" style="height: 30px;">&nbsp;</div>
+                        <div class="border-top border-dark mx-4 pt-1" style="font-size: 0.9em;">
+                             <strong>PREFECT OF DISCIPLINE</strong>
+                        </div>
+                     </div>
+                 </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .print-container {
+        font-family: Arial, sans-serif;
+        padding: 5px 30px; /* Reduced vertical padding */
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        font-size: 13px; /* Smaller base font */
+    }
+    .form-header h3, .form-header h4 {
+        line-height: 1.1;
+    }
+    .text-center { text-align: center; }
+    .mb-0 { margin-bottom: 0; }
+    .mt-1 { margin-top: 0.25rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-3 { margin-top: 1rem; }
+    .mt-4 { margin-top: 1.5rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-4 { margin-bottom: 1.5rem; }
+    
+    .row { display: flex; flex-wrap: wrap; margin-right: -10px; margin-left: -10px; }
+    .narrow-row { margin-bottom: 2px; } /* Tighten row spacing */
+    
+    .col-6 { flex: 0 0 50%; max-width: 50%; padding: 0 10px; }
+    .col-4 { flex: 0 0 33.33%; max-width: 33.33%; padding: 0 10px; }
+    .col-3 { flex: 0 0 25%; max-width: 25%; padding: 0 10px; }
+    .col-12 { flex: 0 0 100%; max-width: 100%; padding: 0 10px; }
+    
+    .col-sm-4, .col-sm-2, .col-sm-8, .col-sm-10 { position: relative; width: 100%; padding-right: 10px; padding-left: 10px; }
+    .col-sm-4 { flex: 0 0 33.33%; max-width: 33.33%; }
+    .col-sm-8 { flex: 0 0 66.67%; max-width: 66.67%; }
+    .col-sm-2 { flex: 0 0 16.67%; max-width: 16.67%; }
+    .col-sm-10 { flex: 0 0 83.33%; max-width: 83.33%; }
+    
+    .form-group { margin-bottom: 0.25rem; display: flex; align-items: flex-end; }
+    .narrow-group { margin-bottom: 0; } /* Maximum compression */
+    
+    .border-bottom { border-bottom: 1px solid black !important; padding-bottom: 0px; }
+    .section-title { font-weight: bold; margin-bottom: 2px; }
+    .form-check-inline { display: inline-flex; align-items: center; margin-right: 1rem; }
+    .ml-4 { margin-left: 1.5rem; }
+    .border { border: 1px solid #dee2e6; }
+    .p-2 { padding: 0.25rem; }
+    .d-flex { display: flex; }
+    .justify-content-between { justify-content: space-between; }
+    .align-items-start { align-items: flex-start; }
+    .evidence-photo { border: 1px solid #000; padding: 2px; }
+    
+    @@media print {
+        @@page { margin: 0; }
+        .print-container { width: 100%; max-width: none; padding: 10px 30px; margin: 0; }
+        .no-print { display: none; }
+        body { background: white; -webkit-print-color-adjust: exact; }
+        .school-info p { margin-bottom: 0; }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int IncidentId { get; set; }
+
+    [Parameter]
+    public int RecordId { get; set; } // NEW: For loading by SimplifiedStudentProfileCaseRecords.RecordID
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public bool IsEscalation { get; set; } = false;
+
+    private IncidentReportModel? incident;
+    private CaseEscalation? escalation;
+    private StudentAdviserInfo? studentInfo;
+    private StudentProfileCaseRecordSummary? caseRecord;
+    private SimplifiedStudentProfileCaseRecordModel? simplifiedRecord; // NEW: for simplified data
+    private School? school;
+    private bool isLoading = true;
+    private int studentCaseCount = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // If RecordId is provided, load directly by RecordID from SimplifiedStudentProfileCaseRecords
+            if (RecordId > 0)
+            {
+                await LoadSimplifiedCaseRecordByRecordId();
+                // Get IncidentId from the loaded record for additional data
+                if (simplifiedRecord?.IncidentID.HasValue == true)
+                {
+                    IncidentId = simplifiedRecord.IncidentID.Value;
+                    await LoadIncidentData();
+                }
+            }
+            else if (IsEscalation)
+            {
+                await LoadEscalationData();
+            }
+            else
+            {
+                await LoadIncidentData();
+                // Try simplified first, fallback to old case record
+                await LoadSimplifiedCaseRecordData();
+                if (simplifiedRecord == null)
+                {
+                    await LoadCaseRecordData();
+                }
+            }
+
+            string studentName = simplifiedRecord?.RespondentName ?? incident?.RespondentName ?? escalation?.StudentName ?? caseRecord?.StudentOffenderName ?? "";
+            if (!string.IsNullOrEmpty(studentName))
+            {
+                // Only load student profile if we don't have simplified data
+                if (simplifiedRecord == null)
+                {
+                    await LoadStudentProfile(studentName);
+                }
+                await LoadCaseCount(studentName);
+            }
+
+            // Fetch School Info - prioritize simplified record
+            school = new School 
+            { 
+                SchoolName = simplifiedRecord?.SchoolName ?? escalation?.SchoolName ?? caseRecord?.SchoolName ?? "KAUSWAGAN NATIONAL HIGH SCHOOL", 
+                Region = simplifiedRecord?.Region ?? caseRecord?.Region ?? "X", 
+                Division = simplifiedRecord?.Division ?? caseRecord?.Division ?? "Lanao del Norte", 
+                District = simplifiedRecord?.District ?? caseRecord?.District ?? "Kauswagan" 
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading form: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadIncidentData()
+    {
+        var incidentResponse = await Http.GetAsync($"api/IncidentReport/details/{IncidentId}");
+        if (incidentResponse.IsSuccessStatusCode)
+        {
+            var content = await incidentResponse.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                incident = JsonSerializer.Deserialize<IncidentReportModel>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+    }
+
+    private async Task LoadSimplifiedCaseRecordByRecordId()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/StudentProfileCaseRecord/simplified/{RecordId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+                {
+                    simplifiedRecord = JsonSerializer.Deserialize<SimplifiedStudentProfileCaseRecordModel>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading simplified case record by RecordId: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSimplifiedCaseRecordData()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/StudentProfileCaseRecord/simplified-incident-id/{IncidentId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+                {
+                    simplifiedRecord = JsonSerializer.Deserialize<SimplifiedStudentProfileCaseRecordModel>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading simplified case record: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCaseRecordData()
+    {
+        var response = await Http.GetAsync($"api/StudentProfileCaseRecord/incident-id/{IncidentId}");
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                caseRecord = JsonSerializer.Deserialize<StudentProfileCaseRecordSummary>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+    }
+
+    private async Task LoadEscalationData()
+    {
+        var response = await Http.GetAsync($"api/Escalation/{IncidentId}");
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                escalation = JsonSerializer.Deserialize<CaseEscalation>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+    }
+
+    private async Task LoadStudentProfile(string studentName)
+    {
+        var adviserResponse = await Http.GetAsync($"api/StudentProfileCaseRecord/student-adviser/{Uri.EscapeDataString(studentName)}");
+        if (adviserResponse.IsSuccessStatusCode)
+        {
+            var content = await adviserResponse.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                var advisers = JsonSerializer.Deserialize<List<StudentAdviserInfo>>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                studentInfo = advisers?.FirstOrDefault();
+            }
+        }
+    }
+
+    private async Task LoadCaseCount(string studentName)
+    {
+        var response = await Http.GetAsync($"api/StudentProfileCaseRecord/count-cases-by-name?studentName={Uri.EscapeDataString(studentName)}");
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                studentCaseCount = result.GetProperty("count").GetInt32();
+                // If count is 0 (should imply logic error if current incident exists), ensure at least 1
+                if (studentCaseCount == 0) studentCaseCount = 1;
+            }
+        }
+    }
+
+    // Helper methods to get data from either simplified or old records
+    private string GetStudentName() => simplifiedRecord?.RespondentName ?? incident?.RespondentName ?? escalation?.StudentName ?? caseRecord?.StudentOffenderName ?? "";
+    private string GetSex() => simplifiedRecord?.Sex ?? studentInfo?.Sex ?? "__________";
+    private string GetDateOfBirth() => simplifiedRecord?.DateOfBirth?.ToShortDateString() ?? "__________";
+    private string GetAge() => simplifiedRecord?.Age?.ToString() ?? "__________";
+    private string GetAddress() => simplifiedRecord?.Address ?? "__________";
+    private string GetGradeLevel() => simplifiedRecord?.GradeLevel ?? studentInfo?.GradeLevel ?? escalation?.GradeLevel ?? caseRecord?.GradeLevel ?? "__________";
+    private string GetSection() => simplifiedRecord?.Section ?? studentInfo?.Section ?? escalation?.Section ?? caseRecord?.Section ?? "__________";
+    private string GetAdviserName() => simplifiedRecord?.AdviserName ?? studentInfo?.AdviserName ?? caseRecord?.AdviserName ?? "__________";
+    private string GetFathersName() => simplifiedRecord?.FathersName ?? studentInfo?.FathersName ?? caseRecord?.FathersName ?? "";
+    private string GetMothersName() => simplifiedRecord?.MothersName ?? studentInfo?.MothersName ?? caseRecord?.MothersName ?? "";
+    private string GetGuardianName() => simplifiedRecord?.GuardianName ?? studentInfo?.GuardianName ?? caseRecord?.GuardianName ?? "";
+    private string GetEvidencePhoto() => simplifiedRecord?.EvidencePhotoBase64 ?? caseRecord?.EvidencePhotoBase64 ?? "";
+    private string GetSignature() => simplifiedRecord?.StudentSignatureBase64 ?? caseRecord?.SignatureBase64 ?? "";
+    private string GetDetailsOfAgreement() => simplifiedRecord?.Agreement ?? caseRecord?.DetailsOfAgreement ?? "__________";
+    private string GetDescription() => simplifiedRecord?.Description ?? incident?.IncidentDescription ?? escalation?.CaseDetails ?? "N/A";
+
+    private string GetIncidentType()
+    {
+        return simplifiedRecord?.ViolationCommitted ?? incident?.IncidentType ?? caseRecord?.ViolationCommitted ?? (escalation != null ? "Minor Case Escalation" : "");
+    }
+
+    private bool IsViolation(string violationName)
+    {
+        var incType = GetIncidentType();
+        if (string.IsNullOrEmpty(incType)) return false;
+        return incType.Contains(violationName, StringComparison.OrdinalIgnoreCase);
+    }
+    
+    private bool IsStandardViolation(string violation)
+    {
+        if (string.IsNullOrEmpty(violation)) return true;
+        var standard = new[] { "Tardiness", "Cutting Classes", "Incomplete Uniform", "Bullying" };
+        var isStd = standard.Any(s => s.Equals(violation, StringComparison.OrdinalIgnoreCase));
+        return isStd;
+    }
+
+    private bool IsOffenseNumber(string offense)
+    {
+        // For simplified records, we don't have NumberOfOffense - could calculate from studentCaseCount
+        if (simplifiedRecord != null)
+        {
+            return (offense == "First Offense" && studentCaseCount == 1) ||
+                   (offense == "Second Offense" && studentCaseCount == 2) ||
+                   (offense == "Third Offense" && studentCaseCount >= 3);
+        }
+        if (caseRecord == null || string.IsNullOrEmpty(caseRecord.NumberOfOffense)) return false;
+        return caseRecord.NumberOfOffense.Equals(offense, StringComparison.OrdinalIgnoreCase) || 
+               (offense == "First Offense" && caseRecord.NumberOfOffense == "1") ||
+               (offense == "Second Offense" && caseRecord.NumberOfOffense == "2") ||
+               (offense == "Third Offense" && caseRecord.NumberOfOffense == "3");
+    }
+}

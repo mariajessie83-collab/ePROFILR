@@ -1,0 +1,213 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<header class="pod-header">
+    <div class="pod-header-inner">
+        <div class="pod-brand-row">
+            <div class="pod-brand">
+                <h3 class="pod-app-name">POD Dashboard</h3>
+                <span class="pod-sub">Prefect of Discipline</span>
+            </div>
+            <button class="hamburger-btn" @onclick="ToggleMenu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav class="pod-nav @(isMenuOpen ? "open" : "")">
+            <a class="pod-nav-item" href="/" @onclick="CloseMenu">Back to Main</a>
+            <a class="pod-nav-item" href="/pod-dashboard" @onclick="CloseMenu">Dashboard</a>
+            <a class="pod-nav-item" href="/case-records-dashboard" @onclick="CloseMenu">Case Records</a>
+            <a class="pod-nav-item" href="/incident-report" @onclick="CloseMenu">Incident Reports</a>
+            <a class="pod-nav-item" href="/pod/offline-online-rounding" @onclick="CloseMenu">📱 POD Rounding</a>
+            <button class="pod-logout-btn" @onclick="Logout">Logout</button>
+        </nav>
+    </div>
+    <div class="pod-divider"></div>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        .pod-header {
+            background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-family: 'Poppins', sans-serif !important;
+            position: relative;
+            z-index: 1000;
+        }
+        .pod-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pod-brand-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: auto;
+        }
+        .pod-app-name {
+            margin: 0;
+            color: #ffffff;
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .pod-sub {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+            display: block;
+            margin-top: 4px;
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .pod-nav {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .pod-nav-item {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif !important;
+            white-space: nowrap;
+        }
+        .pod-nav-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .pod-logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 14px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .pod-logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-1px);
+        }
+        .pod-divider {
+            height: 3px;
+            background: linear-gradient(90deg, #003d82 0%, #00a8e8 100%);
+        }
+        .pod-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            min-height: calc(100vh - 100px);
+        }
+        .hamburger-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        @@media (max-width: 768px) {
+            .pod-header-inner {
+                flex-direction: column;
+                align-items: stretch;
+                padding-bottom: 10px;
+            }
+            .pod-brand-row {
+                width: 100%;
+                margin-bottom: 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .hamburger-btn {
+                display: block;
+            }
+            .pod-nav {
+                display: none;
+                flex-direction: column;
+                width: 100%;
+                gap: 5px;
+                padding-top: 15px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                margin-top: 10px;
+                animation: slideDown 0.3s ease-out forwards;
+            }
+            .pod-nav.open {
+                display: flex;
+            }
+            .pod-nav-item {
+                width: 100%;
+                text-align: left; /* Changed from center to left for standard mobile menu feel */
+                padding: 12px 15px;
+                background: rgba(0, 0, 0, 0.1); /* Slight bg for items */
+                font-size: 1rem;
+            }
+            .pod-logout-btn {
+                width: 100%;
+                margin-top: 10px;
+                background: rgba(255, 255, 255, 0.15);
+            }
+            .pod-app-name {
+                font-size: 1.5rem;
+            }
+            .pod-sub {
+                font-size: 0.9rem;
+            }
+            @@keyframes slideDown {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        }
+    </style>
+</header>
+
+<div class="pod-content">
+    @Body
+</div>
+
+@code {
+    private bool isMenuOpen = false;
+
+    private void ToggleMenu()
+    {
+        isMenuOpen = !isMenuOpen;
+    }
+
+    private void CloseMenu()
+    {
+        isMenuOpen = false;
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "username");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userPosition");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userFullName");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "teacherId");
+            NavigationManager.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+            NavigationManager.NavigateTo("/", true);
+        }
+    }
+}
+

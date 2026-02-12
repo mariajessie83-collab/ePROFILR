@@ -1,0 +1,3 @@
+ALTER TABLE studentprofilecaserecords
+ADD COLUMN EvidencePhotoBase64 LONGTEXT DEFAULT NULL,
+ADD COLUMN SignatureBase64 LONGTEXT DEFAULT NULL;

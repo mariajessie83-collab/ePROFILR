@@ -1,0 +1,159 @@
+@using SharedProject
+@inject IJSRuntime JSRuntime
+
+@if (IsVisible)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="view-modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-alt mr-2"></i>
+                        Incident Report Details
+                    </h5>
+                    <button type="button" class="close-btn" @onclick="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    @if (Report == null)
+                    {
+                        <div class="text-center p-5">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2">Loading details...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="incident-details-grid">
+                            <!-- Left Column: Primary Info -->
+                            <div class="details-section main-info">
+                                <h6 class="section-label">Incident Information</h6>
+                                <div class="detail-row">
+                                    <span class="label">Incident Type:</span>
+                                    <span class="value badge-type">@Report.IncidentType</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="label">Reference No:</span>
+                                    <span class="value font-weight-bold">@Report.ReferenceNumber</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="label">Date Reported:</span>
+                                    <span class="value">@Report.DateReported.ToString("MMMM dd, yyyy hh:mm tt")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="label">Status:</span>
+                                    <span class="value">
+                                        <span class="status-badge @Report.Status.ToLower()">@Report.Status</span>
+                                    </span>
+                                </div>
+                                @if (Report.IsSentToGuidance)
+                                {
+                                    <div class="detail-row escalation-info">
+                                        <span class="label text-purple">Escalated:</span>
+                                        <span class="value text-purple font-weight-bold">
+                                            @Report.DateSentToGuidance?.ToString("MMM dd, yyyy") by @Report.ReferredBy
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Right Column: Parties Involved -->
+                            <div class="details-section parties-info">
+                                <h6 class="section-label">Parties Involved</h6>
+                                <div class="detail-row">
+                                    <span class="label">Complainant:</span>
+                                    <span class="value">@Report.ComplainantName</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="label">Respondent(s):</span>
+                                    <span class="value">@Report.RespondentName</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="label">Victim:</span>
+                                    <span class="value">@Report.VictimName</span>
+                                </div>
+                            </div>
+
+                            <!-- Full Width: Description -->
+                            <div class="details-section full-width description-box">
+                                <h6 class="section-label">Incident Description</h6>
+                                <div class="description-content">
+                                    @Report.IncidentDescription
+                                </div>
+                            </div>
+
+                            <!-- Full Width: Evidence -->
+                            @if (!string.IsNullOrEmpty(Report.EvidencePhotoBase64))
+                            {
+                                <div class="details-section full-width evidence-box">
+                                    <h6 class="section-label">Evidence Photo</h6>
+                                    <div class="evidence-wrapper @(isBlurred ? "blurred" : "")">
+                                        <img src="@Report.EvidencePhotoBase64" class="evidence-img" @onclick="ToggleBlur" />
+                                        @if (isBlurred)
+                                        {
+                                            <div class="blur-overlay" @onclick="ToggleBlur">
+                                                <i class="fas fa-eye-slash mb-2"></i>
+                                                <span>Click to Unblur</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="text-muted mt-1 small">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        Click image to toggle blur visibility.
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    @if (ShowResolutionButton && Report?.Status != "Resolved" && Report?.Status != "Closed")
+                    {
+                        <button class="btn btn-resolve" @onclick="OnResolveClick" disabled="@isActionLoading">
+                            @if (isActionLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm mr-1"></span>
+                            }
+                            <i class="fas fa-check-circle mr-1"></i>
+                            Mark as Resolved
+                        </button>
+                    }
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public IncidentReportSummary? Report { get; set; }
+    [Parameter] public bool ShowResolutionButton { get; set; }
+    [Parameter] public EventCallback<int> OnResolve { get; set; }
+
+    private bool isBlurred = true;
+    private bool isActionLoading = false;
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+
+    private void ToggleBlur()
+    {
+        isBlurred = !isBlurred;
+    }
+
+    private async Task OnResolveClick()
+    {
+        if (Report == null) return;
+        isActionLoading = true;
+        await OnResolve.InvokeAsync(Report.IncidentID);
+        isActionLoading = false;
+        await Close();
+    }
+}

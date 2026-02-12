@@ -1,0 +1,205 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<header class="teacher-header">
+    <div class="teacher-header-inner">
+        <div class="teacher-brand">
+            <h3 class="teacher-app-name">Teacher Dashboard</h3>
+            <span class="teacher-sub">For teachers and advisers</span>
+        </div>
+        <button class="teacher-menu-toggle" @onclick="ToggleMenu">
+            <span>☰</span>
+        </button>
+        <nav class="teacher-nav @(isMenuOpen ? "open" : "")">
+            <a class="teacher-nav-item" href="/">Back to Main</a>
+            <button class="teacher-logout-btn" @onclick="Logout">Logout</button>
+        </nav>
+    </div>
+    <div class="teacher-divider"></div>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        .teacher-header {
+            background: linear-gradient(135deg, #003d82 0%, #00a8e8 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .teacher-header * {
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .teacher-header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .teacher-app-name {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif !important;
+            letter-spacing: -0.5px;
+        }
+        .teacher-sub {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            font-weight: 400;
+            font-family: 'Poppins', sans-serif !important;
+            vertical-align: middle;
+        }
+        .teacher-nav {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .teacher-nav-item {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .teacher-nav-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .teacher-logout-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 8px 18px;
+            margin-left: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-family: 'Poppins', sans-serif !important;
+        }
+        .teacher-logout-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.7);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .teacher-divider {
+            height: 4px;
+            background: linear-gradient(90deg, #003d82, #00a8e8, #003d82);
+            background-size: 200% 100%;
+            animation: gradientMove 3s ease infinite;
+        }
+        @@keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .teacher-content {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 24px 20px;
+            min-height: calc(100vh - 80px);
+        }
+        .teacher-menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        @@media (max-width: 1024px) {
+            .teacher-header-inner {
+                flex-wrap: wrap; /* Allow wrapping */
+                position: relative;
+            }
+            
+            .teacher-brand {
+                text-align: left;
+                margin-bottom: 0;
+            }
+
+            .teacher-menu-toggle {
+                display: block;
+            }
+
+            .teacher-nav {
+                display: none; /* Hidden by default on mobile */
+                width: 100%;
+                flex-direction: column;
+                background: rgba(0, 61, 130, 0.95); /* Semi-transparent background */
+                position: absolute;
+                top: 100%;
+                left: 0;
+                padding: 20px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                z-index: 1000;
+                backdrop-filter: blur(5px);
+                border-top: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .teacher-nav.open {
+                display: flex;
+            }
+            
+            .teacher-nav-item {
+                width: 100%;
+                text-align: center;
+                padding: 12px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .teacher-logout-btn {
+                width: 100%;
+                margin: 10px 0 0 0;
+                text-align: center;
+            }
+        }
+    </style>
+</header>
+
+<div class="teacher-content">
+    @Body
+</div>
+
+@code {
+    private bool isMenuOpen = false;
+
+    private void ToggleMenu()
+    {
+        isMenuOpen = !isMenuOpen;
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "username");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userPosition");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userFullName");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "teacherId");
+            NavigationManager.NavigateTo("/", true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+            NavigationManager.NavigateTo("/", true);
+        }
+    }
+}
+

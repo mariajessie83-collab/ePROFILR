@@ -1,0 +1,2543 @@
+@page "/case-record-review/{RecordId:int}"
+@layout Gsystem.Layout.PODLayout
+@using System.Text.Json
+@using SharedProject
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<PageTitle>Case Record Review - Record #@RecordId</PageTitle>
+
+@if (isAuthenticated && isPODUser)
+{
+    <div class="page-container">
+        <!-- Top Navigation & Actions -->
+        <header class="page-header">
+            <div class="header-left">
+                <button class="btn-back" @onclick="GoBack">
+                    <span class="icon">←</span> Back to Dashboard
+                </button>
+            </div>
+            @if (isEditMode)
+            {
+                <div class="header-right">
+                    <button class="btn btn-text" @onclick="CancelEdit">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveChanges" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes</span>
+                        }
+                    </button>
+                </div>
+            }
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="content-wrapper">
+            <!-- Page Title & Status -->
+            <div class="record-header">
+                <div class="title-group">
+                    <span class="record-id">Record #@RecordId</span>
+                    <h1>Case Record Review</h1>
+                </div>
+                @if (caseRecord != null)
+                {
+                    <div class="status-indicator @GetStatusBadgeClass(caseRecord.Status)">
+                        <span class="dot"></span>
+                        @caseRecord.Status
+                    </div>
+                }
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Retrieving record details...</p>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="notification-banner @(isSuccess ? "success" : "error")">
+                    @message
+                </div>
+            }
+
+            @* Action Buttons *@
+            @if (caseRecord != null && !isLoading && !isEditMode)
+            {
+                <div class="action-buttons-container">
+                    <button class="btn-action btn-action-edit" @onclick="EnableEditMode">
+                        <span class="action-icon">✎</span>
+                        <span class="action-text">Edit Record</span>
+                    </button>
+                </div>
+            }
+
+            @if (caseRecord != null && !isLoading)
+            {
+                <div class="grid-layout">
+                    <!-- Left Column: Primary Info -->
+                    <div class="primary-column">
+                        
+                        <!-- Student Information Card -->
+                        <section class="card">
+                            <div class="card-header">
+                                <h2>Student Information</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="data-row highlight">
+                                    <div class="data-group">
+                                        <label>Student Name</label>
+                                        <div class="value large">@caseRecord.StudentOffenderName</div>
+                                    </div>
+                                </div>
+                                <div class="data-grid-3">
+                                    <div class="data-group">
+                                        <label>Grade Level</label>
+                                        <div class="value">@caseRecord.GradeLevel</div>
+                                    </div>
+                                    <div class="data-group">
+                                        <label>Section</label>
+                                        <div class="value">@caseRecord.Section</div>
+                                    </div>
+                                    <div class="data-group">
+                                        <label>Adviser</label>
+                                        <div class="value">@caseRecord.AdviserName</div>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(caseRecord.TrackStrand))
+                                {
+                                    <div class="data-row mt-medium">
+                                        <div class="data-group">
+                                            <label>Track / Strand</label>
+                                            <div class="value">@caseRecord.TrackStrand</div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </section>
+
+                        <!-- Offense Details Card -->
+                        <section class="card">
+                            <div class="card-header">
+                                <h2>Offense Details</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="data-row">
+                                    <div class="data-group">
+                                        <label>Violation Committed</label>
+                                        <div class="value highlight-alert">@caseRecord.ViolationCommitted</div>
+                                    </div>
+                                </div>
+                                
+                                @if (!string.IsNullOrEmpty(caseRecord.OtherViolationDescription))
+                                {
+                                    <div class="data-row mt-medium">
+                                        <div class="data-group">
+                                            <label>Description</label>
+                                            <div class="value description">@caseRecord.OtherViolationDescription</div>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="data-grid-2 mt-large">
+                                    <div class="data-group">
+                                        <label>Level of Offense</label>
+                                        <div class="value">
+                                            <span class="badge @GetLevelBadgeClass(caseRecord.LevelOfOffense)">
+                                                @caseRecord.LevelOfOffense
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="data-group">
+                                        <label>Date of Offense</label>
+                                        <div class="value">@caseRecord.DateOfOffense.ToString("MMMM dd, yyyy")</div>
+                                    </div>
+                                </div>
+
+                                <div class="data-row mt-large">
+                                    <div class="data-group">
+                                        <label>Agreement / Action Taken</label>
+                                        @if (isEditMode)
+                                        {
+                                            <div class="editor-container">
+                                                <div class="editor-toolbar">
+                                                    <select class="form-select" @onchange="OnAgreementTypeChanged">
+                                                        <option value="">Select Template...</option>
+                                                        <option value="verbal_warning">Verbal Warning</option>
+                                                        <option value="written_warning">Written Warning</option>
+                                                        <option value="parent_conference">Parent Conference</option>
+                                                    </select>
+                                                    <button class="btn-small" @onclick="ApplyGeneratedAgreement" disabled="@string.IsNullOrEmpty(generatedAgreementText)">Apply</button>
+                                                </div>
+                                                <textarea class="form-textarea" rows="8" 
+                                                          @bind="caseRecord.DetailsOfAgreement" 
+                                                          @bind:event="oninput"></textarea>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="value text-block">
+                                                @((MarkupString)ConvertMarkdownToBold(caseRecord.DetailsOfAgreement))
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Right Column: Secondary Info -->
+                    <div class="secondary-column">
+                        <!-- Guardian Contact Card -->
+                        <section class="card">
+                            <div class="card-header">
+                                <h2>Guardian Contact</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="data-group">
+                                    <label>Contact Number</label>
+                                    <div class="value phone-number">@caseRecord.ParentGuardianContact</div>
+                                </div>
+                                <div class="separator"></div>
+                                <div class="contact-list">
+                                    @if (!string.IsNullOrEmpty(caseRecord.FathersName))
+                                    {
+                                        <div class="contact-item">
+                                            <label>Father</label>
+                                            <span>@caseRecord.FathersName</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(caseRecord.MothersName))
+                                    {
+                                        <div class="contact-item">
+                                            <label>Mother</label>
+                                            <span>@caseRecord.MothersName</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(caseRecord.GuardianName))
+                                    {
+                                        <div class="contact-item">
+                                            <label>Guardian</label>
+                                            <span>@caseRecord.GuardianName</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Record Metadata -->
+                        <section class="card meta-card">
+                            <div class="card-body">
+                                <div class="meta-row">
+                                    <span class="meta-label">Created</span>
+                                    <span class="meta-value">@dateCreated.ToString("MMM dd, yyyy")</span>
+                                </div>
+                                @if (dateModified.HasValue)
+                                {
+                                    <div class="meta-row">
+                                        <span class="meta-label">Last Modified</span>
+                                        <span class="meta-value">@dateModified.Value.ToString("MMM dd, yyyy")</span>
+                                    </div>
+                                }
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            }
+        </main>
+    </div>
+}
+else if (isAuthenticated && !isPODUser)
+{
+    <div class="center-message">
+        <h2>Access Restricted</h2>
+        <p>You do not have permission to view this record.</p>
+        <a href="/pod-dashboard" class="btn btn-primary">Return to Dashboard</a>
+    </div>
+}
+else
+{
+    <div class="center-message">
+        <h2>Authentication Required</h2>
+        <p>Please log in to access the system.</p>
+        <a href="/login/teacher" class="btn btn-primary">Login</a>
+    </div>
+}
+
+    
+    @* Print-only version for PDF *@
+    @if (existingYakapForm != null)
+    {
+        <div class="yakap-print-version" id="yakap-print-content" style="display: none;">
+        <div class="yakap-print-header">
+            <h4 class="yakap-print-title">YUNIT NA AAKAY SA KABATAAN PARA SA ASAL AT PAGPAPAKATAO</h4>
+            <p class="yakap-print-subtitle">@(string.IsNullOrWhiteSpace(existingYakapForm.SchoolName) ? "School Name" : existingYakapForm.SchoolName)</p>
+            <p class="yakap-print-confidential">Confidential Document</p>
+        </div>
+        
+        <div class="yakap-print-student-info">
+            <div class="yakap-print-info-row">
+                <div class="yakap-print-info-item">
+                    <label>STUDENT NAME:</label>
+                    <span>@(string.IsNullOrWhiteSpace(existingYakapForm.StudentName) ? (caseRecord?.StudentOffenderName ?? "Not provided") : existingYakapForm.StudentName)</span>
+                </div>
+                <div class="yakap-print-info-item">
+                    <label>GRADE & SECTION:</label>
+                    <span>@(string.IsNullOrWhiteSpace(existingYakapForm.GradeAndSection) ? (caseRecord != null ? $"{caseRecord.GradeLevel} - {caseRecord.Section}" : "Not provided") : existingYakapForm.GradeAndSection)</span>
+                </div>
+            </div>
+            
+            <div class="yakap-print-info-row">
+                <div class="yakap-print-info-item">
+                    <label>SCHOOL NAME:</label>
+                    <span>@GetDisplaySchoolName()</span>
+                </div>
+                <div class="yakap-print-info-item" style="text-align: right;">
+                    <label>DATE OF SESSION:</label>
+                    <span>@existingYakapForm.DateOfSession.ToString("MMMM dd, yyyy")</span>
+                </div>
+            </div>
+            
+            <div class="yakap-print-info-row">
+                <div class="yakap-print-info-item">
+                    <label>FACILITATOR/COUNSELOR:</label>
+                    <span>@(string.IsNullOrWhiteSpace(existingYakapForm.FacilitatorCounselor) ? "Not provided" : existingYakapForm.FacilitatorCounselor)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="yakap-print-section">
+            <h5 class="yakap-print-section-title">Bahagi I – Pag-unawa sa Aking Karanasan</h5>
+            
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">1. Ano ang nangyari?</label>
+                <p class="yakap-print-question-hint">(Ilarawan ang asal o sitwasyon na naging dahilan ng iyong paglahok sa Y.A.K.A.P. session)</p>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question1_AnoAngNangyari))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question1_AnoAngNangyari
+                    }
+                </div>
+            </div>
+
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">2. Ano ang iniisip o nararamdaman mo noong panahong iyon?</label>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question2_AnoAngIniisipOFeelings))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question2_AnoAngIniisipOFeelings
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="yakap-print-section">
+            <h5 class="yakap-print-section-title">Bahagi II – Pananagutan sa Ginawang Pagkilos</h5>
+            
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">3. Ano ang naging epekto ng iyong ginawa sa iba (kaklase, guro, pamilya)?</label>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question3_AnoAngEpektoSaIba))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question3_AnoAngEpektoSaIba
+                    }
+                </div>
+            </div>
+
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">4. Ano ang iniisip mo ngayon tungkol sa iyong mga naging desisyon?</label>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question4_AnoAngIniisipTungkolSaDesisyon))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question4_AnoAngIniisipTungkolSaDesisyon
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="yakap-print-section">
+            <h5 class="yakap-print-section-title">Bahagi III – Pagharap sa Hinaharap Gamit ang Positibong Disiplina</h5>
+            
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">5. Ano ang gagawin mong iba sa susunod?</label>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question5_AnoAngGagawinMongIba))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question5_AnoAngGagawinMongIba
+                    }
+                </div>
+            </div>
+
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">6. Anong positibong pagpapahalaga o prinsipyo ang gagabay sa iyong susunod na hakbang?</label>
+                <p class="yakap-print-question-hint">(hal. Paggagalang, Pananagutan, Katapatan, Pagtitimpi, Empatiya)</p>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question6_AnongPositibongPagpapahalaga))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question6_AnongPositibongPagpapahalaga
+                    }
+                </div>
+            </div>
+
+            <div class="yakap-print-question-group">
+                <label class="yakap-print-question-label">7. Sumulat ng maikling mensahe para sa iyong hinaharap na sarili</label>
+                <p class="yakap-print-question-hint">(paalala ng mga aral na natutunan mo)</p>
+                <div class="yakap-print-answer">
+                    @if (string.IsNullOrWhiteSpace(existingYakapForm.Question7_MensaheParaSaHinaharap))
+                    {
+                        <em>No answer provided</em>
+                    }
+                    else
+                    {
+                        @existingYakapForm.Question7_MensaheParaSaHinaharap
+                    }
+                </div>
+            </div>
+        </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int RecordId { get; set; }
+
+    private StudentProfileCaseRecordModel? caseRecord;
+    private StudentProfileCaseRecordModel? originalCaseRecord;
+    private bool isLoading = false;
+    private bool isSaving = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private bool isAuthenticated = false;
+    private bool isPODUser = false;
+    private string currentUser = string.Empty;
+    private bool isEditMode = false;
+
+    private DateTime dateCreated = DateTime.Now;
+    private DateTime? dateModified = null;
+    private string createdBy = string.Empty;
+    private string modifiedBy = string.Empty;
+
+    private bool showSMSModal = false;
+    private bool isSendingSMS = false;
+    private string smsMessage = "";
+    private bool showPreviewDropdown = false;
+
+    // Y.A.K.A.P. Form variables
+    private bool showYakapModal = false;
+    private bool showSendYakapModal = false;
+    private bool isSavingYakap = false;
+    private bool isSendingYakap = false;
+    private YakapFormRequest yakapForm = new YakapFormRequest();
+    private YakapFormModel? existingYakapForm = null;
+    private bool hasYakapForm = false;
+    private string actualSchoolName = string.Empty;
+
+    private string selectedAgreementType = "";
+    private string selectedPenalty = "";
+    private string customAgreementDetails = "";
+    private string generatedAgreementText = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(100);
+        await CheckAuthentication();
+        
+        if (RecordId <= 0)
+        {
+            message = "Invalid record ID.";
+            return;
+        }
+        
+        if (isAuthenticated && isPODUser)
+        {
+            await LoadCaseRecord();
+            await CheckYakapFormExists();
+        }
+        else if (!isAuthenticated)
+        {
+            await Task.Delay(500);
+            NavigationManager.NavigateTo("/pod-dashboard", forceLoad: false);
+        }
+    }
+
+    private async Task CheckAuthentication()
+    {
+        try
+        {
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            
+            if (!string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(currentUser))
+            {
+                isAuthenticated = true;
+                isPODUser = userRole?.Equals("teacher", StringComparison.OrdinalIgnoreCase) == true &&
+                           userPosition?.Equals("POD", StringComparison.OrdinalIgnoreCase) == true;
+            }
+        }
+        catch
+        {
+            isAuthenticated = false;
+            isPODUser = false;
+        }
+    }
+
+    private async Task LoadCaseRecord()
+    {
+        isLoading = true;
+        try
+        {
+            // Try loading from SimplifiedStudentProfileCaseRecords FIRST
+            var simplifiedResponse = await Http.GetAsync($"api/StudentProfileCaseRecord/simplified/{RecordId}");
+            if (simplifiedResponse.IsSuccessStatusCode)
+            {
+                var simplifiedContent = await simplifiedResponse.Content.ReadAsStringAsync();
+                var simplifiedResult = JsonSerializer.Deserialize<JsonElement>(simplifiedContent);
+                
+                if (simplifiedResult.TryGetProperty("success", out var simplifiedSuccess) && simplifiedSuccess.GetBoolean() &&
+                    simplifiedResult.TryGetProperty("data", out var simplifiedData))
+                {
+                    caseRecord = new StudentProfileCaseRecordModel();
+                    // Map fields from SimplifiedStudentProfileCaseRecords
+                    if (simplifiedData.TryGetProperty("respondentName", out var v1)) caseRecord.StudentOffenderName = v1.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("gradeLevel", out var v2)) caseRecord.GradeLevel = v2.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("trackStrand", out var v3)) caseRecord.TrackStrand = v3.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("section", out var v4)) caseRecord.Section = v4.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("adviserName", out var v5)) caseRecord.AdviserName = v5.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("fathersName", out var v6)) caseRecord.FathersName = v6.GetString();
+                    if (simplifiedData.TryGetProperty("mothersName", out var v7)) caseRecord.MothersName = v7.GetString();
+                    if (simplifiedData.TryGetProperty("guardianName", out var v8)) caseRecord.GuardianName = v8.GetString();
+                    // SimplifiedStudentProfileCaseRecords uses ParentContactName for parent/guardian contact
+                    if (simplifiedData.TryGetProperty("parentContactName", out var v9)) caseRecord.ParentGuardianContact = v9.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("violationCommitted", out var v10)) caseRecord.ViolationCommitted = v10.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("description", out var v11)) caseRecord.OtherViolationDescription = v11.GetString();
+                    if (simplifiedData.TryGetProperty("violationCategory", out var v12)) caseRecord.LevelOfOffense = v12.GetString() ?? "";
+                    // NumberOfOffense is not in simplified - could be calculated
+                    caseRecord.NumberOfOffense = "";
+                    if (simplifiedData.TryGetProperty("dateOfOffense", out var v14)) 
+                    {
+                        if (v14.ValueKind == JsonValueKind.String)
+                            caseRecord.DateOfOffense = DateTime.Parse(v14.GetString() ?? DateTime.Now.ToString());
+                        else if (v14.ValueKind != JsonValueKind.Null)
+                            caseRecord.DateOfOffense = v14.GetDateTime();
+                    }
+                    // Use Agreement field for DetailsOfAgreement
+                    if (simplifiedData.TryGetProperty("agreement", out var v15)) caseRecord.DetailsOfAgreement = v15.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("status", out var v16)) caseRecord.Status = v16.GetString() ?? "";
+                    if (simplifiedData.TryGetProperty("schoolName", out var v17)) caseRecord.SchoolName = v17.GetString();
+                    
+                    // Meta
+                    if (simplifiedData.TryGetProperty("dateCreated", out var m1))
+                    {
+                        if (m1.ValueKind == JsonValueKind.String)
+                            dateCreated = DateTime.Parse(m1.GetString() ?? DateTime.Now.ToString());
+                        else if (m1.ValueKind != JsonValueKind.Null)
+                            dateCreated = m1.GetDateTime();
+                    }
+
+                    originalCaseRecord = CloneCaseRecord(caseRecord);
+                    return; // Successfully loaded from simplified table
+                }
+            }
+
+            // Fallback: Try loading from OLD StudentProfileCaseRecords table
+            var response = await Http.GetAsync($"api/StudentProfileCaseRecord/{RecordId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    caseRecord = new StudentProfileCaseRecordModel();
+                    // Map fields from old table
+                    if (data.TryGetProperty("studentOffenderName", out var v1)) caseRecord.StudentOffenderName = v1.GetString() ?? "";
+                    if (data.TryGetProperty("gradeLevel", out var v2)) caseRecord.GradeLevel = v2.GetString() ?? "";
+                    if (data.TryGetProperty("trackStrand", out var v3)) caseRecord.TrackStrand = v3.GetString() ?? "";
+                    if (data.TryGetProperty("section", out var v4)) caseRecord.Section = v4.GetString() ?? "";
+                    if (data.TryGetProperty("adviserName", out var v5)) caseRecord.AdviserName = v5.GetString() ?? "";
+                    if (data.TryGetProperty("fathersName", out var v6)) caseRecord.FathersName = v6.GetString();
+                    if (data.TryGetProperty("mothersName", out var v7)) caseRecord.MothersName = v7.GetString();
+                    if (data.TryGetProperty("guardianName", out var v8)) caseRecord.GuardianName = v8.GetString();
+                    if (data.TryGetProperty("parentGuardianContact", out var v9)) caseRecord.ParentGuardianContact = v9.GetString() ?? "";
+                    if (data.TryGetProperty("violationCommitted", out var v10)) caseRecord.ViolationCommitted = v10.GetString() ?? "";
+                    if (data.TryGetProperty("otherViolationDescription", out var v11)) caseRecord.OtherViolationDescription = v11.GetString();
+                    if (data.TryGetProperty("levelOfOffense", out var v12)) caseRecord.LevelOfOffense = v12.GetString() ?? "";
+                    if (data.TryGetProperty("numberOfOffense", out var v13)) caseRecord.NumberOfOffense = v13.GetString() ?? "";
+                    if (data.TryGetProperty("dateOfOffense", out var v14)) caseRecord.DateOfOffense = DateTime.Parse(v14.GetString() ?? DateTime.Now.ToString());
+                    if (data.TryGetProperty("detailsOfAgreement", out var v15)) caseRecord.DetailsOfAgreement = v15.GetString() ?? "";
+                    if (data.TryGetProperty("status", out var v16)) caseRecord.Status = v16.GetString() ?? "";
+                    if (data.TryGetProperty("schoolName", out var v17)) caseRecord.SchoolName = v17.GetString();
+                    
+                    // Meta
+                    if (data.TryGetProperty("dateCreated", out var m1)) dateCreated = DateTime.Parse(m1.GetString() ?? DateTime.Now.ToString());
+                    if (data.TryGetProperty("createdBy", out var m2)) createdBy = m2.GetString() ?? "";
+                    if (data.TryGetProperty("dateModified", out var m3) && !string.IsNullOrEmpty(m3.GetString())) dateModified = DateTime.Parse(m3.GetString() ?? "");
+                    if (data.TryGetProperty("modifiedBy", out var m4)) modifiedBy = m4.GetString() ?? "";
+
+                    originalCaseRecord = CloneCaseRecord(caseRecord);
+                }
+                else
+                {
+                    message = "Record not found.";
+                }
+            }
+            else
+            {
+                message = "Record not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private StudentProfileCaseRecordModel CloneCaseRecord(StudentProfileCaseRecordModel source)
+    {
+        return new StudentProfileCaseRecordModel
+        {
+            StudentOffenderName = source.StudentOffenderName,
+            GradeLevel = source.GradeLevel,
+            TrackStrand = source.TrackStrand,
+            Section = source.Section,
+            AdviserName = source.AdviserName,
+            FathersName = source.FathersName,
+            MothersName = source.MothersName,
+            GuardianName = source.GuardianName,
+            ParentGuardianContact = source.ParentGuardianContact,
+            ViolationCommitted = source.ViolationCommitted,
+            OtherViolationDescription = source.OtherViolationDescription,
+            LevelOfOffense = source.LevelOfOffense,
+            NumberOfOffense = source.NumberOfOffense,
+            DateOfOffense = source.DateOfOffense,
+            DetailsOfAgreement = source.DetailsOfAgreement,
+            Status = source.Status,
+            SchoolName = source.SchoolName
+        };
+    }
+
+    private void EnableEditMode() { isEditMode = true; message = ""; }
+    
+    private void CancelEdit()
+    {
+        if (originalCaseRecord != null) caseRecord = CloneCaseRecord(originalCaseRecord);
+        isEditMode = false;
+        message = "";
+    }
+
+    private async Task SaveChanges()
+    {
+        if (caseRecord == null) return;
+        isSaving = true;
+        try
+        {
+            var json = JsonSerializer.Serialize(caseRecord);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PutAsync($"api/StudentProfileCaseRecord/{RecordId}", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Changes saved.";
+                isSuccess = true;
+                isEditMode = false;
+                originalCaseRecord = CloneCaseRecord(caseRecord);
+                await Task.Delay(1000);
+                await LoadCaseRecord();
+            }
+            else
+            {
+                message = "Failed to save changes.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        JSRuntime.InvokeVoidAsync("history.back");
+    }
+
+    private void OpenSMSModal() { smsMessage = GetDefaultSMSMessage(); showSMSModal = true; }
+    private void CloseSMSModal() { showSMSModal = false; smsMessage = ""; }
+    
+    private string GetDefaultSMSMessage()
+    {
+        if (caseRecord == null) return "";
+        return $"Dear Parent/Guardian,\n\nThis is to inform you that your child {caseRecord.StudentOffenderName} has been involved in a disciplinary case regarding: {caseRecord.ViolationCommitted}.\n\nPlease contact the school office for more details.\n\nePROFILR System";
+    }
+
+    private void LoadDefaultMessage() { smsMessage = GetDefaultSMSMessage(); }
+
+    private async Task SendSMSNotification()
+    {
+        if (caseRecord == null || string.IsNullOrEmpty(smsMessage)) return;
+        isSendingSMS = true;
+        try
+        {
+            var smsRequest = new { recordId = RecordId, phoneNumber = caseRecord.ParentGuardianContact, message = smsMessage, studentName = caseRecord.StudentOffenderName };
+            var response = await Http.PostAsync("api/SMS/SendSMS", new StringContent(JsonSerializer.Serialize(smsRequest), System.Text.Encoding.UTF8, "application/json"));
+            
+            if (response.IsSuccessStatusCode)
+            {
+                message = "SMS sent.";
+                isSuccess = true;
+                CloseSMSModal();
+            }
+            else
+            {
+                message = "Failed to send SMS.";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSendingSMS = false;
+        }
+    }
+
+    private string GetLevelBadgeClass(string level) => level?.ToLower() switch { 
+        "minor" => "badge-minor", 
+        "major" => "badge-major", 
+        "severe" => "badge-severe", 
+        "prohibited acts" => "badge-prohibited",
+        _ => "badge-default" 
+    };
+    private string GetStatusBadgeClass(string status) => status?.ToLower() switch { "active" => "status-active", "resolved" => "status-resolved", "closed" => "status-closed", _ => "status-default" };
+
+    private void OnAgreementTypeChanged(ChangeEventArgs e)
+    {
+        selectedAgreementType = e.Value?.ToString() ?? "";
+        UpdateAgreementText();
+    }
+
+    private void UpdateAgreementText()
+    {
+        generatedAgreementText = selectedAgreementType switch
+        {
+            "verbal_warning" => "The student has received a **verbal warning** regarding their conduct.",
+            "written_warning" => "The student has been issued a **written warning** and this violation has been **documented in their record**.",
+            "parent_conference" => "A **mandatory conference with the parent/guardian is required** before the student may return to regular classes.",
+            _ => ""
+        };
+    }
+
+    private void ApplyGeneratedAgreement()
+    {
+        if (!string.IsNullOrEmpty(generatedAgreementText) && caseRecord != null)
+        {
+            caseRecord.DetailsOfAgreement = generatedAgreementText;
+        }
+    }
+
+    private string ConvertMarkdownToBold(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        text = text.Replace("<", "&lt;").Replace(">", "&gt;");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        return text.Replace("\n", "<br/>");
+    }
+
+    // Y.A.K.A.P. Form Methods
+    private async Task CheckYakapFormExists()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/YakapForm/record/{RecordId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("data", out var data))
+                {
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                    };
+                    existingYakapForm = JsonSerializer.Deserialize<YakapFormModel>(data.GetRawText(), options);
+                    hasYakapForm = existingYakapForm != null;
+                    
+                    // If school name is placeholder, fetch actual school name
+                    if (hasYakapForm && existingYakapForm != null && 
+                        (string.IsNullOrWhiteSpace(existingYakapForm.SchoolName) || existingYakapForm.SchoolName == "School Name"))
+                    {
+                        await LoadActualSchoolName();
+                    }
+                    else if (hasYakapForm && existingYakapForm != null)
+                    {
+                        actualSchoolName = existingYakapForm.SchoolName;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            hasYakapForm = false;
+            existingYakapForm = null;
+        }
+    }
+    
+    private async Task LoadActualSchoolName()
+    {
+        actualSchoolName = string.Empty;
+        
+        try
+        {
+            // First, try to get school from POD user's location
+            var response = await Http.GetAsync($"api/IncidentReport/pod-location/{Uri.EscapeDataString(currentUser)}");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(content);
+                
+                if (result.TryGetProperty("Success", out var success) && success.GetBoolean() &&
+                    result.TryGetProperty("Data", out var data))
+                {
+                    if (data.TryGetProperty("SchoolName", out var schoolNameProp))
+                    {
+                        actualSchoolName = schoolNameProp.GetString() ?? string.Empty;
+                    }
+                }
+            }
+            
+            // If still no school name, try to get from student's information
+            if (string.IsNullOrWhiteSpace(actualSchoolName) && caseRecord != null)
+            {
+                try
+                {
+                    var studentResponse = await Http.GetAsync($"api/IncidentReport/student-info/{Uri.EscapeDataString(caseRecord.StudentOffenderName)}");
+                    if (studentResponse.IsSuccessStatusCode)
+                    {
+                        var studentContent = await studentResponse.Content.ReadAsStringAsync();
+                        var studentResult = JsonSerializer.Deserialize<JsonElement>(studentContent);
+                        
+                        if (studentResult.TryGetProperty("success", out var studentSuccess) && studentSuccess.GetBoolean() &&
+                            studentResult.TryGetProperty("data", out var studentData))
+                        {
+                            if (studentData.TryGetProperty("SchoolName", out var studentSchoolNameProp))
+                            {
+                                var studentSchoolName = studentSchoolNameProp.GetString();
+                                if (!string.IsNullOrWhiteSpace(studentSchoolName))
+                                {
+                                    actualSchoolName = studentSchoolName;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore error fetching student info
+                }
+            }
+        }
+        catch
+        {
+            // School name will remain empty if all methods fail
+        }
+    }
+
+    private string GetDisplaySchoolName()
+    {
+        if (existingYakapForm == null) return "Not provided";
+
+        // If saved school name is placeholder or empty, use actual school name
+        if (string.IsNullOrWhiteSpace(existingYakapForm.SchoolName) || existingYakapForm.SchoolName == "School Name")
+        {
+            // First check if we have it in the case record
+            if (caseRecord != null && !string.IsNullOrWhiteSpace(caseRecord.SchoolName))
+            {
+                return caseRecord.SchoolName;
+            }
+            
+            return string.IsNullOrWhiteSpace(actualSchoolName) ? "Not provided" : actualSchoolName;
+        }
+        
+        // Otherwise use the saved school name
+        return existingYakapForm.SchoolName;
+    }
+
+    private async Task OpenSendYakapModal()
+    {
+        if (caseRecord == null) return;
+        
+        // Get school information from current POD user or student
+        string schoolName = string.Empty;
+        int? schoolID = null;
+        
+        // PRIORITIZE: Use the school name from the case record if available (fetched from Students table)
+        if (!string.IsNullOrWhiteSpace(caseRecord.SchoolName))
+        {
+            schoolName = caseRecord.SchoolName;
+        }
+
+        // If not found in case record, try to get from POD user's location or other sources
+        if (string.IsNullOrWhiteSpace(schoolName))
+        {
+            try
+            {
+                // First, try to get school from POD user's location
+                var response = await Http.GetAsync($"api/IncidentReport/pod-location/{Uri.EscapeDataString(currentUser)}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var result = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    if (result.TryGetProperty("Success", out var success) && success.GetBoolean() &&
+                        result.TryGetProperty("Data", out var data))
+                    {
+                        if (data.TryGetProperty("SchoolName", out var schoolNameProp))
+                        {
+                            schoolName = schoolNameProp.GetString() ?? string.Empty;
+                        }
+                        if (data.TryGetProperty("SchoolID", out var schoolIDProp) && schoolIDProp.ValueKind != JsonValueKind.Null)
+                        {
+                            schoolID = schoolIDProp.GetInt32();
+                        }
+                    }
+                }
+                
+                // If still no school name, try to get from student's information
+                if (string.IsNullOrWhiteSpace(schoolName) && caseRecord != null)
+                {
+                    try
+                    {
+                        var studentResponse = await Http.GetAsync($"api/IncidentReport/student-info/{Uri.EscapeDataString(caseRecord.StudentOffenderName)}");
+                        if (studentResponse.IsSuccessStatusCode)
+                        {
+                            var studentContent = await studentResponse.Content.ReadAsStringAsync();
+                            var studentResult = JsonSerializer.Deserialize<JsonElement>(studentContent);
+                            
+                            if (studentResult.TryGetProperty("success", out var studentSuccess) && studentSuccess.GetBoolean() &&
+                                studentResult.TryGetProperty("data", out var studentData))
+                            {
+                                if (studentData.TryGetProperty("SchoolName", out var studentSchoolNameProp))
+                                {
+                                    var studentSchoolName = studentSchoolNameProp.GetString();
+                                    if (!string.IsNullOrWhiteSpace(studentSchoolName))
+                                    {
+                                        schoolName = studentSchoolName;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Continue with empty school name
+                    }
+                }
+            }
+            catch
+            {
+                // School name will remain empty if all methods fail
+            }
+        }
+        
+        // If still no school name, use a generic placeholder (should not happen in production)
+        if (string.IsNullOrWhiteSpace(schoolName))
+        {
+            schoolName = "School Name"; // Generic placeholder - should be set from database
+        }
+        
+        // Initialize form with case record data
+        // Only set FacilitatorCounselor if currentUser has a value, otherwise leave it empty
+        var facilitatorValue = string.IsNullOrWhiteSpace(currentUser) ? string.Empty : currentUser.Trim();
+        
+        yakapForm = new YakapFormRequest
+        {
+            RecordID = RecordId,
+            StudentName = caseRecord.StudentOffenderName,
+            GradeAndSection = $"{caseRecord.GradeLevel} - {caseRecord.Section}",
+            DateOfSession = default(DateTime), // Don't set default date - let user choose
+            FacilitatorCounselor = facilitatorValue,
+            SchoolName = schoolName,
+            SchoolID = schoolID,
+            CreatedBy = currentUser
+        };
+        
+        showSendYakapModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseSendYakapModal()
+    {
+        showSendYakapModal = false;
+        yakapForm = new YakapFormRequest();
+    }
+
+    private async Task SendYakapFormToStudent()
+    {
+        if (caseRecord == null) return;
+        
+        isSendingYakap = true;
+        try
+        {
+            // Create form with Status = "Sent" (empty answers, student will fill)
+            // Use DateTime.Now if DateOfSession is not set
+            var sessionDate = (yakapForm.DateOfSession == default(DateTime) || yakapForm.DateOfSession == DateTime.MinValue) 
+                ? DateTime.Now 
+                : yakapForm.DateOfSession;
+            
+            var formToSend = new YakapFormRequest
+            {
+                RecordID = RecordId,
+                StudentName = caseRecord.StudentOffenderName,
+                GradeAndSection = $"{caseRecord.GradeLevel} - {caseRecord.Section}",
+                DateOfSession = sessionDate,
+                FacilitatorCounselor = yakapForm.FacilitatorCounselor,
+                SchoolName = yakapForm.SchoolName,
+                SchoolID = yakapForm.SchoolID,
+                CreatedBy = currentUser,
+                // Leave questions empty - student will fill them
+                Question1_AnoAngNangyari = "",
+                Question2_AnoAngIniisipOFeelings = "",
+                Question3_AnoAngEpektoSaIba = "",
+                Question4_AnoAngIniisipTungkolSaDesisyon = "",
+                Question5_AnoAngGagawinMongIba = "",
+                Question6_AnongPositibongPagpapahalaga = "",
+                Question7_MensaheParaSaHinaharap = ""
+            };
+
+            var json = JsonSerializer.Serialize(formToSend);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PostAsync("api/YakapForm", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Y.A.K.A.P. form sent to student successfully.";
+                isSuccess = true;
+                CloseSendYakapModal();
+                await CheckYakapFormExists(); // Refresh form status
+                await Task.Delay(2000);
+                message = "";
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                message = $"Failed to send Y.A.K.A.P. form. {errorContent}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSendingYakap = false;
+        }
+    }
+
+    private async Task ViewYakapForm()
+    {
+        // Refresh the form data to ensure we have the latest answers
+        await CheckYakapFormExists();
+        
+        if (existingYakapForm != null)
+        {
+            showYakapModal = true;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseYakapModal()
+    {
+        showYakapModal = false;
+    }
+
+    private async Task DownloadYakapFormPdf()
+    {
+        if (existingYakapForm == null) return;
+
+        try
+        {
+            // Get the server base URL from HttpClient
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? NavigationManager.BaseUri.TrimEnd('/');
+            var pdfUrl = $"{baseUrl}/api/YakapForm/download-pdf/{existingYakapForm.YakapFormID}";
+            
+            // Generate filename
+            var fileName = $"YAKAP_Form_{existingYakapForm.StudentName?.Replace(" ", "_") ?? "Form"}_{DateTime.Now:yyyyMMdd}.pdf";
+            
+            // Fetch PDF as bytes using HttpClient
+            var response = await Http.GetAsync($"api/YakapForm/download-pdf/{existingYakapForm.YakapFormID}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64String = Convert.ToBase64String(pdfBytes);
+                
+                // Download the file using JavaScript
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64String);
+            }
+            else
+            {
+                message = $"Error downloading PDF: {response.StatusCode}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error downloading PDF: {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private async Task SaveYakapForm()
+    {
+        if (caseRecord == null) return;
+        
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(yakapForm.StudentName) ||
+            string.IsNullOrWhiteSpace(yakapForm.GradeAndSection) ||
+            string.IsNullOrWhiteSpace(yakapForm.FacilitatorCounselor) ||
+            string.IsNullOrWhiteSpace(yakapForm.SchoolName) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question1_AnoAngNangyari) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question2_AnoAngIniisipOFeelings) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question3_AnoAngEpektoSaIba) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question4_AnoAngIniisipTungkolSaDesisyon) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question5_AnoAngGagawinMongIba) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question6_AnongPositibongPagpapahalaga) ||
+            string.IsNullOrWhiteSpace(yakapForm.Question7_MensaheParaSaHinaharap))
+        {
+            message = "Please fill in all required fields.";
+            isSuccess = false;
+            return;
+        }
+
+        isSavingYakap = true;
+        try
+        {
+            var json = JsonSerializer.Serialize(yakapForm);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await Http.PostAsync("api/YakapForm", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                message = "Y.A.K.A.P. form saved successfully.";
+                isSuccess = true;
+                CloseYakapModal();
+                await Task.Delay(2000);
+                message = "";
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                message = $"Failed to save Y.A.K.A.P. form. {errorContent}";
+                isSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSavingYakap = false;
+        }
+    }
+}
+
+<style>
+    /* 
+     * MODERN PREMIUM DESIGN
+     * Font: Outfit (Google Fonts) for contemporary aesthetics
+     * Colors: Vibrant gradients, glassmorphism, dynamic animations
+     */
+    
+    @@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+    
+    :root {
+        /* Vibrant Color Palette */
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        
+        /* Background Colors */
+        --bg-page: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+        --bg-card: rgba(255, 255, 255, 0.95);
+        --bg-card-hover: rgba(255, 255, 255, 1);
+        
+        /* Text Colors */
+        --text-primary: #2d3748;
+        --text-secondary: #4a5568;
+        --text-tertiary: #718096;
+        --text-white: #ffffff;
+        
+        /* Accent Colors */
+        --accent-purple: #667eea;
+        --accent-pink: #f093fb;
+        --accent-blue: #4facfe;
+        --accent-orange: #fa709a;
+        
+        /* Shadows & Effects */
+        --shadow-soft: 0 10px 40px rgba(102, 126, 234, 0.15);
+        --shadow-hover: 0 20px 60px rgba(102, 126, 234, 0.25);
+        --shadow-intense: 0 30px 80px rgba(102, 126, 234, 0.35);
+        
+        /* Border Radius */
+        --radius-card: 24px;
+        --radius-btn: 12px;
+        --radius-badge: 20px;
+    }
+
+    /* Global Layout with Animated Background */
+    .page-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 24px;
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: var(--text-primary);
+        background: var(--bg-page);
+        min-height: 100vh;
+    }
+    
+    .content-wrapper {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* Header with Glassmorphism */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 40px;
+        background: transparent;
+        backdrop-filter: blur(20px);
+        padding: 20px 28px;
+        border-radius: var(--radius-card);
+        border: none;
+        box-shadow: none;
+        animation: slideDown 0.6s ease-out;
+    }
+    
+    @@keyframes slideDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .btn-back {
+        background: rgba(102, 126, 234, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        color: var(--accent-purple);
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 20px;
+        border-radius: var(--radius-btn);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-back:hover {
+        background: rgba(102, 126, 234, 0.15);
+        transform: translateX(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-back .icon {
+        font-size: 1.2rem;
+        transition: transform 0.3s ease;
+    }
+    
+    .btn-back:hover .icon {
+        transform: translateX(-3px);
+    }
+
+    .header-right {
+        display: flex;
+        gap: 12px;
+    }
+
+    /* Premium Gradient Buttons */
+    .btn {
+        padding: 12px 24px;
+        border-radius: var(--radius-btn);
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: none;
+        letter-spacing: 0.02em;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s ease;
+    }
+    
+    .btn:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(102, 126, 234, 0.5);
+    }
+
+    .btn-secondary {
+        background: white;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        color: var(--accent-purple);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(102, 126, 234, 0.05);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+    }
+
+    .btn-text {
+        background: rgba(102, 126, 234, 0.05);
+        color: var(--accent-purple);
+        backdrop-filter: blur(10px);
+    }
+
+    .btn-text:hover {
+        background: rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-small {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        border-radius: 8px;
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-small:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    /* Record Header with Animation */
+    .record-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 40px;
+        padding: 32px;
+        background: white;
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-card);
+        border: 1px solid rgba(102, 126, 234, 0.15);
+        animation: fadeInUp 0.7s ease-out 0.1s both;
+    }
+    
+    @@keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .title-group h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 8px 0 0 0;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.03em;
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .record-id {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Animated Status Indicators */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        border-radius: var(--radius-badge);
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        animation: statusPulse 2s ease-in-out infinite;
+    }
+    
+    @@keyframes statusPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .status-indicator .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: dotPulse 1.5s ease-in-out infinite;
+        box-shadow: 0 0 10px currentColor;
+    }
+    
+    @@keyframes dotPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .status-active { 
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    .status-resolved { 
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        color: white;
+    }
+    .status-closed { 
+        background: linear-gradient(135deg, #a8a8a8 0%, #7f7f7f 100%);
+        color: white;
+    }
+    .status-default { 
+        background: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+        color: #666;
+    }
+
+    /* Grid Layout */
+    .grid-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 32px;
+    }
+
+    /* Glassmorphism Cards with Hover Effects */
+    .card {
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-soft);
+        margin-bottom: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: fadeInUp 0.8s ease-out both;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        transition: left 0.6s ease;
+    }
+    
+    .card:hover::before {
+        left: 100%;
+    }
+
+    .card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--shadow-hover);
+        background: var(--bg-card-hover);
+    }
+    
+    .primary-column .card:nth-child(1) { animation-delay: 0.1s; }
+    .primary-column .card:nth-child(2) { animation-delay: 0.2s; }
+    .secondary-column .card:nth-child(1) { animation-delay: 0.3s; }
+    .secondary-column .card:nth-child(2) { animation-delay: 0.4s; }
+
+    .card-header {
+        padding: 28px 36px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(240, 147, 251, 0.08) 100%);
+        border-bottom: 2px solid rgba(102, 126, 234, 0.15);
+    }
+
+    .card-header h2 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin: 0;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: 0.02em;
+    }
+
+    .card-body {
+        padding: 36px;
+    }
+
+    /* Data Display with Enhanced Typography */
+    .data-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .data-group label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--accent-purple);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .value {
+        font-size: 1.05rem;
+        color: var(--text-primary);
+        line-height: 1.6;
+        font-weight: 500;
+    }
+
+    .value.large {
+        font-size: 1.8rem;
+        font-weight: 800;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        width: 100%;
+        display: block;
+    }
+
+    .value.highlight-alert {
+        font-size: 1.2rem;
+        font-weight: 700;
+        background: var(--danger-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .value.description {
+        color: var(--text-secondary);
+        font-weight: 400;
+    }
+
+    .value.phone-number {
+        font-size: 1.4rem;
+        font-weight: 700;
+        background: var(--success-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-feature-settings: "tnum";
+    }
+
+    .value.text-block {
+        white-space: pre-wrap;
+        color: var(--text-primary);
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(240, 147, 251, 0.05) 100%);
+        padding: 20px;
+        border-radius: 16px;
+        border: 2px solid rgba(102, 126, 234, 0.15);
+        font-weight: 400;
+    }
+
+    /* Layout Utilities */
+    .data-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 28px; }
+    .data-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
+    .mt-medium { margin-top: 28px; }
+    .mt-large { margin-top: 36px; }
+
+    .separator {
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
+        margin: 28px 0;
+    }
+
+    /* Contact List */
+    .contact-list {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .contact-item {
+        display: flex;
+        justify-content: space-between;
+        font-size: 1rem;
+        padding: 12px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(240, 147, 251, 0.05) 100%);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    
+    .contact-item:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(240, 147, 251, 0.1) 100%);
+        transform: translateX(5px);
+    }
+
+    .contact-item label {
+        color: var(--accent-purple);
+        font-weight: 700;
+    }
+    
+    .contact-item span {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    /* Meta Card with Gradient */
+    .meta-card .card-body {
+        padding: 28px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(240, 147, 251, 0.08) 100%);
+    }
+
+    .meta-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        font-size: 0.95rem;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .meta-row:hover {
+        background: rgba(255, 255, 255, 0.8);
+        transform: translateX(5px);
+    }
+
+    .meta-row:last-child { margin-bottom: 0; }
+    .meta-label { color: var(--accent-purple); font-weight: 700; }
+    .meta-value { font-weight: 600; color: var(--text-primary); }
+
+    /* Vibrant Badges */
+    .badge {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transition: all 0.3s ease;
+    }
+    
+    .badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+    
+    .badge-minor { 
+        background: var(--warning-gradient);
+        color: white;
+    }
+    .badge-major { 
+        background: var(--secondary-gradient);
+        color: white;
+    }
+    .badge-severe { 
+        background: var(--danger-gradient);
+        color: white;
+    }
+    .badge-prohibited { 
+        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+        color: white;
+    }
+    .badge-default {
+        background: #e2e8f0;
+        color: var(--text-secondary);
+    }
+
+    /* Enhanced Forms */
+    .form-select, .form-textarea {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        border-radius: var(--radius-btn);
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        background: white;
+    }
+
+    .editor-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .editor-toolbar {
+        display: flex;
+        gap: 16px;
+    }
+
+    /* Premium Modal */
+    .modal-backdrop {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(102, 126, 234, 0.4);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-out;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .modal-window {
+        background: white;
+        width: 100%;
+        max-width: 600px;
+        border-radius: 24px;
+        box-shadow: 0 30px 80px rgba(102, 126, 234, 0.4);
+        overflow: hidden;
+        animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @@keyframes modalSlideUp {
+        from { opacity: 0; transform: translateY(50px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header {
+        padding: 24px 36px;
+        background: var(--primary-gradient);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 { 
+        margin: 0; 
+        font-size: 1.4rem; 
+        font-weight: 700;
+        color: white;
+    }
+    .btn-close { 
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+    .btn-close:hover { 
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(90deg);
+    }
+
+    .modal-content { padding: 36px; }
+
+    .recipient-badge {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(240, 147, 251, 0.1) 100%);
+        padding: 16px 20px;
+        border-radius: 16px;
+        margin-bottom: 28px;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 2px solid rgba(102, 126, 234, 0.2);
+    }
+
+    .recipient-badge .label { color: var(--accent-purple); font-weight: 700; }
+    .recipient-badge strong { color: var(--text-primary); font-weight: 800; }
+    .recipient-badge .sub { color: var(--text-secondary); font-size: 0.9rem; }
+
+    .action-label {
+        background: var(--primary-gradient);
+        padding: 14px 20px;
+        border-radius: 12px;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    .action-label .action-number {
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+        font-weight: 800;
+        font-size: 1.1rem;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .action-label .action-text {
+        color: white;
+        font-weight: 700;
+        font-size: 1.05rem;
+        letter-spacing: 0.02em;
+    }
+
+    .label-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .label-row label {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--accent-purple);
+    }
+
+    .btn-link {
+        background: none;
+        border: none;
+        color: var(--accent-purple);
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-link:hover { 
+        text-decoration: underline;
+        color: var(--accent-pink);
+    }
+
+    .char-count {
+        text-align: right;
+        font-size: 0.85rem;
+        color: var(--text-tertiary);
+        margin-top: 8px;
+        font-weight: 600;
+    }
+
+    .modal-actions {
+        padding: 24px 36px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(240, 147, 251, 0.05) 100%);
+        border-top: 2px solid rgba(102, 126, 234, 0.1);
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+    }
+
+    /* Vibrant Notifications */
+    .notification-banner {
+        padding: 20px 28px;
+        border-radius: 16px;
+        margin-bottom: 32px;
+        font-weight: 600;
+        font-size: 1rem;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        animation: slideInRight 0.5s ease-out;
+    }
+    
+    @@keyframes slideInRight {
+        from { opacity: 0; transform: translateX(50px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    .notification-banner.success { 
+        background: var(--success-gradient);
+        color: white;
+    }
+    .notification-banner.error { 
+        background: var(--danger-gradient);
+        color: white;
+    }
+
+    /* Loading & Empty States */
+    .loading-state, .center-message {
+        text-align: center;
+        padding: 80px;
+        color: white;
+    }
+
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid white;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+
+    @@keyframes spin { 
+        0% { transform: rotate(0deg); } 
+        100% { transform: rotate(360deg); } 
+    }
+
+    /* Responsive */
+    @@media (max-width: 900px) {
+        .grid-layout { grid-template-columns: 1fr; }
+        .secondary-column { order: -1; }
+    }
+    
+    @@media (max-width: 600px) {
+        .data-grid-3, .data-grid-2 { grid-template-columns: 1fr; }
+        .page-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+        .header-right { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+        .record-header { flex-direction: column; align-items: flex-start; gap: 20px; }
+        .title-group h1 { font-size: 2rem; }
+    }
+
+    /* Action Buttons Container */
+    .action-buttons-container {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 32px;
+        animation: fadeInUp 0.8s ease-out 0.2s both;
+        background: transparent;
+    }
+
+    .btn-action {
+        flex: 1;
+        padding: 16px 24px;
+        border: none;
+        border-radius: var(--radius-btn);
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-action::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-action:hover::before {
+        left: 100%;
+    }
+
+    .btn-action-edit {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-action-edit:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-action-sms {
+        background: var(--success-gradient);
+        color: white;
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    }
+
+    .btn-action-sms:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+    }
+
+    .btn-action-yakap {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 102, 204, 0.3);
+    }
+
+    .btn-action-yakap:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 102, 204, 0.4);
+    }
+
+    .action-icon {
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .action-text {
+        letter-spacing: 0.02em;
+    }
+
+    /* Y.A.K.A.P. Modal Styles */
+    .yakap-modal-window {
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .yakap-header {
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .yakap-header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+    }
+
+    .yakap-header-left h3 {
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: white;
+    }
+
+    .yakap-guidance-review {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: 20px;
+    }
+
+    .guidance-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #0066cc 0%, #004d99 100%);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .guidance-text {
+        font-size: 1rem;
+        font-weight: 700;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .yakap-content {
+        padding: 36px;
+        max-height: calc(90vh - 200px);
+        overflow-y: auto;
+    }
+
+    .yakap-header-info {
+        text-align: center;
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 2px solid rgba(0, 102, 204, 0.2);
+    }
+
+    .yakap-title-section .yakap-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0066cc;
+        margin: 0 0 8px 0;
+        letter-spacing: 0.02em;
+    }
+
+    .yakap-subtitle {
+        font-size: 0.95rem;
+        color: var(--text-secondary);
+        margin: 0 0 8px 0;
+        font-weight: 600;
+    }
+
+    .yakap-confidential {
+        font-size: 0.85rem;
+        color: var(--text-tertiary);
+        font-weight: 600;
+        font-style: italic;
+        margin: 0;
+    }
+
+    .yakap-student-info {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 32px;
+        padding: 24px;
+        background: linear-gradient(135deg, rgba(0, 102, 204, 0.05) 0%, rgba(0, 77, 153, 0.05) 100%);
+        border-radius: 16px;
+        border: 2px solid rgba(0, 102, 204, 0.2);
+    }
+
+    .yakap-info-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    .yakap-info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .yakap-info-item label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #0066cc;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 4px;
+    }
+
+    .yakap-info-value {
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        border: 1px solid rgba(0, 102, 204, 0.15);
+    }
+
+    .yakap-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .yakap-input-group label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0066cc;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .yakap-input-group .form-control {
+        padding: 12px 16px;
+        border: 2px solid rgba(0, 102, 204, 0.2);
+        border-radius: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .yakap-input-group .form-control:focus {
+        outline: none;
+        border-color: #0066cc;
+        box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.15);
+    }
+
+    .yakap-section {
+        margin-bottom: 32px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 16px;
+        border-left: 4px solid #0066cc;
+    }
+
+    .yakap-section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0066cc;
+        margin: 0 0 20px 0;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(0, 102, 204, 0.2);
+    }
+
+    .yakap-question-group {
+        margin-bottom: 24px;
+    }
+
+    .yakap-question-label {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        line-height: 1.5;
+    }
+
+    .yakap-question-hint {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        margin-bottom: 12px;
+        font-style: italic;
+    }
+
+    .yakap-textarea {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid rgba(0, 102, 204, 0.2);
+        border-radius: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.95rem;
+        resize: vertical;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .yakap-textarea:focus {
+        outline: none;
+        border-color: #0066cc;
+        box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.15);
+        background: white;
+    }
+
+    .info-box {
+        background: linear-gradient(135deg, rgba(0, 102, 204, 0.1) 0%, rgba(0, 77, 153, 0.1) 100%);
+        border: 2px solid rgba(0, 102, 204, 0.3);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin: 20px 0;
+    }
+
+    .info-box p {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .btn-action-yakap-view {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-action-yakap-view:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    @@media (max-width: 768px) {
+        .yakap-info-row {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        .yakap-student-info {
+            padding: 16px;
+        }
+        .yakap-modal-window {
+            max-width: 95%;
+            margin: 20px;
+        }
+    }
+
+    /* Print Styles - Plain Black and White */
+    @@media print {
+        /* Hide page title */
+        .no-print,
+        title {
+            display: none !important;
+        }
+
+        body * {
+            visibility: hidden;
+        }
+
+        .yakap-print-version,
+        .yakap-print-version * {
+            visibility: visible;
+        }
+
+        .yakap-print-version {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            display: block !important;
+            background: white;
+            color: black;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .yakap-print-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid black;
+        }
+
+        .yakap-print-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: black;
+            margin: 0 0 10px 0;
+        }
+
+        .yakap-print-subtitle {
+            font-size: 1rem;
+            color: black;
+            margin: 0 0 5px 0;
+            font-weight: 600;
+        }
+
+        .yakap-print-confidential {
+            font-size: 0.85rem;
+            color: black;
+            font-style: italic;
+            margin: 0;
+        }
+
+        .yakap-print-student-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid black;
+        }
+
+        .yakap-print-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .yakap-print-info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .yakap-print-info-item {
+            flex: 1;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .yakap-print-info-item[style*="text-align: right"] {
+            justify-content: flex-end;
+        }
+
+        .yakap-print-info-item label {
+            font-weight: bold;
+            color: black;
+            font-size: 0.9rem;
+        }
+
+        .yakap-print-info-item span {
+            color: black;
+            font-size: 0.9rem;
+        }
+
+        .yakap-print-section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+
+        .yakap-print-section-title {
+            font-size: 1rem;
+            font-weight: bold;
+            color: black;
+            margin: 0 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid black;
+        }
+
+        .yakap-print-question-group {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+
+        .yakap-print-question-label {
+            display: block;
+            font-weight: bold;
+            color: black;
+            margin-bottom: 5px;
+            font-size: 0.95rem;
+        }
+
+        .yakap-print-question-hint {
+            display: block;
+            font-size: 0.85rem;
+            color: black;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .yakap-print-answer {
+            margin-top: 8px;
+            padding: 10px;
+            border: 1px solid black;
+            min-height: 40px;
+            white-space: pre-wrap;
+            color: black;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .yakap-print-answer em {
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Hide all other elements when printing */
+        .modal-backdrop,
+        .modal-actions,
+        .btn-close,
+        .yakap-header,
+        .yakap-guidance-review,
+        .page-container,
+        .page-header,
+        .record-header,
+        .action-buttons-container,
+        .content-wrapper {
+            display: none !important;
+        }
+
+        /* Hide any Case Record text and page elements */
+        .record-id,
+        .title-group h1,
+        .record-header,
+        .page-header {
+            display: none !important;
+        }
+
+        @@page {
+            margin: 1cm;
+            size: A4;
+        }
+        
+        /* Hide browser's default header/footer (URL, date, page numbers) */
+        @@page {
+            margin-top: 1cm;
+            margin-bottom: 1cm;
+        }
+        
+        /* Additional browser-specific rules to hide URL */
+        html {
+            margin: 0;
+        }
+
+        /* Remove browser print headers and footers */
+        body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Hide browser print headers/footers using CSS */
+        @@media print {
+            @@page {
+                margin: 1cm;
+                size: A4;
+            }
+        }
+    }
+</style>
+

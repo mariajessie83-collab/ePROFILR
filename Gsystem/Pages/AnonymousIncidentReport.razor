@@ -1,0 +1,18 @@
+@page "/anonymous-incident-report"
+@layout Gsystem.Layout.SimpleLayout
+@using Gsystem.Components
+
+<PageTitle>Anonymous Incident Report</PageTitle>
+
+<ProtectedPage AllowedRoles="@(new[] { "student", "teacher" })">
+    <h2>Anonymous Student Incident Report</h2>
+    <p>
+        You may submit an incident report without providing your name. This is a placeholder page for the anonymous form.
+        Maaari kang mag-ulat nang hindi ibinibigay ang iyong pangalan.
+        
+        <br />
+        <NavLink href="/" class="btn outline">Back to Home</NavLink>
+    </p>
+</ProtectedPage>
+
+

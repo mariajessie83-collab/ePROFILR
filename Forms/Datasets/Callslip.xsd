@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="Callslip" targetNamespace="http://tempuri.org/Callslip.xsd" xmlns:mstns="http://tempuri.org/Callslip.xsd" xmlns="http://tempuri.org/Callslip.xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" xmlns:msprop="urn:schemas-microsoft-com:xml-msprop" attributeFormDefault="qualified" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:appinfo source="urn:schemas-microsoft-com:xml-msdatasource">
+      <DataSource DefaultConnectionIndex="0" FunctionsComponentName="QueriesTableAdapter" Modifier="AutoLayout, AnsiClass, Class, Public" SchemaSerializationMode="IncludeSchema" xmlns="urn:schemas-microsoft-com:xml-msdatasource">
+        <Connections />
+        <Tables />
+        <Sources />
+      </DataSource>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:element name="Callslip" msdata:IsDataSet="true" msdata:UseCurrentLocale="true" msprop:EnableTableAdapterManager="true" msprop:Generator_UserDSName="Callslip" msprop:Generator_DataSetName="Callslip">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="callSlipData" msdata:Locale="en-US" msprop:Generator_RowEvHandlerName="callSlipDataRowChangeEventHandler" msprop:Generator_RowDeletedName="callSlipDataRowDeleted" msprop:Generator_RowDeletingName="callSlipDataRowDeleting" msprop:Generator_RowEvArgName="callSlipDataRowChangeEvent" msprop:Generator_TablePropName="callSlipData" msprop:Generator_RowChangedName="callSlipDataRowChanged" msprop:Generator_RowChangingName="callSlipDataRowChanging" msprop:Generator_TableClassName="callSlipDataDataTable" msprop:Generator_RowClassName="callSlipDataRow" msprop:Generator_TableVarName="tablecallSlipData" msprop:Generator_UserTableName="callSlipData">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="IncidentId" msprop:Generator_ColumnPropNameInRow="IncidentId" msprop:Generator_ColumnPropNameInTable="IncidentIdColumn" msprop:Generator_ColumnVarNameInTable="columnIncidentId" msprop:Generator_UserColumnName="IncidentId" type="xs:int" minOccurs="0" />
+              <xs:element name="ComplainantName" msprop:Generator_ColumnPropNameInRow="ComplainantName" msprop:Generator_ColumnPropNameInTable="ComplainantNameColumn" msprop:Generator_ColumnVarNameInTable="columnComplainantName" msprop:Generator_UserColumnName="ComplainantName" type="xs:string" minOccurs="0" />
+              <xs:element name="VictimName" msprop:Generator_ColumnPropNameInRow="VictimName" msprop:Generator_ColumnPropNameInTable="VictimNameColumn" msprop:Generator_ColumnVarNameInTable="columnVictimName" msprop:Generator_UserColumnName="VictimName" type="xs:string" minOccurs="0" />
+              <xs:element name="RespondentName" msprop:Generator_ColumnPropNameInRow="RespondentName" msprop:Generator_ColumnPropNameInTable="RespondentNameColumn" msprop:Generator_ColumnVarNameInTable="columnRespondentName" msprop:Generator_UserColumnName="RespondentName" type="xs:string" minOccurs="0" />
+              <xs:element name="DateReported" msprop:Generator_ColumnPropNameInRow="DateReported" msprop:Generator_ColumnPropNameInTable="DateReportedColumn" msprop:Generator_ColumnVarNameInTable="columnDateReported" msprop:Generator_UserColumnName="DateReported" type="xs:dateTime" minOccurs="0" />
+              <xs:element name="TimeReported" msprop:Generator_ColumnPropNameInRow="TimeReported" msprop:Generator_ColumnPropNameInTable="TimeReportedColumn" msprop:Generator_ColumnVarNameInTable="columnTimeReported" msprop:Generator_UserColumnName="TimeReported" type="xs:dateTime" minOccurs="0" />
+              <xs:element name="SchoolName" msprop:Generator_ColumnPropNameInRow="SchoolName" msprop:Generator_ColumnPropNameInTable="SchoolNameColumn" msprop:Generator_ColumnVarNameInTable="columnSchoolName" msprop:Generator_UserColumnName="SchoolName" type="xs:string" minOccurs="0" />
+              <xs:element name="GradeLevel" msprop:Generator_ColumnPropNameInRow="GradeLevel" msprop:Generator_ColumnPropNameInTable="GradeLevelColumn" msprop:Generator_ColumnVarNameInTable="columnGradeLevel" msprop:Generator_UserColumnName="GradeLevel" type="xs:string" minOccurs="0" />
+              <xs:element name="Section" msprop:Generator_ColumnPropNameInRow="Section" msprop:Generator_ColumnPropNameInTable="SectionColumn" msprop:Generator_ColumnVarNameInTable="columnSection" msprop:Generator_UserColumnName="Section" type="xs:string" minOccurs="0" />
+              <xs:element name="RoomNumber" msprop:Generator_ColumnPropNameInRow="RoomNumber" msprop:Generator_ColumnPropNameInTable="RoomNumberColumn" msprop:Generator_ColumnVarNameInTable="columnRoomNumber" msprop:Generator_UserColumnName="RoomNumber" type="xs:string" minOccurs="0" />
+              <xs:element name="Status" msprop:Generator_ColumnPropNameInRow="Status" msprop:Generator_ColumnPropNameInTable="StatusColumn" msprop:Generator_ColumnVarNameInTable="columnStatus" msprop:Generator_UserColumnName="Status" type="xs:duration" minOccurs="0" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

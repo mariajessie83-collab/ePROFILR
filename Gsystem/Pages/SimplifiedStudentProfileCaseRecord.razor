@@ -1,0 +1,1799 @@
+@page "/simplified-case-record"
+@layout Gsystem.Layout.Walkinlayout
+@using System.Text.Json
+@using System.ComponentModel.DataAnnotations
+@using SharedProject
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Web
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<style>
+    .simplified-container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 30px;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .form-title {
+        color: #1e293b;
+        font-weight: 800;
+        font-size: 2.2rem;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+
+    .form-subtitle {
+        color: #64748b;
+        text-align: center;
+        margin-bottom: 40px;
+        font-size: 1.1rem;
+    }
+
+    .wizard-stepper {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 30px;
+        gap: 20px;
+    }
+
+    .step-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .step-indicator.active {
+        color: #3b82f6;
+    }
+
+    .step-number {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+    }
+
+    .active .step-number {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .form-section {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 25px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #3b82f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-transform: uppercase;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .form-label {
+        display: block;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+
+    .required-star {
+        color: #ef4444;
+        margin-left: 4px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.2s;
+        background: #ffffff;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @@media (max-width: 600px) {
+        .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .respondent-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+
+    .respondent-tab {
+        padding: 10px 20px;
+        background: #e2e8f0;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        white-space: nowrap;
+        border: none;
+        transition: all 0.2s;
+    }
+
+    .respondent-tab.active {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .respondent-tab.submitted {
+        background: #10b981;
+        color: white;
+    }
+
+    .signature-container {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        background: #ffffff;
+        margin-top: 10px;
+        position: relative;
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 16px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+        background: #2563eb;
+        transform: translateY(-2px);
+    }
+
+    .submit-btn:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+    }
+
+    .contact-option-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+    }
+
+    .contact-option {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 14px;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #ffffff;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .contact-option input {
+        margin-top: 6px;
+    }
+
+    .contact-option-body {
+        text-align: left;
+    }
+
+    .contact-option-type {
+        font-size: 0.85rem;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .contact-option-name {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .contact-option-contact {
+        font-size: 0.9rem;
+        color: #334155;
+    }
+
+    .contact-option:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 6px 14px rgba(59, 130, 246, 0.12);
+    }
+
+    .classification-result {
+        text-align: center;
+        padding: 40px;
+        background: #f8fafc;
+        border-radius: 16px;
+        border: 2px solid #e2e8f0;
+    }
+
+    .minor-offense { color: #f59e0b; }
+    .major-offense { color: #ef4444; }
+
+    .autocomplete-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        z-index: 1000;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .autocomplete-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        transition: background 0.2s;
+        display: flex;
+        justify-content: space-between;
+    }
+    .autocomplete-item:hover {
+        background: #f1f5f9;
+        color: #3b82f6;
+    }
+    .autocomplete-grade {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    /* Force all text inputs to uppercase */
+    .form-input[type="text"],
+    .form-input:not([type="date"]):not([type="datetime-local"]):not([type="number"]),
+    input[type="text"],
+    textarea {
+        text-transform: uppercase;
+    }
+
+    /* ========== MOBILE RESPONSIVE STYLES ========== */
+    
+    /* Tablet and below (768px) */
+    @@media (max-width: 768px) {
+        .simplified-container {
+            max-width: 100%;
+            margin: 20px auto;
+            padding: 16px;
+            border-radius: 12px;
+        }
+        
+        .form-title {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .form-subtitle {
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        
+        .wizard-stepper {
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .step-indicator {
+            font-size: 0.8rem;
+        }
+        
+        .form-section {
+            padding: 16px;
+            margin-bottom: 16px;
+            border-radius: 10px;
+        }
+        
+        .section-title {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+        
+        .form-input {
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            border-radius: 8px;
+        }
+        
+        .respondent-tabs {
+            gap: 8px;
+            margin-bottom: 16px;
+            scrollbar-width: thin;
+        }
+        
+        .respondent-tab {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: 20px;
+        }
+        
+        .submit-btn {
+            padding: 12px;
+            font-size: 1rem;
+            border-radius: 10px;
+            margin-top: 16px;
+        }
+        
+        .btn-clear {
+            padding: 10px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .classification-result {
+            padding: 24px 16px;
+            border-radius: 12px;
+        }
+        
+        .classification-result .form-title {
+            font-size: 1.5rem;
+        }
+        
+        .classification-value {
+            font-size: 1.8rem !important;
+        }
+        
+        .autocomplete-list {
+            max-height: 150px;
+            border-radius: 6px;
+        }
+        
+        .autocomplete-item {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+    }
+    
+    /* Mobile (600px and below) */
+    @@media (max-width: 600px) {
+        .simplified-container {
+            margin: 10px auto;
+            padding: 12px;
+        }
+        
+        .contact-option-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-options {
+            max-width: 100% !important;
+        }
+    }
+    
+    /* Small mobile (480px and below) */
+    @@media (max-width: 480px) {
+        .wizard-stepper {
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .step-indicator span {
+            display: none;
+        }
+        
+        .step-indicator .step-number {
+            width: 32px;
+            height: 32px;
+            font-size: 0.9rem;
+        }
+        
+        .modal-content-custom {
+            padding: 24px 20px;
+            max-width: 95%;
+            border-radius: 16px;
+        }
+        
+        .success-title {
+            font-size: 1.4rem;
+        }
+        
+        .success-message {
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+        }
+        
+        .form-title {
+            font-size: 1.3rem;
+        }
+        
+        .section-title {
+            font-size: 0.9rem;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+    }
+</style>
+
+<div class="simplified-container">
+    @if (!isFinalSummary)
+    {
+        <h1 class="form-title">@(wizardStep == 1 ? "Incident Details" : "Respondent Profiles")</h1>
+        <p class="form-subtitle">Record student offenses and profile information.</p>
+
+        <div class="wizard-stepper">
+            <div class="step-indicator @(wizardStep == 1 ? "active" : "")">
+                <div class="step-number">1</div>
+                <span>Incident</span>
+            </div>
+            <div style="width: 40px; height: 2px; background: #e2e8f0; margin-top: 14px;"></div>
+            <div class="step-indicator @(wizardStep == 2 ? "active" : "")">
+                <div class="step-number">2</div>
+                <span>Respondents</span>
+            </div>
+        </div>
+
+        @if (wizardStep == 1)
+        {
+            <div class="form-section">
+                <div class="section-title">General Information</div>
+                <div class="form-group">
+                    <label class="form-label">Violation Committed <span class="required-star">*</span></label>
+                    @if (!string.IsNullOrEmpty(overallViolation))
+                    {
+                        <input type="text" class="form-input" value="@overallViolation" readonly style="background: #f8fafc; cursor: not-allowed;" />
+                        <small style="color: #64748b; font-size: 0.85rem; display: block; margin-top: 4px;">Auto-filled from case.</small>
+                    }
+                    else
+                    {
+                        <select class="form-input" @onchange="OnViolationChanged" value="@overallViolation">
+                            <option value="">-- Select Violation --</option>
+                            @foreach (var violation in violationTypes)
+                            {
+                                <option value="@violation">@violation</option>
+                            }
+                        </select>
+                    }
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Date of Offense <span class="required-star">*</span></label>
+                        <input type="datetime-local" class="form-input" 
+                               value="@incidentDate.ToString("yyyy-MM-ddTHH:mm")" 
+                               @onchange="(e) => { DateTime.TryParse(e.Value?.ToString(), out incidentDate); }" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Respondent(s) <span class="required-star">*</span></label>
+                        <InputText class="form-input" @bind-Value="respondentNamesInput" placeholder="Separated by semi-colon (e.g. Juan; Maria)" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Incident Narrative</label>
+                    <div @onclick="OpenDescriptionModal" style="cursor: pointer;">
+                        <textarea class="form-input" rows="3" readonly value="@incidentDescription" placeholder="Click to enter details..." style="cursor: pointer;"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Evidence Photo (Optional)</label>
+                    <InputFile class="form-input" OnChange="HandleFileChange" accept="image/*" />
+                    @if (!string.IsNullOrEmpty(evidencePhotoBase64))
+                    {
+                        <div style="margin-top:10px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; width: 200px;">
+                            <img src="@evidencePhotoBase64" style="width:100%" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <button class="submit-btn" @onclick="NextToRespondents" disabled="@(string.IsNullOrEmpty(overallViolation) || string.IsNullOrEmpty(respondentNamesInput))">
+                Fill Out Player Profiles ➔
+            </button>
+        }
+        else
+        {
+            <div class="respondent-tabs">
+                @for (int i = 0; i < respondents.Count; i++)
+                {
+                    var index = i;
+                    <button class="respondent-tab @(currentRespondentIndex == index ? "active" : "") @(respondents[index].IsSubmitted ? "submitted" : "")" 
+                            @onclick="() => { currentRespondentIndex = index; }">
+                        @(respondents[index].IsSubmitted ? "✓ " : "") @respondents[index].Name
+                    </button>
+                }
+            </div>
+
+            @if (currentRespondentIndex >= 0 && currentRespondentIndex < respondents.Count)
+            {
+                var r = respondents[currentRespondentIndex];
+                <div class="form-section">
+                    <div class="section-title">
+                        Profile: @r.Name
+                        @if (!r.IsSubmitted)
+                        {
+                            <button class="btn-clear" style="font-size:0.8rem; padding:4px 10px;" @onclick="() => TryAutoFill(r)">Auto-Fill Info</button>
+                        }
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Advisor <span class="required-star">*</span></label>
+                        <input type="text" class="form-input" @bind="r.AdviserName" @oninput='(e) => SearchTeachers(e.Value?.ToString() ?? "")' placeholder="Search or type Advisor's Name..." disabled="@r.IsSubmitted" />
+                        @if (teacherSuggestions.Any())
+                        {
+                            <div class="autocomplete-list">
+                                @foreach (var teacher in teacherSuggestions)
+                                {
+                                    <div class="autocomplete-item" @onclick="() => SelectTeacher(teacher, r)">
+                                        <span>@teacher.TeacherName</span>
+                                        <span class="autocomplete-grade">@(string.IsNullOrEmpty(teacher.SectionHandle) ? teacher.GradeHandle : $"{teacher.GradeHandle} - {teacher.SectionHandle}")</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Date of Birth <span class="required-star">*</span></label>
+                            <input type="date" class="form-input" 
+                                   value="@(r.DateOfBirth?.ToString("yyyy-MM-dd"))" 
+                                   @onchange='(e) => { if (DateTime.TryParse(e.Value?.ToString(), out var dt)) r.DateOfBirth = dt; else r.DateOfBirth = null; }' 
+                                   placeholder="Select Birth Date"
+                                   disabled="@r.IsSubmitted" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Age <span class="required-star">*</span></label>
+                            <input type="number" class="form-input" @bind="r.Age" placeholder="Student's Age" disabled="@r.IsSubmitted" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sex <span class="required-star">*</span></label>
+                            <select class="form-input" @bind="r.Sex" disabled="@r.IsSubmitted">
+                                <option value="">Select Sex</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Grade & Section <span class="required-star">*</span></label>
+                            <div class="grid-2" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <input type="text" class="form-input" @bind="r.GradeLevel" @oninput='(e) => r.GradeLevel = e.Value?.ToString() ?? ""' placeholder="Grade Level" disabled="@r.IsSubmitted" />
+                                <input type="text" class="form-input" @bind="r.Section" placeholder="Section Name" disabled="@r.IsSubmitted" />
+                            </div>
+                        </div>
+                        @if (r.GradeLevel?.Trim().Contains("11") == true || r.GradeLevel?.Trim().Contains("12") == true)
+                        {
+                            <div class="form-group">
+                                <label class="form-label">Track / Strand</label>
+                                <input type="text" class="form-input" @bind="r.TrackStrand" placeholder="e.g., STEM, HUMSS, GAS" disabled="@r.IsSubmitted" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Address <span class="required-star">*</span></label>
+                        <input type="text" class="form-input" @bind="r.Address" placeholder="Complete Home Address" disabled="@r.IsSubmitted" />
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Contact Person</label>
+                            <select class="form-input" @bind="r.SelectedParentType">
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Guardian">Guardian</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Full Name <span class="required-star">*</span></label>
+                            @if (r.SelectedParentType == "Father")
+                            {
+                                <input type="text" class="form-input" @bind="r.FatherName" placeholder="Father's Full Name" disabled="@r.IsSubmitted" />
+                            }
+                            else if (r.SelectedParentType == "Mother")
+                            {
+                                <input type="text" class="form-input" @bind="r.MotherName" placeholder="Mother's Full Name" disabled="@r.IsSubmitted" />
+                            }
+                            else
+                            {
+                                <input type="text" class="form-input" @bind="r.GuardianName" placeholder="Guardian's Full Name" disabled="@r.IsSubmitted" />
+                            }
+                        </div>
+                    </div>
+
+                    @if (!r.IsSubmitted)
+                    {
+                        <button class="submit-btn" @onclick="SubmitCurrentRespondent" disabled="@isSubmitting">
+                            @if (isSubmitting) { <span class="spinner-border spinner-border-sm"></span> <span>Saving...</span> }
+                            else { <span>Save Profile for @r.Name</span> }
+                        </button>
+                    }
+                    else
+                    {
+                        @* Success handled by modal *@
+                    }
+                </div>
+            }
+
+            <div style="display:flex; justify-content:space-between; margin-top:20px;">
+                <button class="btn-clear" @onclick="() => { wizardStep = 1; }">Back to Incident</button>
+                @if (respondents.All(res => res.IsSubmitted))
+                {
+                    <button class="submit-btn" style="width:auto;" @onclick="() => { isFinalSummary = true; }">Finish & Classification ➔</button>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="classification-result">
+            <h2 class="form-title">Classification Phase</h2>
+            <div style="font-size: 4rem; margin: 20px 0;">
+                @(violationCategory?.Contains("Minor") == true ? "⚠️" : "🚫")
+            </div>
+            <h1 class="classification-value @(violationCategory?.Contains("Minor") == true ? "minor-offense" : "major-offense")">
+                @violationCategory
+            </h1>
+            <p style="color: #64748b;">
+                Records created for: <strong>@string.Join(", ", respondents.Select(r => r.Name))</strong>
+            </p>
+
+            @if (violationCategory?.Contains("Minor") != true && respondents.Any(r => r.WillConductParentConference))
+            {
+                <div class="form-section" style="margin-top:20px; text-align:left;">
+                    <div class="section-title" style="border-bottom:none;">Parent/Guardian to Contact</div>
+                    @if (parentContactOptions.Any())
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Available parent/guardian</label>
+                            <div class="contact-option-grid">
+                                @foreach (var option in parentContactOptions)
+                                {
+                                    <label class="contact-option">
+                                        <input type="radio"
+                                               name="parent-contact"
+                                               value="@option.Type"
+                                               checked="@string.Equals(selectedParentContactType, option.Type, StringComparison.OrdinalIgnoreCase)"
+                                               @onchange="@(_ => SelectParentContactOption(option))" />
+                                        <div class="contact-option-body">
+                                            <span class="contact-option-type">@option.Type</span>
+                                            <div class="contact-option-name">@option.Name</div>
+                                            @if (!string.IsNullOrWhiteSpace(option.ContactNumber))
+                                            {
+                                                <div class="contact-option-contact">@option.ContactNumber</div>
+                                            }
+                                        </div>
+                                    </label>
+                                }
+                            </div>
+                            <small class="form-text-guide">Prefilled from student guardian records. Just set the schedule and print.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Simplified View: Only ask for Date -->
+                        <div class="form-group">
+                             <div class="alert alert-info">
+                                 The parent names have been set in the profile step. Just verify the meeting schedule below.
+                             </div>
+                        </div>
+                    }
+                    <div class="form-group">
+                        <label class="form-label">Scheduled Meeting Date & Time</label>
+                        <input type="datetime-local" class="form-input"
+                               @bind="parentMeetingDate" />
+                        <small class="form-text-guide">Set the date and time when the parent/guardian is expected to arrive.</small>
+                    </div>
+                </div>
+            }
+
+            <div class="action-options" style="margin-top:20px; display:grid; gap:15px; max-width:400px; margin-left:auto; margin-right:auto;">
+                @if (violationCategory?.Contains("Minor") == true)
+                {
+                    <button class="submit-btn" @onclick="SendAllToTeacher">Send to Teacher Account</button>
+                }
+                else if (respondents.Any(r => r.WillConductParentConference))
+                {
+                    <button class="submit-btn" style="background:#10b981;"
+                            @onclick="ConfirmParentMeetingAndDownload"
+                            disabled="@(!CanConfirmParentMeeting || isDownloadingPdf)">
+                        @if (isDownloadingPdf)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                            <span>Downloading PDF...</span>
+                        }
+                        else
+                        {
+                            <span>Print Parent Conference Request</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <button class="submit-btn" style="background:#6366f1;" @onclick='() => NavigationManager.NavigateTo("/pod-dashboard")'>
+                        Finish & Return to Dashboard
+                    </button>
+                }
+            </div>
+
+            @if (classificationRecords.Any())
+            {
+                <div class="form-section" style="margin-top:20px; text-align:left;">
+                    <div class="section-title">Classification Records (saved)</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Respondent</th>
+                                    <th>Contact Type</th>
+                                    <th>Contact Name</th>
+                                    <th>Meeting Schedule</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rec in classificationRecords)
+                                {
+                                    <tr>
+                                        <td>@rec.RespondentName</td>
+                                        <td>@(rec.ParentContactType ?? "N/A")</td>
+                                        <td>@(rec.ParentContactName ?? "N/A")</td>
+                                        <td>@(rec.ParentMeetingDate?.ToString("MMM dd, yyyy hh:mm tt") ?? "Not set")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+    <!-- Success Modal -->
+    @if (showSuccessModal)
+    {
+        <div class="modal-backdrop-custom">
+            <div class="modal-content-custom">
+                <div class="success-icon-container">
+                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
+                        <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                    </svg>
+                </div>
+                <h3 class="success-title">Saved Successfully!</h3>
+                <p class="success-message">The student profile has been recorded.</p>
+                
+                @if (violationCategory?.Contains("Minor") != true)
+                {
+                    <div style="margin-bottom: 25px; background: #f0fdf4; padding: 15px; border-radius: 12px; border: 1px solid #bbf7d0; text-align: left;">
+                        <label style="font-weight: 700; color: #166534; display: block; margin-bottom: 10px; font-size: 0.95rem;">
+                            Do you want to schedule a Parent/Guardian Conference for this student?
+                        </label>
+                        <div style="display: flex; gap: 15px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #374151; font-weight: 600;">
+                                <input type="radio" name="will-conduct-parent" value="true" checked="@(respondents[currentRespondentIndex].WillConductParentConference == true)" @onchange="@(_ => respondents[currentRespondentIndex].WillConductParentConference = true)" />
+                                Yes, Schedule Now
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #374151; font-weight: 600;">
+                                <input type="radio" name="will-conduct-parent" value="false" checked="@(respondents[currentRespondentIndex].WillConductParentConference == false)" @onchange="@(_ => respondents[currentRespondentIndex].WillConductParentConference = false)" />
+                                No, Record Only
+                            </label>
+                        </div>
+                    </div>
+                }
+
+                <div class="modal-actions-custom">
+                    <button class="btn-save-next" @onclick="ProceedToNextOrFinish">
+                        Save and Next
+                        <span class="arrow-icon">→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Print Success Modal -->
+    @if (showPrintSuccessModal)
+    {
+        <div class="modal-backdrop-custom">
+            <div class="modal-content-custom">
+                <div class="success-icon-container">
+                    <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
+                        <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                    </svg>
+                </div>
+                <h3 class="success-title">PDF Downloaded!</h3>
+                <p class="success-message">Redirecting to POD Dashboard...</p>
+            </div>
+        </div>
+    }
+
+    <!-- Description Modal -->
+    @if (showDescriptionModal)
+    {
+        <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100;" @onclick="CloseDescriptionModal">
+            <div style="background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 600px;" @onclick:stopPropagation="true">
+                <h3>Incident Details</h3>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" class="form-input" value="@descriptionDate" @onchange="(e) => descriptionDate = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" class="form-input" value="@descriptionTime" @onchange="(e) => descriptionTime = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" class="form-input" @bind="descriptionLocation" placeholder="e.g. Canteen, Room 304, Backend of Building A" />
+                </div>
+                <div class="form-group">
+                    <label>Summary</label>
+                    <textarea class="form-input" rows="4" @bind="descriptionSummary" placeholder="Please provide a brief description of the incident..."></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button class="btn-clear" @onclick="CloseDescriptionModal">Cancel</button>
+                    <button class="submit-btn" style="width: auto; margin-top: 0; padding: 10px 20px;" @onclick="SaveDescriptionModal">Save</button>
+                </div>
+            </div>
+        </div>
+    }
+
+
+
+
+<style>
+    /* Success Modal Styles */
+    .modal-backdrop-custom {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        backdrop-filter: blur(4px);
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .modal-content-custom {
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        max-width: 400px;
+        width: 90%;
+        animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .success-icon-container {
+        margin-bottom: 20px;
+    }
+
+    .success-title {
+        color: #10b981;
+        font-weight: 800;
+        margin-bottom: 10px;
+        font-size: 1.8rem;
+    }
+
+    .success-message {
+        color: #6b7280;
+        margin-bottom: 30px;
+        font-size: 1.1rem;
+    }
+
+    .btn-save-next {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .btn-save-next:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .arrow-icon {
+        font-size: 1.3rem;
+    }
+
+    /* Animations */
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @@keyframes popIn {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Checkmark Animation */
+    .checkmark {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: block;
+        stroke-width: 3;
+        stroke: #10b981;
+        stroke-miterlimit: 10;
+        margin: 0 auto;
+        box-shadow: inset 0 0 0 #10b981;
+        animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+    }
+
+    .checkmark__circle {
+        stroke-dasharray: 166;
+        stroke-dashoffset: 166;
+        stroke-width: 3;
+        stroke-miterlimit: 10;
+        stroke: #10b981;
+        fill: none;
+        animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    .checkmark__check {
+        transform-origin: 50% 50%;
+        stroke-dasharray: 48;
+        stroke-dashoffset: 48;
+        animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+    }
+
+    @@keyframes stroke {
+        100% { stroke-dashoffset: 0; }
+    }
+
+    @@keyframes scale {
+        0%, 100% { transform: none; }
+        50% { transform: scale3d(1.1, 1.1, 1); }
+    }
+
+    @@keyframes fill {
+        100% { box-shadow: inset 0 0 0 50px #d1fae5; }
+    }
+</style>
+
+<script>
+    window.downloadPdfFromApi = async function(url, podName) {
+        try {
+            console.log('Fetching PDF from:', url);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-POD-Name': podName || ''
+                }
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response content-type:', response.headers.get('content-type'));
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API Error:', errorText);
+                throw new Error('Failed to download PDF: ' + response.status);
+            }
+            
+            // Check if response is actually a PDF
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/pdf')) {
+                const text = await response.text();
+                console.error('Not a PDF response:', text);
+                throw new Error('Server did not return a PDF');
+            }
+            
+            const blob = await response.blob();
+            console.log('Blob size:', blob.size);
+            
+            if (blob.size === 0) {
+                throw new Error('PDF file is empty');
+            }
+            
+            // Get filename from content-disposition header
+            const contentDisposition = response.headers.get('content-disposition');
+            let fileName = 'ParentConferenceRequest.pdf';
+            
+            console.log('Content-Disposition:', contentDisposition);
+            
+            if (contentDisposition) {
+                // Try to extract filename from header
+                const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;\r\n"']*)['"]?/i);
+                if (filenameMatch && filenameMatch[1]) {
+                    fileName = decodeURIComponent(filenameMatch[1]);
+                } else {
+                    const simpleMatch = contentDisposition.match(/filename=([^;\s]+)/);
+                    if (simpleMatch && simpleMatch[1]) {
+                        fileName = simpleMatch[1].replace(/['"]/g, '');
+                    }
+                }
+            }
+            
+            console.log('Downloading as:', fileName);
+            
+            // Create download link and trigger download
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup after a short delay
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+            }, 100);
+            
+            console.log('PDF downloaded successfully:', fileName);
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            alert('Error downloading PDF: ' + error.message);
+        }
+    };
+</script>
+
+@code {
+    private int wizardStep = 1;
+    private bool isFinalSummary = false;
+    private bool isSubmitting = false;
+    // Parent/guardian classification data (for Major cases)
+    private string parentContactType = "";
+    private string parentContactName = "";
+    private DateTime? parentMeetingDate;
+    private bool showSuccessModal = false;
+    private bool showPrintSuccessModal = false;
+    private List<ParentContactOption> parentContactOptions = new();
+    private string selectedParentContactType = "";
+    private string selectedParentContactName = "";
+    private List<SimplifiedStudentProfileCaseRecordModel> classificationRecords = new();
+
+    private bool CanConfirmParentMeeting =>
+        parentMeetingDate.HasValue;
+
+    // Step 1 Data
+    private string overallViolation = "";
+    private string violationCategory = "";
+    private DateTime incidentDate = DateTime.Now;
+    private string respondentNamesInput = "";
+    private string incidentDescription = "";
+    private string? evidencePhotoBase64;
+    private int? incidentId; // Declared for linkage
+    private int? escalationId; // Added for separate escalation tracking
+
+    // Description Modal State
+    private bool showDescriptionModal = false;
+    private string descriptionDate = "";
+    private string descriptionTime = "";
+    private string descriptionLocation = "";
+    private string descriptionSummary = "";
+
+    // Step 2 Data
+    private List<RespondentInfo> respondents = new();
+    private int currentRespondentIndex = -1;
+    private List<string> violationTypes = new();
+    private List<TeacherSearchResult> teacherSuggestions = new();
+    private string? podSchoolName;
+
+
+    private string? gradeLevelFromQuery;
+    private string? sectionFromQuery;
+    private string? strandFromQuery;
+
+    private class ParentContactOption
+    {
+        public string Type { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? ContactNumber { get; set; }
+    }
+
+    private class RespondentInfo
+    {
+        public string Name { get; set; } = "";
+        public DateTime? DateOfBirth { get; set; }
+        public int? Age { get; set; }
+        public string Sex { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string GradeLevel { get; set; } = "";
+        public string TrackStrand { get; set; } = "";
+        public string Section { get; set; } = "";
+        public string AdviserName { get; set; } = "";
+        public string ActionTaken { get; set; } = "";
+        public string Findings { get; set; } = "";
+        public string Agreement { get; set; } = "";
+        public string PenaltyAction { get; set; } = "";
+        public string? SignatureBase64 { get; set; }
+        public bool IsSubmitted { get; set; } = false;
+        public int? CreatedRecordId { get; set; }
+        public string? FatherName { get; set; }
+        public string? MotherName { get; set; }
+        public string? GuardianName { get; set; }
+        public string? GuardianContact { get; set; }
+        public string SelectedParentType { get; set; } = "Father"; // Default selection
+        public bool WillConductParentConference { get; set; } = false; // Changed: default to false (Record Only)
+        public string Status { get; set; } = "UnderReview";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadViolationTypes();
+        
+        var uri = new Uri(NavigationManager.Uri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+
+        respondentNamesInput = query["offenderName"] ?? query["respondentName"] ?? "";
+        overallViolation = query["violationType"] ?? "";
+        incidentDescription = query["caseDetails"] ?? query["details"] ?? query["description"] ?? "";
+
+    // adviserNameFromQuery removed as per user request
+        gradeLevelFromQuery = query["gradeLevel"] ?? "";
+        sectionFromQuery = query["section"] ?? "";
+        strandFromQuery = query["trackStrand"] ?? "";
+
+        // Parse Incident ID
+        if (int.TryParse(query["incidentId"], out var iId))
+        {
+            incidentId = iId;
+        }
+
+        // Parse Escalation ID
+        if (int.TryParse(query["escalationId"], out var eId))
+        {
+            escalationId = eId;
+        }
+        
+        if (!string.IsNullOrEmpty(overallViolation) && !violationTypes.Contains(overallViolation))
+        {
+            violationTypes.Add(overallViolation);
+        }
+        
+        if (!string.IsNullOrEmpty(overallViolation)) await ResolveCategory();
+
+        await LoadPodLocation();
+    }
+
+    private async Task LoadPodLocation()
+    {
+        try {
+            var currentUser = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "username");
+            if (!string.IsNullOrEmpty(currentUser))
+            {
+                var res = await Http.GetFromJsonAsync<JsonElement>($"api/IncidentReport/pod-location/{currentUser}");
+                if (res.TryGetProperty("success", out var success) && success.GetBoolean() &&
+                    res.TryGetProperty("data", out var locData))
+                {
+                    podSchoolName = locData.TryGetProperty("schoolName", out var sn) ? sn.GetString() : null;
+                    Console.WriteLine($"POD School identified: {podSchoolName}");
+                }
+            }
+        } catch { }
+    }
+
+    private async Task LoadViolationTypes()
+    {
+        try {
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<string>>>("api/StudentProfileCaseRecord/violation-types");
+            if (res?.Success == true) violationTypes = res.Data!;
+        } catch { violationTypes = new List<string> { "Bullying", "Vandalism", "Theft", "Tardiness" }; }
+    }
+
+    private async Task OnViolationChanged(ChangeEventArgs e)
+    {
+        overallViolation = e.Value?.ToString() ?? "";
+        await ResolveCategory();
+    }
+
+    private async Task ResolveCategory()
+    {
+        if (string.IsNullOrEmpty(overallViolation)) return;
+        try {
+            var res = await Http.GetFromJsonAsync<ApiResponse<string>>($"api/StudentProfileCaseRecord/violation-category?violationName={Uri.EscapeDataString(overallViolation)}");
+            if (res?.Success == true) violationCategory = res.Data!;
+        } catch { }
+    }
+
+    private async Task HandleFileChange(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > 5 * 1024 * 1024) return;
+        var buffer = new byte[file.Size];
+        await file.OpenReadStream(5 * 1024 * 1024).ReadAsync(buffer);
+        evidencePhotoBase64 = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+    }
+
+    private void NextToRespondents()
+    {
+        var names = respondentNamesInput.Split(new[] { ';', '/', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                      .Select(n => n.Trim()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+        
+        respondents = names.Select(n => new RespondentInfo { Name = n }).ToList();
+        if (respondents.Any())
+        {
+            currentRespondentIndex = 0;
+            wizardStep = 2;
+            foreach (var r in respondents)
+            {
+
+                
+                // Pre-fill Grade, Section, and Strand from query
+                if (!string.IsNullOrEmpty(gradeLevelFromQuery)) r.GradeLevel = gradeLevelFromQuery;
+                if (!string.IsNullOrEmpty(sectionFromQuery)) r.Section = sectionFromQuery;
+                if (!string.IsNullOrEmpty(strandFromQuery)) r.TrackStrand = strandFromQuery;
+                
+                _ = TryAutoFill(r);
+            }
+        }
+    }
+
+    private async Task TryAutoFill(RespondentInfo r)
+    {
+        try {
+            Console.WriteLine($"[DEBUG] Starting auto-fill for respondent: {r.Name}");
+            
+            // Try to get data from previous SimplifiedStudentProfileCaseRecords for the same respondent name
+            // This allows reusing previously entered data for the same student
+            var url = $"api/StudentProfileCaseRecord/simplified?respondentName={Uri.EscapeDataString(r.Name)}";
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<SimplifiedStudentProfileCaseRecordModel>>>(url);
+            
+            if (res?.Success == true && res.Data != null && res.Data.Any())
+            {
+                // Use the most recent record with complete data
+                var prev = res.Data
+                    .Where(x => !string.IsNullOrEmpty(x.GradeLevel) || !string.IsNullOrEmpty(x.Section))
+                    .OrderByDescending(x => x.DateCreated)
+                    .FirstOrDefault();
+                
+                if (prev != null)
+                {
+                    Console.WriteLine($"[DEBUG] Auto-fill from previous case record: Grade={prev.GradeLevel}, Section={prev.Section}");
+                    
+                    r.GradeLevel = prev.GradeLevel ?? "";
+                    r.Section = prev.Section ?? "";
+                    r.TrackStrand = prev.TrackStrand ?? "";
+                    
+
+                    
+                    r.Sex = prev.Sex ?? "";
+                    r.Address = prev.Address ?? "";
+                    r.DateOfBirth = prev.DateOfBirth;
+                    r.Age = prev.Age;
+                    r.FatherName = prev.FathersName;
+                    r.MotherName = prev.MothersName;
+                    r.GuardianName = prev.GuardianName;
+
+                    UpdateParentOptionsFromRespondents();
+                    StateHasChanged();
+                    return;
+                }
+            }
+            
+            Console.WriteLine($"[DEBUG] No previous case record found for: {r.Name}. User must fill in student data manually.");
+            
+        } catch (Exception ex) {
+            Console.WriteLine($"[DEBUG] Auto-fill EXCEPTION for {r.Name}: {ex.Message}");
+        }
+    }
+
+    private void UpdateParentOptionsFromRespondents()
+    {
+        var first = respondents.FirstOrDefault();
+        var options = new List<ParentContactOption>();
+
+        if (first != null)
+        {
+            if (!string.IsNullOrWhiteSpace(first.FatherName))
+            {
+                options.Add(new ParentContactOption { Type = "Father", Name = first.FatherName!, ContactNumber = first.GuardianContact });
+            }
+            if (!string.IsNullOrWhiteSpace(first.MotherName))
+            {
+                options.Add(new ParentContactOption { Type = "Mother", Name = first.MotherName!, ContactNumber = first.GuardianContact });
+            }
+            if (!string.IsNullOrWhiteSpace(first.GuardianName))
+            {
+                options.Add(new ParentContactOption { Type = "Guardian", Name = first.GuardianName!, ContactNumber = first.GuardianContact });
+            }
+        }
+
+        parentContactOptions = options;
+
+        if (parentContactOptions.Any())
+        {
+            SelectParentContactOption(parentContactOptions.First());
+        }
+        else
+        {
+            selectedParentContactName = parentContactName;
+            selectedParentContactType = parentContactType;
+        }
+
+        StateHasChanged();
+    }
+
+    private void SelectParentContactOption(ParentContactOption option)
+    {
+        selectedParentContactType = option.Type;
+        selectedParentContactName = option.Name;
+        parentContactType = option.Type;
+        parentContactName = option.Name;
+    }
+
+    private void OnParentContactTypeChanged(ChangeEventArgs e)
+    {
+        parentContactType = e.Value?.ToString();
+        
+        var first = respondents.FirstOrDefault();
+        if (first != null)
+        {
+            if (string.Equals(parentContactType, "Father", StringComparison.OrdinalIgnoreCase)) 
+                parentContactName = first.FatherName;
+            else if (string.Equals(parentContactType, "Mother", StringComparison.OrdinalIgnoreCase)) 
+                parentContactName = first.MotherName;
+            else if (string.Equals(parentContactType, "Guardian", StringComparison.OrdinalIgnoreCase)) 
+                parentContactName = first.GuardianName;
+        }
+    }
+
+    private async Task SearchTeachers(string term)
+    {
+        teacherSuggestions.Clear();
+        if (term.Length < 2) return;
+
+        try {
+            var url = $"api/StudentProfileCaseRecord/search-teachers?searchTerm={Uri.EscapeDataString(term)}";
+            if (!string.IsNullOrEmpty(podSchoolName))
+            {
+                url += $"&schoolName={Uri.EscapeDataString(podSchoolName)}";
+            }
+            var res = await Http.GetFromJsonAsync<ApiResponse<List<TeacherSearchResult>>>(url);
+            if (res?.Success == true) {
+                teacherSuggestions = res.Data!;
+            }
+        } catch { }
+    }
+
+    private void SelectTeacher(TeacherSearchResult teacher, RespondentInfo r)
+    {
+        r.AdviserName = teacher.TeacherName;
+        // Auto-fill grade and section from teacher's handles
+        if (!string.IsNullOrEmpty(teacher.GradeHandle))
+        {
+            r.GradeLevel = teacher.GradeHandle;
+        }
+        if (!string.IsNullOrEmpty(teacher.SectionHandle))
+        {
+            r.Section = teacher.SectionHandle;
+        }
+        // If the teacher record has a strand (SHS), auto-fill Track / Strand field too
+        if (!string.IsNullOrEmpty(teacher.TrackStrand))
+        {
+            r.TrackStrand = teacher.TrackStrand;
+        }
+        teacherSuggestions.Clear();
+    }
+
+    private async Task SubmitCurrentRespondent()
+    {
+        if (currentRespondentIndex < 0 || currentRespondentIndex >= respondents.Count) return;
+        var r = respondents[currentRespondentIndex];
+
+        // Validation - ensure required student profile fields are filled
+        var missingFields = new List<string>();
+        if (string.IsNullOrWhiteSpace(r.AdviserName)) missingFields.Add("Advisor");
+        if (r.DateOfBirth == null) missingFields.Add("Date of Birth");
+        if (r.Age == null || r.Age <= 0) missingFields.Add("Age");
+        if (string.IsNullOrWhiteSpace(r.Sex)) missingFields.Add("Sex");
+        if (string.IsNullOrWhiteSpace(r.GradeLevel)) missingFields.Add("Grade Level");
+        if (string.IsNullOrWhiteSpace(r.Section)) missingFields.Add("Section");
+        if (string.IsNullOrWhiteSpace(r.Address)) missingFields.Add("Address");
+        
+        string parentName = r.SelectedParentType switch {
+            "Father" => r.FatherName,
+            "Mother" => r.MotherName,
+            "Guardian" => r.GuardianName,
+            _ => ""
+        };
+        if (string.IsNullOrWhiteSpace(parentName)) missingFields.Add($"Full Name ({r.SelectedParentType})");
+        
+        if (missingFields.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Please fill in the following required fields: {string.Join(", ", missingFields)}");
+            return;
+        }
+
+        isSubmitting = true;
+        try {
+            var req = new SimplifiedStudentProfileCaseRecordRequest {
+                RespondentName = r.Name,
+                DateOfOffense = incidentDate,
+                ViolationCommitted = overallViolation,
+                ViolationCategory = violationCategory,
+                Description = incidentDescription,
+                EvidencePhotoBase64 = evidencePhotoBase64,
+                StudentSignatureBase64 = "",
+                DateOfBirth = r.DateOfBirth,
+                Age = r.Age,
+                Sex = r.Sex,           // Added Sex
+                Address = r.Address,   // Added Address
+                GradeLevel = r.GradeLevel,
+                Section = r.Section,
+                TrackStrand = r.TrackStrand,
+                AdviserName = r.AdviserName,
+                ActionTaken = "", // Reserved for Part B
+                Findings = "",
+                Agreement = "",
+                PenaltyAction = "",
+                FathersName = r.FatherName,
+                MothersName = r.MotherName,
+                GuardianName = r.GuardianName,
+                
+                // Save the selected parent info here
+                ParentContactType = r.SelectedParentType,
+                ParentContactName = r.SelectedParentType switch {
+                    "Father" => r.FatherName,
+                    "Mother" => r.MotherName,
+                    "Guardian" => r.GuardianName,
+                    _ => r.FatherName // fallback
+                },
+                IncidentID = incidentId, // Pass the incident ID here
+                EscalationID = escalationId, // Pass the escalation ID separately
+                Status = r.WillConductParentConference ? "ParentOnHold" : "UnderReview"
+            };
+
+            var res = await Http.PostAsJsonAsync("api/StudentProfileCaseRecord/simplified", req);
+            var apiResult = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
+
+            if (res.IsSuccessStatusCode && apiResult?.Success == true) {
+                r.IsSubmitted = true;
+                r.CreatedRecordId = apiResult.Data;
+                
+                // NEW: Update escalation status if this came from an escalation
+                // NEW: Update escalation status if this came from an escalation
+                // REMOVED: Redundant status update. We will handle this in ProceedToNextOrFinish
+                // to ensure the final user choice (Yes/No for conference) is respected.
+
+                // Show success modal instead of auto-advance
+                showSuccessModal = true;
+                StateHasChanged();
+            } else {
+                await JSRuntime.InvokeVoidAsync("alert", "Error: " + apiResult?.Message);
+            }
+        } catch (Exception ex) {
+            await JSRuntime.InvokeVoidAsync("alert", "Error: " + ex.Message);
+        } finally {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task ProceedToNextOrFinish()
+    {
+        var r = respondents[currentRespondentIndex];
+        
+        // Sync the final status choice to the database
+        if (r.CreatedRecordId.HasValue)
+        {
+            string targetStatus = r.WillConductParentConference ? "ParentOnHold" : "UnderReview";
+            var payload = new ParentMeetingUpdateRequest 
+            { 
+                Status = targetStatus,
+                ParentContactType = r.SelectedParentType,
+                ParentContactName = r.SelectedParentType switch {
+                    "Father" => r.FatherName,
+                    "Mother" => r.MotherName,
+                    "Guardian" => r.GuardianName,
+                    _ => r.FatherName
+                },
+                ParentMeetingDate = null
+            };
+            await Http.PutAsJsonAsync($"api/StudentProfileCaseRecord/simplified/{r.CreatedRecordId}/parent-meeting", payload);
+            
+            // Also update local record state for summary table
+            r.Status = targetStatus;
+        }
+
+        showSuccessModal = false;
+        
+        if (currentRespondentIndex < respondents.Count - 1)
+        {
+            // Next student
+            currentRespondentIndex++;
+        }
+        else
+        {
+            // Finish - determine if we need to show Classification Phase or go straight to Dashboard
+            
+            // Show summary if:
+            // 1. It is a Minor offense (needs "Send to Teacher")
+            // 2. Any respondent requires a Parent Conference (needs "Print PDF")
+            bool isMinor = violationCategory?.Contains("Minor") == true;
+            bool anyParentConference = respondents.Any(res => res.WillConductParentConference);
+            
+            if (isMinor || anyParentConference)
+            {
+                isFinalSummary = true;
+                // Optional: Load records if needed for the summary table
+                await LoadClassificationRecords();
+            }
+            else
+            {
+                // Major/Prohibited AND No Parent Conference -> Skip summary, go to Dashboard
+                NavigationManager.NavigateTo("/pod-dashboard");
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadClassificationRecords()
+    {
+        classificationRecords.Clear();
+
+        foreach (var recordId in respondents.Where(res => res.CreatedRecordId.HasValue).Select(res => res.CreatedRecordId!.Value))
+        {
+            try
+            {
+                var res = await Http.GetFromJsonAsync<ApiResponse<SimplifiedStudentProfileCaseRecordModel>>($"api/StudentProfileCaseRecord/simplified/{recordId}");
+                if (res?.Success == true && res.Data != null)
+                {
+                    classificationRecords.Add(res.Data);
+                }
+            }
+            catch
+            {
+                // Ignore fetch errors for now; table will just hide missing rows.
+            }
+        }
+    }
+
+    private async Task SendAllToTeacher()
+    {
+        foreach (var r in respondents.Where(res => res.CreatedRecordId.HasValue)) {
+            await Http.PostAsync($"api/StudentProfileCaseRecord/send-to-teacher/{r.CreatedRecordId}", null);
+        }
+        await JSRuntime.InvokeVoidAsync("alert", "All records sent to respective teacher accounts!");
+    }
+
+    private bool isDownloadingPdf = false;
+    
+    private async Task ConfirmParentMeetingAndDownload()
+    {
+        // Prevent double-clicking
+        if (isDownloadingPdf) return;
+        isDownloadingPdf = true;
+        StateHasChanged();
+        
+        try
+        {
+            if (!CanConfirmParentMeeting)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Please select who will be called, provide the name, and set the meeting date/time.");
+                return;
+            }
+
+            // Get POD name for PDF generation
+            string? podName = null;
+            try
+            {
+                podName = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userFullName");
+            }
+            catch { }
+
+            // Update status and parent fields for all created records before downloading PDFs
+            var recordsToDownload = new List<int>();
+            
+            if (!parentMeetingDate.HasValue)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Please set the Scheduled Meeting Date & Time before printing.");
+                return;
+            }
+        
+        foreach (var r in respondents.Where(res => res.CreatedRecordId.HasValue))
+        {
+            try
+            {
+                // Determine parent contact info for this respondent
+                var parentContactType = r.SelectedParentType;
+                var parentContactName = r.SelectedParentType switch
+                {
+                    "Father" => r.FatherName,
+                    "Mother" => r.MotherName,
+                    "Guardian" => r.GuardianName,
+                    _ => r.FatherName
+                };
+
+                // Ensure the date is properly formatted (convert to UTC or keep as local based on your needs)
+                var meetingDateToSend = parentMeetingDate.Value;
+                
+                var payload = new ParentMeetingUpdateRequest
+                {
+                    ParentContactType = parentContactType,
+                    ParentContactName = parentContactName,
+                    ParentMeetingDate = meetingDateToSend,
+                    Status = "ParentOnHold"
+                };
+                
+                var url = $"api/StudentProfileCaseRecord/simplified/{r.CreatedRecordId}/parent-meeting";
+                Console.WriteLine($"[DEBUG] Updating record {r.CreatedRecordId} at {url}");
+                Console.WriteLine($"[DEBUG] Payload: ParentMeetingDate={meetingDateToSend:yyyy-MM-dd HH:mm:ss} (Kind: {meetingDateToSend.Kind}), Status=ParentOnHold");
+                Console.WriteLine($"[DEBUG] ParentContactType={parentContactType}, ParentContactName={parentContactName}");
+                
+                var response = await Http.PutAsJsonAsync(url, payload);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[DEBUG] Successfully updated record {r.CreatedRecordId}");
+                    recordsToDownload.Add(r.CreatedRecordId!.Value);
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[ERROR] Failed to update record {r.CreatedRecordId}: {response.StatusCode}");
+                    Console.WriteLine($"[ERROR] Response: {errorContent}");
+                    
+                    // Still try to download PDF even if update fails (in case record already has meeting date)
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        // Record might not exist, skip this one
+                        await JSRuntime.InvokeVoidAsync("alert", $"Warning: Record {r.CreatedRecordId} not found. Skipping PDF generation for {r.Name}.");
+                    }
+                    else
+                    {
+                        // For other errors, still try to generate PDF
+                        recordsToDownload.Add(r.CreatedRecordId!.Value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating record {r.CreatedRecordId}: {ex.Message}");
+            }
+        }
+
+            await LoadClassificationRecords();
+
+            // Download PDF for each student using the API endpoint (direct PDF download)
+            // Use Distinct() to ensure no duplicate downloads
+            var uniqueRecords = recordsToDownload.Distinct().ToList();
+            Console.WriteLine($"[DEBUG] Downloading {uniqueRecords.Count} PDF(s) for records: {string.Join(", ", uniqueRecords)}");
+            
+            // Get the base URL from HttpClient
+            var baseUrl = Http.BaseAddress?.ToString().TrimEnd('/') ?? "";
+            
+            foreach (var recordId in uniqueRecords)
+            {
+                var pdfUrl = $"{baseUrl}/api/StudentProfileCaseRecord/simplified/{recordId}/parent-conference-pdf";
+                Console.WriteLine($"[DEBUG] PDF URL: {pdfUrl}");
+                // Open in new tab - browser will download automatically
+                await JSRuntime.InvokeVoidAsync("open", pdfUrl, "_blank");
+            }
+            
+            // Show success and redirect to POD Dashboard after a short delay
+            showPrintSuccessModal = true;
+            StateHasChanged();
+            
+            await Task.Delay(2000); // Wait for user to see success message
+            NavigationManager.NavigateTo("/pod-dashboard");
+        }
+        finally
+        {
+            isDownloadingPdf = false;
+            StateHasChanged();
+        }
+    }
+
+
+
+
+
+    private void OpenDescriptionModal()
+    {
+        // Parse current description back into fields if it exists
+        if (!string.IsNullOrEmpty(incidentDescription))
+        {
+            var parts = incidentDescription.Split(" | ");
+            if (parts.Length >= 3)
+            {
+                descriptionDate = parts[0].Replace("Date: ", "");
+                descriptionTime = parts[1].Replace("Time: ", "");
+                descriptionLocation = parts[2].Replace("Location: ", "");
+                if (parts.Length >= 4)
+                {
+                    descriptionSummary = parts[3].Replace("Summary: ", "");
+                }
+            }
+        }
+        else
+        {
+            // Initialize with current date/time if empty
+            descriptionDate = incidentDate.ToString("yyyy-MM-dd");
+            descriptionTime = incidentDate.ToString("HH:mm");
+        }
+        showDescriptionModal = true;
+    }
+
+    private void CloseDescriptionModal()
+    {
+        showDescriptionModal = false;
+    }
+
+    private void SaveDescriptionModal()
+    {
+        // Combine fields into a formatted description
+        incidentDescription = $"Date: {descriptionDate} | Time: {descriptionTime} | Location: {descriptionLocation} | Summary: {descriptionSummary}";
+        showDescriptionModal = false;
+    }
+
+    private void ResetWizard() {
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    public class ApiResponse<T> {
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+        public T? Data { get; set; }
+    }
+}

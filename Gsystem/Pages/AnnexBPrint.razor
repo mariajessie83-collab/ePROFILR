@@ -1,0 +1,345 @@
+@page "/forms/annex-b-print/{IncidentId:int}"
+@using SharedProject
+@using System.Text.Json
+@layout Gsystem.Shared.EmptyLayout
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<div class="print-container">
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Loading...</div>
+    }
+    else if (simplifiedRecord == null)
+    {
+        <div class="error-message">Record not found.</div>
+    }
+    else
+    {
+        <div class="text-right mb-4">
+            <h5 class="font-weight-bold">Annex "B"</h5>
+        </div>
+
+        <div class="text-center mb-5">
+            <h4 class="font-weight-bold text-uppercase">Department of Education</h4>
+            <h4 class="font-weight-bold text-uppercase" style="text-decoration: underline;">Intake Sheet</h4>
+        </div>
+
+        <div class="section mb-4">
+            <h5 class="font-weight-bold mb-3">I. INFORMATION:</h5>
+
+            <div class="pl-4 mb-4">
+                <h6 class="font-weight-bold mb-3">A. VICTIM:</h6>
+                
+                <div class="form-group row mb-2 align-items-end">
+                    <label class="col-auto col-form-label">Name:</label>
+                    <div class="col border-bottom border-dark">@(simplifiedRecord.VictimName ?? "No Specific Victim")</div>
+                </div>
+
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <div class="form-group row mb-0 align-items-end">
+                            <label class="col-auto col-form-label">Date of Birth:</label>
+                             <div class="col border-bottom border-dark">&nbsp;</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="form-group row mb-0 align-items-end">
+                            <label class="col-auto col-form-label">Age:</label>
+                             <div class="col border-bottom border-dark">&nbsp;</div>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                         <div class="form-group row mb-0 align-items-end">
+                            <label class="col-auto col-form-label">Sex:</label>
+                            <div class="col border-bottom border-dark">&nbsp;</div>
+                        </div>
+                    </div>
+                </div>
+
+                 <div class="row mb-2">
+                    <div class="col-12">
+                        <div class="form-group row mb-0 align-items-end">
+                            <label class="col-auto col-form-label">Address and Contact Number:</label>
+                            <div class="col border-bottom border-dark">@(simplifiedRecord.VictimContact)</div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (false) // We don't have victim parent data yet
+                {
+                    <div class="mb-2 mt-3">
+                        <label class="col-form-label">Parents:</label>
+                        <div class="pl-4">
+                             <div class="row mb-2">
+                                <div class="col-8">
+                                    <div class="form-group row mb-0 align-items-end">
+                                        <label class="col-auto col-form-label">Mother:</label>
+                                        <div class="col border-bottom border-dark">&nbsp;</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="form-group row mb-0 align-items-end">
+                                        <label class="col-auto col-form-label">Age:</label>
+                                        <div class="col border-bottom border-dark">&nbsp;</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group row mb-2 align-items-end">
+                                <label class="col-auto col-form-label">Occupation:</label>
+                                <div class="col border-bottom border-dark">&nbsp;</div>
+                            </div>
+                            <div class="row mb-2 mt-3">
+                                <div class="col-8">
+                                    <div class="form-group row mb-0 align-items-end">
+                                        <label class="col-auto col-form-label">Father:</label>
+                                        <div class="col border-bottom border-dark">&nbsp;</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="form-group row mb-0 align-items-end">
+                                        <label class="col-auto col-form-label">Age:</label>
+                                        <div class="col border-bottom border-dark">&nbsp;</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group row mb-2 align-items-end">
+                                <label class="col-auto col-form-label">Occupation:</label>
+                                <div class="col border-bottom border-dark">&nbsp;</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="pl-4 mb-4">
+                 <h6 class="font-weight-bold mb-3">B. COMPLAINANT:</h6>
+                  <div class="form-group row mb-2 align-items-end">
+                    <label class="col-auto col-form-label">Name:</label>
+                    <div class="col border-bottom border-dark">@(simplifiedRecord.ComplainantName)</div>
+                </div>
+                 <div class="form-group row mb-2 align-items-end">
+                    <label class="col-auto col-form-label">Address and Contact Number:</label>
+                    <div class="col border-bottom border-dark">@simplifiedRecord.ComplainantContact</div>
+                </div>
+            </div>
+
+            <div class="pl-4 mb-4">
+                <h6 class="font-weight-bold mb-3">C. RESPONDENT:</h6>
+                
+                <div class="mb-3">
+                    <div class="font-italic mb-2">C-2. If respondent is a Student</div>
+                    
+                     <div class="form-group row mb-2 align-items-end">
+                        <label class="col-auto col-form-label">Name:</label>
+                        <div class="col border-bottom border-dark">@simplifiedRecord.RespondentName</div>
+                    </div>
+
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <div class="form-group row mb-0 align-items-end">
+                                <label class="col-auto col-form-label">Date of Birth:</label>
+                                 <div class="col border-bottom border-dark">
+                                     @(simplifiedRecord.DateOfBirth?.ToString("MMMM dd, yyyy") ?? "")
+                                 </div>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="form-group row mb-0 align-items-end">
+                                <label class="col-auto col-form-label">Age:</label>
+                                 <div class="col border-bottom border-dark">
+                                     @(simplifiedRecord.Age?.ToString() ?? "")
+                                 </div>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                             <div class="form-group row mb-0 align-items-end">
+                                <label class="col-auto col-form-label">Sex:</label>
+                                <div class="col border-bottom border-dark">@simplifiedRecord.Sex</div>
+                            </div>
+                        </div>
+                    </div>
+
+                     <div class="row mb-2">
+                        <div class="col-6">
+                            <div class="form-group row mb-0 align-items-end">
+                                <label class="col-auto col-form-label">Gr./Yr and Section:</label>
+                                <div class="col border-bottom border-dark">@simplifiedRecord.GradeLevel - @simplifiedRecord.Section</div>
+                            </div>
+                        </div>
+                         <div class="col-6">
+                            <div class="form-group row mb-0 align-items-end">
+                                <label class="col-auto col-form-label">Adviser:</label>
+                                <div class="col border-bottom border-dark">@simplifiedRecord.AdviserName</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(simplifiedRecord.MothersName) || !string.IsNullOrWhiteSpace(simplifiedRecord.FathersName) || !string.IsNullOrWhiteSpace(simplifiedRecord.GuardianName))
+                    {
+                        <div class="mb-2 mt-2">
+                            <label class="col-form-label">Parents/Guardian:</label>
+                            <div class="pl-4">
+                                @if (!string.IsNullOrWhiteSpace(simplifiedRecord.MothersName))
+                                {
+                                    <div class="row mb-2">
+                                        <div class="col-12">
+                                            <div class="form-group row mb-0 align-items-end">
+                                                <label class="col-auto col-form-label">Mother:</label>
+                                                <div class="col border-bottom border-dark">@simplifiedRecord.MothersName</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(simplifiedRecord.FathersName))
+                                {
+                                    <div class="row mb-2 mt-2">
+                                        <div class="col-12">
+                                            <div class="form-group row mb-0 align-items-end">
+                                                <label class="col-auto col-form-label">Father:</label>
+                                                <div class="col border-bottom border-dark">@simplifiedRecord.FathersName</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(simplifiedRecord.GuardianName))
+                                {
+                                    <div class="row mb-2 mt-2">
+                                        <div class="col-12">
+                                            <div class="form-group row mb-0 align-items-end">
+                                                <label class="col-auto col-form-label">Guardian:</label>
+                                                <div class="col border-bottom border-dark">@simplifiedRecord.GuardianName</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="section mb-4">
+            <h5 class="font-weight-bold mb-3">II. DETAILS OF THE CASE:</h5>
+            @foreach(var line in GetDescriptionLines())
+            {
+                 <div class="border-bottom border-dark mb-2" style="height: 25px;">@line</div>
+            }
+             @for(int i=0; i<Math.Max(1, 5 - GetDescriptionLines().Count()); i++)
+            {
+                <div class="border-bottom border-dark mb-2" style="height: 25px;">&nbsp;</div>
+            }
+        </div>
+
+        <div class="section mb-4">
+             <h5 class="font-weight-bold mb-3">III. ACTION TAKEN:</h5>
+            <div class="pl-4">
+                 <div class="border-bottom border-dark mb-2" style="min-height: 25px;">@simplifiedRecord.Agreement</div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-6 offset-6 text-center">
+                 <div class="mb-4 text-left">
+                    <span class="font-weight-bold">Prepared by:</span>
+                 </div>
+                <div class="border-bottom border-dark font-weight-bold mb-1" style="min-height: 25px;">
+                    PREFECT OF DISCIPLINE
+                </div>
+                <div class="mb-4">Designation</div>
+                <div class="border-bottom border-dark font-weight-bold mb-1" style="min-height: 25px;">
+                   @DateTime.Now.ToShortDateString()
+                </div>
+                <div>Date</div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .print-container {
+        font-family: Arial, sans-serif;
+        padding: 30px 40px;
+        background: white;
+        max-width: 900px;
+        margin: 0 auto;
+        font-size: 14px;
+        color: black;
+    }
+    .form-group {
+        margin-bottom: 0px; 
+    }
+    .border-dark {
+        border-color: black !important;
+    }
+    .border-bottom {
+        border-bottom: 1px solid black;
+    }
+    h4, h5, h6 {
+        color: black;
+    }
+    @@media print {
+        @@page { margin: 0.5in; size: portrait; }
+        .print-container { width: 100%; max-width: none; padding: 0; margin: 0; }
+        .no-print { display: none; }
+        body { background: white; -webkit-print-color-adjust: exact; }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int IncidentId { get; set; }
+
+    private SimplifiedStudentProfileCaseRecordModel? simplifiedRecord;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadSimplifiedRecord();
+            if (simplifiedRecord != null)
+            {
+                // Trigger print
+                await JSRuntime.InvokeVoidAsync("print");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading form: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadSimplifiedRecord()
+    {
+        var response = await Http.GetAsync($"api/StudentProfileCaseRecord/simplified-incident-id/{IncidentId}");
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(content);
+            if (result.TryGetProperty("success", out var success) && success.GetBoolean())
+            {
+                simplifiedRecord = JsonSerializer.Deserialize<SimplifiedStudentProfileCaseRecordModel>(result.GetProperty("data").GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+    }
+
+    private IEnumerable<string> GetDescriptionLines()
+    {
+        string desc = simplifiedRecord?.Description ?? "";
+        if (string.IsNullOrEmpty(desc)) return new List<string>();
+
+        var lines = new List<string>();
+        for (int i = 0; i < desc.Length; i += 80)
+        {
+            lines.Add(desc.Substring(i, Math.Min(80, desc.Length - i)));
+        }
+        return lines;
+    }
+}

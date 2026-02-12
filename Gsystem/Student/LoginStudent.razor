@@ -1,0 +1,461 @@
+@page "/login/student"
+@layout Gsystem.Layout.SimpleLayout
+@using System.Text.Json
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using SharedProject
+@using Blazored.LocalStorage
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService localStorage
+
+<PageTitle>Student Login</PageTitle>
+
+<!-- Sky Background -->
+<div class="sky-background">
+    <div class="clouds"></div>
+    <div class="airplanes-container">
+        <!-- Paper Planes (SVG Backgrounds) -->
+        <div class="paper-plane plane-1"></div>
+        <div class="paper-plane plane-2"></div>
+        <div class="paper-plane plane-3"></div>
+        <div class="paper-plane plane-4"></div>
+        <div class="paper-plane plane-5"></div>
+    </div>
+</div>
+
+@if (isTeacherAccessingStudentPage)
+{
+    <div class="teacher-access-warning" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    ">
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        ">
+            <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
+            <h3 style="color: #d32f2f; margin-bottom: 15px;">Access Restricted</h3>
+            <p style="color: #666; margin-bottom: 20px;">
+                Teachers cannot access the student login page. You will be redirected to the teacher login page.
+            </p>
+            <div style="color: #999; font-size: 14px;">
+                Redirecting in 3 seconds...
+            </div>
+        </div>
+    </div>
+}
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <h2>Student Login</h2>
+            <p>Enter your student credentials to access your account</p>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="loading-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <div class="spinner" style="width: 60px; height: 60px; border: 6px solid #f3f3f3; border-top: 6px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="color: white; margin-top: 20px; font-size: 20px; font-weight: bold;">Logging in...</p>
+                <p style="color: white; margin-top: 10px; font-size: 14px;">Please wait...</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isSuccess ? "alert-success" : "alert-error")">
+                @message
+            </div>
+        }
+
+        <!-- Snackbar -->
+        @if (showSnackbar)
+        {
+            <div class="snackbar @snackbarType" style="position: fixed; bottom: 20px; right: 20px; background: @(snackbarType == "success" ? "#4CAF50" : "#f44336"); color: white; padding: 16px 24px; border-radius: 4px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10000; animation: slideIn 0.3s ease-out;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>@snackbarMessage</span>
+                    <button @onclick="HideSnackbar" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; margin-left: 8px;">&times;</button>
+                </div>
+            </div>
+        }
+
+        <!-- Login Form -->
+        <form class="login-form" @onsubmit="HandleLogin" @key="@loginFormKey">
+            <div class="form-group">
+                <label for="studentId">Student ID</label>
+                <input type="text" id="studentId" class="form-control" placeholder="Enter your student ID" @bind="loginRequest.Username" required />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <div class="password-input-wrapper">
+                    <input type="@(showPassword ? "text" : "password")" id="password" class="form-control" placeholder="Enter your password" @bind="loginRequest.Password" required />
+                    <button type="button" class="password-toggle-btn" @onclick="() => showPassword = !showPassword">
+                        @(showPassword ? "👁️" : "👁️‍🗨️")
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="rememberMe" />
+                    <span class="checkmark"></span>
+                    Remember me
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-login" disabled="@isLoading">@(isLoading ? "Logging in..." : "Login")</button>
+        </form>
+
+        <div class="login-footer">
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isTeacherAccessingStudentPage = false;
+    private LoginRequest loginRequest = new();
+    private bool rememberMe = false;
+    private bool isLoading = false;
+    private bool isSuccess = false;
+    private string message = string.Empty;
+    private string loginFormKey = Guid.NewGuid().ToString();
+    private bool showSnackbar = false;
+    private string snackbarMessage = string.Empty;
+    private string snackbarType = "success";
+    private bool showPassword = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckIfTeacherIsAccessingStudentPage();
+    }
+
+    private async Task CheckIfTeacherIsAccessingStudentPage()
+    {
+        try
+        {
+            // Check if there's an active session flag - if not, browser was closed and reopened
+            var hasActiveSession = await JSRuntime.InvokeAsync<string>("sessionStorage.getItem", "hasActiveSession");
+            
+            var userRole = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userRole");
+            var authToken = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var userPosition = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "userPosition");
+            var lastLoginType = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "lastLoginType");
+            
+            // If no active session flag, browser was closed - clear all old data and allow access
+            if (string.IsNullOrEmpty(hasActiveSession))
+            {
+                // Browser was closed, clear all teacher-related data
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userPosition");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "teacherName");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+                
+                // Allow access to student login page without showing modal
+                isTeacherAccessingStudentPage = false;
+                return;
+            }
+            
+            // Only block if user is actively logged in as teacher (has valid auth token AND active session)
+            if (!string.IsNullOrEmpty(authToken) && userRole == "teacher")
+            {
+                isTeacherAccessingStudentPage = true;
+                StateHasChanged();
+                
+                // Redirect to teacher login page after showing message
+                await Task.Delay(3000);
+                NavigationManager.NavigateTo("/login/teacher");
+            }
+            // If user has teacher role but no auth token, they're logged out - clear the data and allow access
+            else if (!string.IsNullOrEmpty(userRole) && userRole == "teacher" && string.IsNullOrEmpty(authToken))
+            {
+                // Clear the old teacher data since they're logged out
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userPosition");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "teacherName");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+                
+                // Allow access to student login page
+                isTeacherAccessingStudentPage = false;
+            }
+            // If no auth token, allow access regardless of old stored data
+            else if (string.IsNullOrEmpty(authToken))
+            {
+                // No active session, allow access
+                isTeacherAccessingStudentPage = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            // On error, allow access
+            isTeacherAccessingStudentPage = false;
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        message = string.Empty;
+        StateHasChanged(); // Force UI update to show loading spinner
+
+        try
+        {
+            var json = JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, new MediaTypeHeaderValue("application/json"));
+
+            // Debug: Log the login request
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== LOGIN REQUEST DEBUG ===");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Username: {loginRequest.Username}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Password: [HIDDEN]");
+            await JSRuntime.InvokeVoidAsync("console.log", $"JSON: {json}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== END REQUEST DEBUG ===");
+
+            var response = await Http.PostAsync("/api/Auth/login", content);
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            // Debug: Log the response
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== LOGIN RESPONSE DEBUG ===");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Status Code: {response.StatusCode}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Is Success: {response.IsSuccessStatusCode}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"Response Content: {responseContent}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"=== END RESPONSE DEBUG ===");
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Parse the response to check if the user is actually a student
+                try
+                {
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    
+                    if (result.TryGetProperty("data", out var data) && data.TryGetProperty("userRole", out var userRole))
+                    {
+                        var role = userRole.GetString();
+                        
+                        // Check if the user is a teacher trying to login on student page
+                        if (role == "teacher")
+                        {
+                            isLoading = false;
+                            StateHasChanged();
+                            ShowMessage("Access denied. Teachers cannot login on the student page. Please use the teacher login page.", false);
+                            return;
+                        }
+                        
+                        // Only proceed if user is actually a student
+                        if (role == "student")
+                        {
+                            // Get StudentName from the response if available (try all possible property name variations)
+                            var studentName = loginRequest.Username; // Default to username
+                            
+                            // Debug: log the response to see what we're getting
+                            await JSRuntime.InvokeVoidAsync("console.log", "=== LOGIN DATA DEBUG ===");
+                            await JSRuntime.InvokeVoidAsync("console.log", $"Full login response: {responseContent}");
+                            
+                            // Try to get StudentName - check all possible property name formats
+                            if (data.TryGetProperty("StudentName", out var studentNameProp))
+                            {
+                                studentName = studentNameProp.GetString() ?? loginRequest.Username;
+                                Console.WriteLine($"Found StudentName (capital): {studentName}");
+                            }
+                            else if (data.TryGetProperty("studentName", out var studentNamePropLower))
+                            {
+                                studentName = studentNamePropLower.GetString() ?? loginRequest.Username;
+                                Console.WriteLine($"Found studentName (lowercase): {studentName}");
+                            }
+                            else
+                            {
+                                // Enumerate all properties to find StudentName (case-insensitive)
+                                foreach (var prop in data.EnumerateObject())
+                                {
+                                    Console.WriteLine($"Property in data: {prop.Name} = {prop.Value}");
+                                    if (string.Equals(prop.Name, "StudentName", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        studentName = prop.Value.GetString() ?? loginRequest.Username;
+                                        Console.WriteLine($"Found StudentName via enumeration: {studentName}");
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Verify we have a valid student name (not empty and not just username)
+                            if (string.IsNullOrWhiteSpace(studentName) || studentName == loginRequest.Username)
+                            {
+                                Console.WriteLine($"Warning: StudentName not found in response, using username: {loginRequest.Username}");
+                                await JSRuntime.InvokeVoidAsync("console.log", $"WARNING: StudentName not found, using username as fallback");
+                            }
+                            
+                            Console.WriteLine($"Final studentName to store: {studentName}");
+                            await JSRuntime.InvokeVoidAsync("console.log", $"Final studentName to store: {studentName}");
+                            await JSRuntime.InvokeVoidAsync("console.log", "=== END LOGIN DATA DEBUG ===");
+                            
+                            // Store authentication data using both Blazored.LocalStorage and JavaScript localStorage as fallback
+                            var authToken = "student_token_" + DateTime.Now.Ticks;
+                            
+                            try
+                            {
+                                await localStorage.SetItemAsStringAsync("authToken", authToken);
+                                await localStorage.SetItemAsStringAsync("userRole", "student");
+                                await localStorage.SetItemAsStringAsync("username", loginRequest.Username);
+                                await localStorage.SetItemAsStringAsync("userFullName", studentName);
+                                await localStorage.SetItemAsStringAsync("lastLoginType", "student");
+                            }
+                            catch
+                            {
+                                // Fallback to JavaScript localStorage if Blazored.LocalStorage fails
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", authToken);
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userRole", "student");
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "username", loginRequest.Username);
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "userFullName", studentName);
+                                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "lastLoginType", "student");
+                            }
+                            
+                            // Verify data was saved
+                            await JSRuntime.InvokeVoidAsync("console.log", "=== LOGIN SUCCESS - VERIFYING STORAGE ===");
+                            await JSRuntime.InvokeVoidAsync("eval", "console.log('AuthToken saved:', localStorage.getItem('authToken'))");
+                            await JSRuntime.InvokeVoidAsync("eval", "console.log('Username saved:', localStorage.getItem('username'))");
+                            await JSRuntime.InvokeVoidAsync("eval", "console.log('UserRole saved:', localStorage.getItem('userRole'))");
+                            await JSRuntime.InvokeVoidAsync("console.log", "=== END VERIFICATION ===");
+                            
+                            ShowMessage("Login successful!", true);
+                            
+                            // Set navigation flag to prevent SimpleLayout from clearing localStorage
+                            await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "isNavigating", "true");
+                            
+                            // Set session flag to prevent logout on navigation
+                            await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "hasActiveSession", "true");
+                            
+                            // Small delay to ensure sessionStorage is written
+                            await Task.Delay(150);
+
+                            // Redirect to home page after successful login (without force reload)
+                            NavigationManager.NavigateTo("/", false); // Navigate without forcing reload
+                            
+                            // Clear navigation flag after a delay
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(2000);
+                                await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "isNavigating");
+                            });
+                        }
+                        else
+                        {
+                            ShowMessage("Access denied. Only students can login on this page.", false);
+                        }
+                    }
+                    else
+                    {
+                        ShowMessage("Login failed. Invalid response from server.", false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ShowMessage($"Error processing login response: {ex.Message}", false);
+                }
+            }
+            else
+            {
+                ShowMessage("Login failed. Please check your credentials.", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"An error occurred: {ex.Message}", false);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged(); // Force UI update to hide loading spinner
+        }
+    }
+
+    private void ShowMessage(string msg, bool success)
+    {
+        message = msg;
+        isSuccess = success;
+        isLoading = false; // Reset loading state when showing message
+        StateHasChanged();
+    }
+
+    private void ShowSnackbar(string message, string type)
+    {
+        snackbarMessage = message;
+        snackbarType = type;
+        showSnackbar = true;
+        StateHasChanged();
+
+        // Auto-hide after 5 seconds using Task.Run to avoid blocking
+        Task.Run(async () =>
+        {
+            await Task.Delay(5000);
+            await InvokeAsync(() =>
+            {
+                HideSnackbar();
+            });
+        });
+    }
+
+    private void HideSnackbar()
+    {
+        showSnackbar = false;
+        snackbarMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task ClearAllAuthData()
+    {
+        // Clear all localStorage items using Blazored.LocalStorage
+        await localStorage.RemoveItemAsync("authToken");
+        await localStorage.RemoveItemAsync("userRole");
+        await localStorage.RemoveItemAsync("username");
+        await localStorage.RemoveItemAsync("userFullName");
+        await localStorage.RemoveItemAsync("userPosition");
+        await localStorage.RemoveItemAsync("teacherName");
+        await localStorage.RemoveItemAsync("lastLoginType");
+        
+        // Also clear using JavaScript as fallback
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userRole");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "username");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userFullName");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "userPosition");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "teacherName");
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "lastLoginType");
+        
+        // Clear session storage
+        await JSRuntime.InvokeVoidAsync("sessionStorage.clear");
+    }
+}
+<script>
+    // Global function to clear all authentication data (only called on explicit logout)
+    window.clearAllAuthData = function() {
+        console.log('Clearing all authentication data...');
+        
+        // Clear localStorage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userFullName');
+        localStorage.removeItem('userPosition');
+        localStorage.removeItem('teacherName');
+        localStorage.removeItem('lastLoginType');
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        console.log('All authentication data cleared');
+    };
+</script>
