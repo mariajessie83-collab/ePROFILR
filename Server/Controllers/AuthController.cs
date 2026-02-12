@@ -184,7 +184,7 @@ namespace Server.Controllers
                 // First, check if user exists and get basic info
                 var userQuery = @"
                     SELECT u.UserID, u.Username, u.UserRole, u.IsActive
-                    FROM Users u
+                    FROM users u
                     WHERE u.Username = @Username AND u.Password = @Password AND u.IsActive = 1";
 
                 using var userCommand = new MySqlCommand(userQuery, connection);
@@ -209,8 +209,8 @@ namespace Server.Controllers
                         // Get teacher-specific information including TeacherID and School Details
                         var teacherQuery = @"
                             SELECT t.TeacherID, t.TeacherName, t.Position, s.SchoolName, s.Region, s.Division, s.District, s.School_ID
-                            FROM Teachers t
-                            LEFT JOIN Schools s ON t.SchoolID = s.SchoolID
+                            FROM teachers t
+                            LEFT JOIN schools s ON t.SchoolID = s.SchoolID
                             WHERE t.UserID = @UserID AND t.IsActive = 1";
 
                         using var teacherCommand = new MySqlCommand(teacherQuery, connection);
@@ -254,7 +254,7 @@ namespace Server.Controllers
                         // Get student-specific information
                         var studentQuery = @"
                             SELECT StudentName, GradeLevel, Section
-                            FROM Students
+                            FROM students
                             WHERE UserID = @UserID AND IsActive = 1";
 
                         using var studentCommand = new MySqlCommand(studentQuery, connection);
@@ -293,7 +293,7 @@ namespace Server.Controllers
                         // Get admin account information
                         var adminQuery = @"
                             SELECT AdminAccountID, AccountType, FullName, SchoolName, Division, Region, District, DivisionName
-                            FROM AdminAccounts
+                            FROM adminaccounts
                             WHERE UserID = @UserID AND IsActive = 1";
 
                         using var adminCommand = new MySqlCommand(adminQuery, connection);

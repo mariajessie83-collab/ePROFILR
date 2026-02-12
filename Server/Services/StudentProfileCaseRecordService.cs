@@ -33,8 +33,8 @@ namespace Server.Services
                 var query = @"
                     SELECT t.TeacherID, t.TeacherName, t.Position, t.GradeLevel, t.Section, t.Strand,
                            COALESCE(s.SchoolName, t.SchoolName) as SchoolName
-                    FROM Teachers t 
-                    INNER JOIN Users u ON t.UserID = u.UserID
+                    FROM teachers t 
+                    INNER JOIN users u ON t.UserID = u.UserID
                     LEFT JOIN schools s ON t.SchoolID = s.SchoolID
                     WHERE t.IsActive = 1 AND u.IsActive = 1 
                     AND (t.TeacherName LIKE @SearchTerm OR t.Position LIKE @SearchTerm)";
@@ -118,7 +118,7 @@ namespace Server.Services
                 // Robust approach to column names: fetch common columns first
                 var studentQuery = @"
                     SELECT *
-                    FROM Students s
+                    FROM students s
                     LEFT JOIN schools sc ON s.SchoolID = sc.SchoolID
                     WHERE s.IsActive = 1
                       AND (
@@ -310,7 +310,7 @@ namespace Server.Services
 
                 var query = @"
                     SELECT ViolationName 
-                    FROM ViolationTypes 
+                    FROM violationtypes 
                     WHERE IsActive = 1";
 
                 if (!string.IsNullOrEmpty(category))
@@ -360,7 +360,7 @@ namespace Server.Services
                 // Also try exact match first, then case-insensitive
                 var query = @"
                     SELECT ViolationCategory 
-                    FROM ViolationTypes 
+                    FROM violationtypes 
                     WHERE (ViolationName = @ViolationName 
                            OR LOWER(TRIM(ViolationName)) = LOWER(TRIM(@ViolationName)))
                     AND (IsActive = 1 OR IsActive IS NULL)
@@ -424,7 +424,7 @@ namespace Server.Services
 
                 var countQuery = @"
                     SELECT COUNT(*)
-                    FROM StudentProfileCaseRecords
+                    FROM studentprofilecaserecords
                     WHERE IsActive = 1";
 
                 if (!string.IsNullOrEmpty(status))
@@ -465,14 +465,14 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 // First check total count without filters to see if there are any records
-                var countQuery = "SELECT COUNT(*) FROM StudentProfileCaseRecords";
+                var countQuery = "SELECT COUNT(*) FROM studentprofilecaserecords";
                 using var countCommand = new MySqlCommand(countQuery, connection);
                 var totalCount = await countCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total records in database (without filters): {TotalCount}", totalCount);
 
                 var query = @"
                     SELECT RecordID, IncidentID, StudentOffenderName, GradeLevel, Section, ViolationCommitted, LevelOfOffense, DateOfOffense, Status
-                    FROM StudentProfileCaseRecords
+                    FROM studentprofilecaserecords
                     WHERE (IsActive = 1 OR IsActive IS NULL)";
 
                 if (!string.IsNullOrEmpty(status))
@@ -542,8 +542,8 @@ namespace Server.Services
                 var query = @"
                     SELECT DISTINCT cr.RecordID, cr.IncidentID, cr.StudentOffenderName, cr.GradeLevel, cr.Section, 
                            cr.ViolationCommitted, cr.LevelOfOffense, cr.DateOfOffense, cr.Status
-                    FROM StudentProfileCaseRecords cr
-                    INNER JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    INNER JOIN students s ON 
                         UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName))
                         AND UPPER(TRIM(cr.GradeLevel)) = UPPER(TRIM(s.GradeLevel))
                         AND UPPER(TRIM(cr.Section)) = UPPER(TRIM(s.Section))
@@ -573,14 +573,14 @@ namespace Server.Services
                     teacherId, (page - 1) * pageSize, pageSize, status ?? "all");
 
                 // Debug: Check if there are any students for this teacher
-                var studentCountQuery = "SELECT COUNT(*) FROM Students WHERE TeacherID = @TeacherID AND IsActive = 1";
+                var studentCountQuery = "SELECT COUNT(*) FROM students WHERE TeacherID = @TeacherID AND IsActive = 1";
                 using var studentCountCommand = new MySqlCommand(studentCountQuery, connection);
                 studentCountCommand.Parameters.AddWithValue("@TeacherID", teacherId);
                 var studentCount = await studentCountCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total students for teacher {TeacherID}: {StudentCount}", teacherId, studentCount);
 
                 // Debug: Check if there are any case records
-                var caseCountQuery = "SELECT COUNT(*) FROM StudentProfileCaseRecords WHERE (IsActive = 1 OR IsActive IS NULL)";
+                var caseCountQuery = "SELECT COUNT(*) FROM studentprofilecaserecords WHERE (IsActive = 1 OR IsActive IS NULL)";
                 using var caseCountCommand = new MySqlCommand(caseCountQuery, connection);
                 var caseCount = await caseCountCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total case records in database: {CaseCount}", caseCount);
@@ -632,8 +632,8 @@ namespace Server.Services
                 var query = @"
                     SELECT DISTINCT cr.RecordID, cr.IncidentID, cr.StudentOffenderName, cr.GradeLevel, cr.Section, 
                            cr.ViolationCommitted, cr.LevelOfOffense, cr.DateOfOffense, cr.Status
-                    FROM StudentProfileCaseRecords cr
-                    INNER JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    INNER JOIN students s ON 
                         UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName))
                         AND UPPER(TRIM(cr.GradeLevel)) = UPPER(TRIM(s.GradeLevel))
                         AND UPPER(TRIM(cr.Section)) = UPPER(TRIM(s.Section))
@@ -664,14 +664,14 @@ namespace Server.Services
                     teacherId, (page - 1) * pageSize, pageSize, status ?? "all");
 
                 // Debug: Check if there are any students for this teacher
-                var studentCountQuery = "SELECT COUNT(*) FROM Students WHERE TeacherID = @TeacherID AND IsActive = 1";
+                var studentCountQuery = "SELECT COUNT(*) FROM students WHERE TeacherID = @TeacherID AND IsActive = 1";
                 using var studentCountCommand = new MySqlCommand(studentCountQuery, connection);
                 studentCountCommand.Parameters.AddWithValue("@TeacherID", teacherId);
                 var studentCount = await studentCountCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total students for teacher {TeacherID}: {StudentCount}", teacherId, studentCount);
 
                 // Debug: Check if there are any minor case records
-                var caseCountQuery = "SELECT COUNT(*) FROM StudentProfileCaseRecords WHERE (IsActive = 1 OR IsActive IS NULL) AND UPPER(TRIM(LevelOfOffense)) = 'MINOR'";
+                var caseCountQuery = "SELECT COUNT(*) FROM studentprofilecaserecords WHERE (IsActive = 1 OR IsActive IS NULL) AND UPPER(TRIM(LevelOfOffense)) = 'MINOR'";
                 using var caseCountCommand = new MySqlCommand(caseCountQuery, connection);
                 var caseCount = await caseCountCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total minor case records in database: {CaseCount}", caseCount);
@@ -716,7 +716,7 @@ namespace Server.Services
 
                 var query = @"
                     SELECT COUNT(*) 
-                    FROM StudentProfileCaseRecords 
+                    FROM studentprofilecaserecords 
                     WHERE UPPER(TRIM(StudentOffenderName)) = UPPER(TRIM(@StudentName))
                       AND (IsActive = 1 OR IsActive IS NULL)";
 
@@ -762,8 +762,8 @@ namespace Server.Services
                 // - Name contains the search term
                 var query = @"
                     SELECT RecordID, IncidentID, StudentOffenderName, GradeLevel, Section, ViolationCommitted, LevelOfOffense, DateOfOffense, Status, DetailsOfAgreement,
-                           (SELECT Gender FROM Students WHERE UPPER(TRIM(StudentName)) = UPPER(TRIM(StudentProfileCaseRecords.StudentOffenderName)) LIMIT 1) as Sex
-                    FROM StudentProfileCaseRecords
+                           (SELECT Gender FROM students WHERE UPPER(TRIM(StudentName)) = UPPER(TRIM(studentprofilecaserecords.StudentOffenderName)) LIMIT 1) as Sex
+                    FROM studentprofilecaserecords
                     WHERE (
                         -- Exact match
                         UPPER(TRIM(StudentOffenderName)) = UPPER(TRIM(@StudentName))
@@ -852,8 +852,8 @@ namespace Server.Services
                 var query = @"
                     SELECT DISTINCT cr.RecordID, cr.IncidentID, cr.StudentOffenderName, cr.GradeLevel, cr.Section, 
                            cr.ViolationCommitted, cr.LevelOfOffense, cr.DateOfOffense, cr.Status, cr.DetailsOfAgreement
-                    FROM StudentProfileCaseRecords cr
-                    INNER JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    INNER JOIN students s ON 
                         (
                             -- Match by student name (case-insensitive, trimmed)
                             UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName))
@@ -861,7 +861,7 @@ namespace Server.Services
                             OR UPPER(TRIM(cr.StudentOffenderName)) LIKE CONCAT('%', UPPER(TRIM(s.StudentName)), '%')
                             OR UPPER(TRIM(s.StudentName)) LIKE CONCAT('%', UPPER(TRIM(cr.StudentOffenderName)), '%')
                         )
-                    INNER JOIN Users u ON s.UserID = u.UserID
+                    INNER JOIN users u ON s.UserID = u.UserID
                     WHERE u.Username = @Username
                       AND s.IsActive = 1
                       AND (cr.IsActive = 1 OR cr.IsActive IS NULL)
@@ -914,7 +914,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var query = @"
-                    INSERT INTO StudentProfileCaseRecords (
+                    INSERT INTO studentprofilecaserecords (
                         IncidentID, StudentOffenderName, GradeLevel, TrackStrand, Section,
                         AdviserName, FathersName, MothersName, ParentGuardianName, ParentGuardianContact,
                         DateOfOffense, LevelOfOffense, ViolationCommitted, OtherViolationDescription,
@@ -980,7 +980,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var query = @"
-                    UPDATE StudentProfileCaseRecords 
+                    UPDATE studentprofilecaserecords 
                     SET StudentOffenderName = @StudentOffenderName,
                         GradeLevel = @GradeLevel,
                         TrackStrand = @TrackStrand,
@@ -1048,8 +1048,8 @@ namespace Server.Services
                            COALESCE(sc.SchoolName, s.SchoolName) AS SchoolName,
                            sc.Region, sc.Division, sc.District,
                            s.StudentName AS FullStudentName
-                    FROM StudentProfileCaseRecords cr
-                    LEFT JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    LEFT JOIN students s ON 
                         (UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName)) 
                          OR UPPER(TRIM(cr.StudentOffenderName)) LIKE CONCAT('%', UPPER(TRIM(s.StudentName)), '%')
                          OR UPPER(TRIM(s.StudentName)) LIKE CONCAT('%', UPPER(TRIM(cr.StudentOffenderName)), '%'))
@@ -1125,7 +1125,7 @@ namespace Server.Services
                 {
                     var adviserQuery = @"
                         SELECT TeacherName
-                        FROM Teachers
+                        FROM teachers
                         WHERE TeacherID = @TeacherID
                           AND IsActive = 1
                         LIMIT 1";
@@ -1143,7 +1143,7 @@ namespace Server.Services
 
                 var fallbackQuery = @"
                     SELECT TeacherName
-                    FROM Teachers
+                    FROM teachers
                     WHERE IsActive = 1
                       AND UPPER(TRIM(Position)) IN ('ADVISER', 'CLASS ADVISER', 'CLASSADVISER')
                       AND (@GradeLevel IS NULL OR UPPER(TRIM(GradeLevel)) = UPPER(TRIM(@GradeLevel)))
@@ -1185,7 +1185,7 @@ namespace Server.Services
                 // First try to get student data directly from Students table
                 var studentDataQuery = @"
                     SELECT *
-                    FROM Students s
+                    FROM students s
                     LEFT JOIN schools sc ON s.SchoolID = sc.SchoolID
                     WHERE s.IsActive = 1
                       AND (
@@ -1262,7 +1262,7 @@ namespace Server.Services
                 // Now get incident report data
                 var query = @"
                     SELECT ir.IncidentID, ir.RespondentName, ir.AdviserName, ir.DateReported
-                    FROM IncidentReports ir
+                    FROM incidentreports ir
                     WHERE UPPER(TRIM(ir.RespondentName)) = UPPER(TRIM(@StudentName))
                       AND ir.IsActive = 1";
 
@@ -1328,7 +1328,7 @@ namespace Server.Services
                 // Try StudentProfileCaseRecords first
                 var query1 = @"
                     SELECT GradeLevel, Section, TrackStrand, DateReported
-                    FROM StudentProfileCaseRecords
+                    FROM studentprofilecaserecords
                     WHERE UPPER(TRIM(StudentOffenderName)) = UPPER(TRIM(@StudentName))
                     ORDER BY DateReported DESC
                     LIMIT 1";
@@ -1353,7 +1353,7 @@ namespace Server.Services
                 // Try SimplifiedStudentProfileCaseRecords if not found or if we want the absolute latest
                 var query2 = @"
                     SELECT GradeLevel, Section, TrackStrand, DateCreated
-                    FROM SimplifiedStudentProfileCaseRecords
+                    FROM simplifiedstudentprofilecaserecords
                     WHERE UPPER(TRIM(RespondentName)) = UPPER(TRIM(@StudentName))
                     ORDER BY DateCreated DESC
                     LIMIT 1";
@@ -1406,8 +1406,8 @@ namespace Server.Services
                 var majorProhibitedQuery = @"
                     SELECT cr.RecordID, cr.IncidentID, cr.StudentOffenderName, cr.GradeLevel, cr.Section, 
                            cr.ViolationCommitted, cr.LevelOfOffense, cr.DateOfOffense, cr.Status, s.Gender as Sex
-                    FROM StudentProfileCaseRecords cr
-                    LEFT JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    LEFT JOIN students s ON 
                         UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName))
                         AND UPPER(TRIM(cr.GradeLevel)) = UPPER(TRIM(s.GradeLevel))
                         AND UPPER(TRIM(cr.Section)) = UPPER(TRIM(s.Section))
@@ -1467,7 +1467,7 @@ namespace Server.Services
                            MIN(DateOfOffense) as FirstOffense,
                            MAX(DateOfOffense) as LatestOffense,
                            MAX(Status) as Status
-                    FROM StudentProfileCaseRecords
+                    FROM studentprofilecaserecords
                     WHERE (IsActive = 1 OR IsActive IS NULL)
                       AND UPPER(TRIM(LevelOfOffense)) = 'MINOR'";
 
@@ -1552,7 +1552,7 @@ namespace Server.Services
                 // Use SimplifiedStudentProfileCaseRecords table (the new table)
                 var query = @"
                     SELECT DISTINCT IncidentID 
-                    FROM SimplifiedStudentProfileCaseRecords 
+                    FROM simplifiedstudentprofilecaserecords 
                     WHERE (IsActive = 1 OR IsActive IS NULL) AND IncidentID IS NOT NULL";
 
                 using var command = new MySqlCommand(query, connection);
@@ -1581,8 +1581,8 @@ namespace Server.Services
                     SELECT cr.*, 
                            COALESCE(sc.SchoolName, s.SchoolName) AS SchoolName,
                            sc.Region, sc.Division, sc.District
-                    FROM StudentProfileCaseRecords cr
-                    LEFT JOIN Students s ON 
+                    FROM studentprofilecaserecords cr
+                    LEFT JOIN students s ON 
                         (UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName)) 
                          OR UPPER(TRIM(cr.StudentOffenderName)) LIKE CONCAT('%', UPPER(TRIM(s.StudentName)), '%')
                          OR UPPER(TRIM(s.StudentName)) LIKE CONCAT('%', UPPER(TRIM(cr.StudentOffenderName)), '%'))
@@ -1638,7 +1638,7 @@ namespace Server.Services
                 using var connection = new MySqlConnection(connectionString);
                 await connection.OpenAsync();
 
-                var query = "SELECT COUNT(*) FROM StudentProfileCaseRecords WHERE StudentOffenderName = @StudentName AND (IsActive = 1 OR IsActive IS NULL)";
+                var query = "SELECT COUNT(*) FROM studentprofilecaserecords WHERE StudentOffenderName = @StudentName AND (IsActive = 1 OR IsActive IS NULL)";
                 using var command = new MySqlCommand(query, connection);
                 command.Parameters.AddWithValue("@StudentName", studentName);
 
@@ -1661,7 +1661,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var query = @"
-                    INSERT INTO SimplifiedStudentProfileCaseRecords (
+                    INSERT INTO simplifiedstudentprofilecaserecords (
                         IncidentID, EscalationID, RespondentName, DateOfOffense, ViolationCommitted, 
                         ViolationCategory, Description, EvidencePhotoBase64, StudentSignatureBase64, 
                         DateOfBirth, Age, Sex, Address, GradeLevel, TrackStrand, Section, AdviserName, 
@@ -1692,9 +1692,9 @@ namespace Server.Services
                     try 
                     {
                         var getMinorsQuery = @"SELECT IncidentType, DateReported 
-                                              FROM SimplifiedIncidentReports 
+                                              FROM simplifiedincidentreports 
                                               WHERE RespondentName = @RespondentName 
-                                              AND IncidentType IN (SELECT ViolationName FROM ViolationTypes WHERE ViolationCategory = 'Minor')
+                                              AND IncidentType IN (SELECT ViolationName FROM violationtypes WHERE ViolationCategory = 'Minor')
                                               ORDER BY DateReported DESC
                                               LIMIT 5";
                                               
@@ -1772,7 +1772,7 @@ namespace Server.Services
                     _logger.LogInformation("Syncing respondent name to SimplifiedIncidentReports for IncidentID: {IncidentID}", request.IncidentID.Value);
                     
                     // Get current RespondentName from incident report
-                    var getIncidentQuery = "SELECT RespondentName FROM SimplifiedIncidentReports WHERE IncidentID = @IncidentID";
+                    var getIncidentQuery = "SELECT RespondentName FROM simplifiedincidentreports WHERE IncidentID = @IncidentID";
                     using var getCmd = new MySqlCommand(getIncidentQuery, connection);
                     getCmd.Parameters.AddWithValue("@IncidentID", request.IncidentID.Value);
                     
@@ -1825,7 +1825,7 @@ namespace Server.Services
                             var updatedRespondentName = string.Join("; ", respondents);
                             
                             // Update the incident report with the corrected name
-                            var updateIncidentQuery = "UPDATE SimplifiedIncidentReports SET RespondentName = @RespondentName WHERE IncidentID = @IncidentID";
+                            var updateIncidentQuery = "UPDATE simplifiedincidentreports SET RespondentName = @RespondentName WHERE IncidentID = @IncidentID";
                             using var updateCmd = new MySqlCommand(updateIncidentQuery, connection);
                             updateCmd.Parameters.AddWithValue("@RespondentName", updatedRespondentName);
                             updateCmd.Parameters.AddWithValue("@IncidentID", request.IncidentID.Value);
@@ -1858,7 +1858,7 @@ namespace Server.Services
 
                 // 1. Update the Case Record
                 var query = @"
-                    UPDATE SimplifiedStudentProfileCaseRecords
+                    UPDATE simplifiedstudentprofilecaserecords
                     SET ParentMeetingDate = @ParentMeetingDate,
                         ParentContactType = COALESCE(@ParentContactType, ParentContactType),
                         ParentContactName = COALESCE(@ParentContactName, ParentContactName),
@@ -1889,9 +1889,9 @@ namespace Server.Services
                     // Get combined metadata to sync status correctly
                     var getMetadataQuery = @"
                         SELECT s.IncidentID, s.EscalationID, s.RespondentName, COALESCE(sir.SchoolName, ce.SchoolName) as SchoolName
-                        FROM SimplifiedStudentProfileCaseRecords s
-                        LEFT JOIN SimplifiedIncidentReports sir ON s.IncidentID = sir.IncidentID
-                        LEFT JOIN CaseEscalations ce ON s.EscalationID = ce.EscalationID
+                        FROM simplifiedstudentprofilecaserecords s
+                        LEFT JOIN simplifiedincidentreports sir ON s.IncidentID = sir.IncidentID
+                        LEFT JOIN caseescalations ce ON s.EscalationID = ce.EscalationID
                         WHERE s.RecordID = @RecordID";
                     using var getMetadataCmd = new MySqlCommand(getMetadataQuery, connection);
                     getMetadataCmd.Parameters.AddWithValue("@RecordID", recordId);
@@ -1915,7 +1915,7 @@ namespace Server.Services
                     // 2a. Sync to the specific linked Incident Report
                     if (incidentId.HasValue)
                     {
-                        var updateIncidentQuery = "UPDATE SimplifiedIncidentReports SET Status = @Status WHERE IncidentID = @IncidentID";
+                        var updateIncidentQuery = "UPDATE simplifiedincidentreports SET Status = @Status WHERE IncidentID = @IncidentID";
                         using var updateIncCmd = new MySqlCommand(updateIncidentQuery, connection);
                         updateIncCmd.Parameters.AddWithValue("@Status", status);
                         updateIncCmd.Parameters.AddWithValue("@IncidentID", incidentId.Value);
@@ -1927,7 +1927,7 @@ namespace Server.Services
                     if (escalationId.HasValue)
                     {
                         // Update Escalation status
-                        var updateEscQuery = "UPDATE CaseEscalations SET Status = @Status WHERE EscalationID = @EscalationID";
+                        var updateEscQuery = "UPDATE caseescalations SET Status = @Status WHERE EscalationID = @EscalationID";
                         using var updateEscCmd = new MySqlCommand(updateEscQuery, connection);
                         updateEscCmd.Parameters.AddWithValue("@Status", status);
                         updateEscCmd.Parameters.AddWithValue("@EscalationID", escalationId.Value);
@@ -1939,8 +1939,8 @@ namespace Server.Services
                         {
                             // We join with ViolationTypes to filter for 'Minor' offenses only
                             var syncMinorsQuery = @"
-                                UPDATE SimplifiedIncidentReports sir
-                                INNER JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName))
+                                UPDATE simplifiedincidentreports sir
+                                INNER JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName))
                                 SET sir.Status = @Status
                                 WHERE sir.RespondentName = @Name 
                                 AND sir.SchoolName = @School
@@ -1990,9 +1990,9 @@ namespace Server.Services
                 var query = @"
                     SELECT c.*, i.VictimName, i.FullName as ComplainantName, i.ComplainantContactNumber as ComplainantContact, 
                            s.SchoolName, s.Region, s.Division, s.District
-                    FROM SimplifiedStudentProfileCaseRecords c
-                    LEFT JOIN SimplifiedIncidentReports i ON c.IncidentID = i.IncidentID
-                    LEFT JOIN Schools s ON i.SchoolName = s.SchoolName
+                    FROM simplifiedstudentprofilecaserecords c
+                    LEFT JOIN simplifiedincidentreports i ON c.IncidentID = i.IncidentID
+                    LEFT JOIN schools s ON i.SchoolName = s.SchoolName
                     WHERE c.IsActive = 1";
 
                 if (!string.IsNullOrEmpty(respondentName))
@@ -2122,8 +2122,8 @@ namespace Server.Services
                            sir.ComplainantContactNumber as ComplainantContact,
                            sch.Region as Region,
                            sch.District as District
-                    FROM SimplifiedStudentProfileCaseRecords s
-                    LEFT JOIN SimplifiedIncidentReports sir ON s.IncidentID = sir.IncidentID
+                    FROM simplifiedstudentprofilecaserecords s
+                    LEFT JOIN simplifiedincidentreports sir ON s.IncidentID = sir.IncidentID
                     LEFT JOIN schools sch ON sir.SchoolName = sch.SchoolName
                     WHERE s.EscalationID = @EscalationID
                     ORDER BY s.DateCreated DESC
@@ -2201,8 +2201,8 @@ namespace Server.Services
                            sir.ComplainantContactNumber as ComplainantContact,
                            sch.Region as Region,
                            sch.District as District
-                    FROM SimplifiedStudentProfileCaseRecords s
-                    LEFT JOIN SimplifiedIncidentReports sir ON s.IncidentID = sir.IncidentID
+                    FROM simplifiedstudentprofilecaserecords s
+                    LEFT JOIN simplifiedincidentreports sir ON s.IncidentID = sir.IncidentID
                     LEFT JOIN schools sch ON sir.SchoolName = sch.SchoolName
                     WHERE s.IncidentID = @IncidentID
                     ORDER BY s.DateCreated DESC
@@ -2281,8 +2281,8 @@ namespace Server.Services
                            sir.ComplainantContactNumber as ComplainantContact,
                            sch.Region as Region,
                            sch.District as District
-                    FROM SimplifiedStudentProfileCaseRecords s
-                    LEFT JOIN SimplifiedIncidentReports sir ON s.IncidentID = sir.IncidentID
+                    FROM simplifiedstudentprofilecaserecords s
+                    LEFT JOIN simplifiedincidentreports sir ON s.IncidentID = sir.IncidentID
                     LEFT JOIN schools sch ON sir.SchoolName = sch.SchoolName
                     WHERE s.RecordID = @RecordID";
                 using var command = new MySqlCommand(query, connection);
@@ -2348,7 +2348,7 @@ namespace Server.Services
                 using var connection = new MySqlConnection(connectionString);
                 await connection.OpenAsync();
 
-                var query = "UPDATE SimplifiedStudentProfileCaseRecords SET Status = 'Pending Teacher' WHERE RecordID = @RecordID";
+                var query = "UPDATE simplifiedstudentprofilecaserecords SET Status = 'Pending Teacher' WHERE RecordID = @RecordID";
                 using var command = new MySqlCommand(query, connection);
                 command.Parameters.AddWithValue("@RecordID", recordId);
 
@@ -2375,7 +2375,7 @@ namespace Server.Services
                 using (var connection1 = new MySqlConnection(connectionString))
                 {
                     await connection1.OpenAsync();
-                    var getIncidentQuery = "SELECT IncidentID FROM SimplifiedStudentProfileCaseRecords WHERE RecordID = @RecordID";
+                    var getIncidentQuery = "SELECT IncidentID FROM simplifiedstudentprofilecaserecords WHERE RecordID = @RecordID";
                     using var getCmd = new MySqlCommand(getIncidentQuery, connection1);
                     getCmd.Parameters.AddWithValue("@RecordID", recordId);
                     var result = await getCmd.ExecuteScalarAsync();
@@ -2390,7 +2390,7 @@ namespace Server.Services
                 {
                     await connection2.OpenAsync();
                     var query = @"
-                        UPDATE SimplifiedStudentProfileCaseRecords
+                        UPDATE simplifiedstudentprofilecaserecords
                         SET ActionTaken = COALESCE(@ActionTaken, ActionTaken),
                             Findings = COALESCE(@Findings, Findings),
                             Agreement = COALESCE(@Agreement, Agreement),
@@ -2416,7 +2416,7 @@ namespace Server.Services
                     using (var connection3 = new MySqlConnection(connectionString))
                     {
                         await connection3.OpenAsync();
-                        var syncQuery = "UPDATE SimplifiedIncidentReports SET Status = @Status WHERE IncidentID = @IncidentID";
+                        var syncQuery = "UPDATE simplifiedincidentreports SET Status = @Status WHERE IncidentID = @IncidentID";
                         using var syncCmd = new MySqlCommand(syncQuery, connection3);
                         syncCmd.Parameters.AddWithValue("@Status", status);
                         syncCmd.Parameters.AddWithValue("@IncidentID", incidentId.Value);

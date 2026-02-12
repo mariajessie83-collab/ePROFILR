@@ -47,7 +47,7 @@ namespace Server.Services
                             COALESCE(ir.SchoolName, 'Unknown School') AS SchoolName,
                             @GeneratedBy AS TeacherName,
                             'POD' AS Position
-                        FROM SimplifiedIncidentReports ir
+                        FROM simplifiedincidentreports ir
                         WHERE ir.IncidentId = @IncidentId
                         LIMIT 1";
 
@@ -105,7 +105,7 @@ namespace Server.Services
                             COALESCE(ce.SchoolName, 'Unknown School') AS SchoolName,
                             @GeneratedBy AS TeacherName,
                             'POD' AS Position
-                        FROM CaseEscalations ce
+                        FROM caseescalations ce
                         WHERE ce.EscalationID = @EscalationID
                         LIMIT 1";
 
@@ -174,7 +174,7 @@ namespace Server.Services
                             COALESCE(ir.Status, 'Pending') AS Status,
                             @GeneratedBy AS TeacherName,
                             'POD' AS Position
-                        FROM SimplifiedIncidentReports ir
+                        FROM simplifiedincidentreports ir
                         WHERE ir.IncidentId = @IncidentId
                         LIMIT 1";
 
@@ -224,7 +224,7 @@ namespace Server.Services
                             ce.Status,
                             @GeneratedBy AS TeacherName,
                             'POD' AS Position
-                        FROM CaseEscalations ce
+                        FROM caseescalations ce
                         WHERE ce.EscalationID = @EscalationID
                         LIMIT 1";
 

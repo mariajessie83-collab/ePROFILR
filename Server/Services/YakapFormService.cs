@@ -29,7 +29,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var query = @"
-                    INSERT INTO YakapForms 
+                    INSERT INTO yakapforms 
                     (RecordID, StudentName, GradeAndSection, DateOfSession, FacilitatorCounselor, SchoolName, SchoolID,
                      Question1_AnoAngNangyari, Question2_AnoAngIniisipOFeelings, 
                      Question3_AnoAngEpektoSaIba, Question4_AnoAngIniisipTungkolSaDesisyon,
@@ -88,7 +88,7 @@ namespace Server.Services
                            Question3_AnoAngEpektoSaIba, Question4_AnoAngIniisipTungkolSaDesisyon,
                            Question5_AnoAngGagawinMongIba, Question6_AnongPositibongPagpapahalaga,
                            Question7_MensaheParaSaHinaharap, Status, DateCreated, DateModified, CreatedBy, ModifiedBy, IsActive
-                    FROM YakapForms
+                    FROM yakapforms
                     WHERE YakapFormID = @YakapFormID AND IsActive = 1";
 
                 using var command = new MySqlCommand(query, connection);
@@ -149,7 +149,7 @@ namespace Server.Services
                            Question3_AnoAngEpektoSaIba, Question4_AnoAngIniisipTungkolSaDesisyon,
                            Question5_AnoAngGagawinMongIba, Question6_AnongPositibongPagpapahalaga,
                            Question7_MensaheParaSaHinaharap, Status, DateCreated, DateModified, CreatedBy, ModifiedBy, IsActive
-                    FROM YakapForms
+                    FROM yakapforms
                     WHERE RecordID = @RecordID AND IsActive = 1
                     ORDER BY DateCreated DESC
                     LIMIT 1";
@@ -214,7 +214,7 @@ namespace Server.Services
                            Question3_AnoAngEpektoSaIba, Question4_AnoAngIniisipTungkolSaDesisyon,
                            Question5_AnoAngGagawinMongIba, Question6_AnongPositibongPagpapahalaga,
                            Question7_MensaheParaSaHinaharap, Status, DateCreated, DateModified, CreatedBy, ModifiedBy, IsActive
-                    FROM YakapForms
+                    FROM yakapforms
                     WHERE IsActive = 1";
 
                 if (recordId.HasValue)
@@ -293,15 +293,15 @@ namespace Server.Services
                            yf.Question5_AnoAngGagawinMongIba, yf.Question6_AnongPositibongPagpapahalaga,
                            yf.Question7_MensaheParaSaHinaharap, yf.Status, 
                            yf.DateCreated, yf.DateModified, yf.CreatedBy, yf.ModifiedBy, yf.IsActive
-                    FROM YakapForms yf
-                    INNER JOIN StudentProfileCaseRecords cr ON yf.RecordID = cr.RecordID
-                    INNER JOIN Students s ON 
+                    FROM yakapforms yf
+                    INNER JOIN studentprofilecaserecords cr ON yf.RecordID = cr.RecordID
+                    INNER JOIN students s ON 
                         (
                             UPPER(TRIM(cr.StudentOffenderName)) = UPPER(TRIM(s.StudentName))
                             OR UPPER(TRIM(cr.StudentOffenderName)) LIKE CONCAT('%', UPPER(TRIM(s.StudentName)), '%')
                             OR UPPER(TRIM(s.StudentName)) LIKE CONCAT('%', UPPER(TRIM(cr.StudentOffenderName)), '%')
                         )
-                    INNER JOIN Users u ON s.UserID = u.UserID
+                    INNER JOIN users u ON s.UserID = u.UserID
                     WHERE u.Username = @Username
                       AND s.IsActive = 1
                       AND (yf.IsActive = 1 OR yf.IsActive IS NULL)
@@ -385,7 +385,7 @@ namespace Server.Services
                 }
 
                 var query = @"
-                    UPDATE YakapForms 
+                    UPDATE yakapforms 
                     SET StudentName = @StudentName,
                         GradeAndSection = @GradeAndSection,
                         DateOfSession = @DateOfSession,

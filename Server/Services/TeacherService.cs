@@ -112,7 +112,7 @@ namespace Server.Services
                 {
                     // Insert into Users table
                     var userQuery = @"
-                        INSERT INTO Users (Username, Password, UserRole, IsActive, DateCreated)
+                        INSERT INTO users (Username, Password, UserRole, IsActive, DateCreated)
                         VALUES (@Username, @Password, @UserRole, @IsActive, @DateCreated)";
 
                     var userParameters = new[]
@@ -129,7 +129,7 @@ namespace Server.Services
                     await userCommand.ExecuteScalarAsync();
 
                     // Get the inserted user ID
-                    var getUserIdQuery = "SELECT UserID FROM Users WHERE Username = @Username";
+                    var getUserIdQuery = "SELECT UserID FROM users WHERE Username = @Username";
                     var getUserIdCommand = new MySqlCommand(getUserIdQuery, connection, transaction);
                     getUserIdCommand.Parameters.Add(new MySqlParameter("@Username", request.Username));
                     var insertedUserId = await getUserIdCommand.ExecuteScalarAsync();
@@ -141,7 +141,7 @@ namespace Server.Services
 
                     // Insert into Teachers table
                     var teacherQuery = @"
-                        INSERT INTO Teachers (UserID, TeacherName, Email, PhoneNumber, Position, Gender, SchoolID, SchoolName, School_ID, GradeLevel, Section, Strand, IsActive, DateRegister)
+                        INSERT INTO teachers (UserID, TeacherName, Email, PhoneNumber, Position, Gender, SchoolID, SchoolName, School_ID, GradeLevel, Section, Strand, IsActive, DateRegister)
                         VALUES (@UserID, @TeacherName, @Email, @PhoneNumber, @Position, @Gender, @SchoolID, @SchoolName, @School_ID, @GradeLevel, @Section, @Strand, @IsActive, @DateRegister)";
 
                     var teacherParameters = new[]
@@ -296,7 +296,7 @@ namespace Server.Services
                     
                     // Insert into Users table
                     var userQuery = @"
-                        INSERT INTO Users (Username, Password, UserRole, IsActive, DateCreated)
+                        INSERT INTO users (Username, Password, UserRole, IsActive, DateCreated)
                         VALUES (@Username, @Password, @UserRole, @IsActive, @DateCreated)";
 
                     var userParameters = new[]
@@ -314,7 +314,7 @@ namespace Server.Services
                     Console.WriteLine("User inserted successfully");
 
                     // Get the inserted user ID
-                    var getUserIdQuery = "SELECT UserID FROM Users WHERE Username = @Username";
+                    var getUserIdQuery = "SELECT UserID FROM users WHERE Username = @Username";
                     var getUserIdCommand = new MySqlCommand(getUserIdQuery, connection, transaction);
                     getUserIdCommand.Parameters.Add(new MySqlParameter("@Username", username));
                     var insertedUserId = await getUserIdCommand.ExecuteScalarAsync();
@@ -327,7 +327,7 @@ namespace Server.Services
 
                     // Insert into Students table
                     var studentQuery = @"
-                        INSERT INTO Students (UserID, StudentName, Gender, Section, GradeLevel, Strand, SchoolYear, ParentContact, SchoolID, SchoolName, School_ID, TeacherID, IsActive, DateRegister, FathersName, MothersName, GuardianName, GuardianContact, ContactPerson)
+                        INSERT INTO students (UserID, StudentName, Gender, Section, GradeLevel, Strand, SchoolYear, ParentContact, SchoolID, SchoolName, School_ID, TeacherID, IsActive, DateRegister, FathersName, MothersName, GuardianName, GuardianContact, ContactPerson)
                         VALUES (@UserID, @StudentName, @Gender, @Section, @GradeLevel, @Strand, @SchoolYear, @ParentContact, @SchoolID, @SchoolName, @School_ID, @TeacherID, @IsActive, @DateRegister, @FathersName, @MothersName, @GuardianName, @GuardianContact, @ContactPerson)";
 
                     Console.WriteLine($"Executing student query: {studentQuery}");
@@ -393,7 +393,7 @@ namespace Server.Services
         private async Task<bool> CheckUsernameExistsAsync(string username)
         {
             using var connection = new MySqlConnection(_dbConnections.GetConnection());
-            var query = "SELECT COUNT(1) FROM Users WHERE Username = @Username";
+            var query = "SELECT COUNT(1) FROM users WHERE Username = @Username";
             using var command = new MySqlCommand(query, connection);
             command.Parameters.Add(new MySqlParameter("@Username", username));
             
@@ -405,7 +405,7 @@ namespace Server.Services
         private async Task<bool> CheckEmailExistsAsync(string email)
         {
             using var connection = new MySqlConnection(_dbConnections.GetConnection());
-            var query = "SELECT COUNT(1) FROM Teachers WHERE Email = @Email";
+            var query = "SELECT COUNT(1) FROM teachers WHERE Email = @Email";
             using var command = new MySqlCommand(query, connection);
             command.Parameters.Add(new MySqlParameter("@Email", email));
             
@@ -440,7 +440,7 @@ namespace Server.Services
             try
             {
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
-                var query = "SELECT SchoolID, School_ID, SchoolName, Region, Division, District FROM Schools WHERE IsActive = TRUE ORDER BY Region, Division, District, SchoolName";
+                var query = "SELECT SchoolID, School_ID, SchoolName, Region, Division, District FROM schools WHERE IsActive = TRUE ORDER BY Region, Division, District, SchoolName";
                 using var command = new MySqlCommand(query, connection);
                 
                 await connection.OpenAsync();
@@ -486,8 +486,8 @@ namespace Server.Services
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
                 var query = @"
                     SELECT s.*, u.Username, u.Password 
-                    FROM Students s 
-                    INNER JOIN Users u ON s.UserID = u.UserID 
+                    FROM students s 
+                    INNER JOIN users u ON s.UserID = u.UserID 
                     WHERE s.TeacherID = @TeacherID AND s.IsActive = 1 
                     ORDER BY s.StudentName";
                 using var command = new MySqlCommand(query, connection);
@@ -558,7 +558,7 @@ namespace Server.Services
 
                     // Insert into Users table
                     var userQuery = @"
-                        INSERT INTO Users (Username, Password, UserRole, IsActive, DateCreated)
+                        INSERT INTO users (Username, Password, UserRole, IsActive, DateCreated)
                         VALUES (@Username, @Password, @UserRole, @IsActive, @DateCreated)";
 
                     var userCommand = new MySqlCommand(userQuery, connection, transaction);
@@ -574,7 +574,7 @@ namespace Server.Services
                     await userCommand.ExecuteScalarAsync();
 
                     // Get the inserted user ID
-                    var getUserIdQuery = "SELECT UserID FROM Users WHERE Username = @Username";
+                    var getUserIdQuery = "SELECT UserID FROM users WHERE Username = @Username";
                     var getUserIdCommand = new MySqlCommand(getUserIdQuery, connection, transaction);
                     getUserIdCommand.Parameters.Add(new MySqlParameter("@Username", username));
                     var insertedUserId = await getUserIdCommand.ExecuteScalarAsync();
@@ -586,7 +586,7 @@ namespace Server.Services
 
                     // Insert into Students table
                     var studentQuery = @"
-                        INSERT INTO Students (UserID, StudentName, Gender, GradeLevel, Section, Strand, SchoolYear, ParentContact, TeacherID, IsActive, DateRegister, FathersName, MothersName, GuardianName, GuardianContact, ContactPerson)
+                        INSERT INTO students (UserID, StudentName, Gender, GradeLevel, Section, Strand, SchoolYear, ParentContact, TeacherID, IsActive, DateRegister, FathersName, MothersName, GuardianName, GuardianContact, ContactPerson)
                         VALUES (@UserID, @StudentName, @Gender, @GradeLevel, @Section, @Strand, @SchoolYear, @ParentContact, @TeacherID, @IsActive, @DateRegister, @FathersName, @MothersName, @GuardianName, @GuardianContact, @ContactPerson)";
 
                     var studentCommand = new MySqlCommand(studentQuery, connection, transaction);
@@ -643,7 +643,7 @@ namespace Server.Services
             {
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
                 var query = @"
-                    UPDATE Students 
+                    UPDATE students 
                     SET StudentName = @StudentName, Gender = @Gender, GradeLevel = @GradeLevel, 
                         Section = @Section, Strand = @Strand, SchoolYear = @SchoolYear,
                         ParentName = @ParentName, ParentContact = @ParentContact,
@@ -700,7 +700,7 @@ namespace Server.Services
             try
             {
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
-                var query = "UPDATE Students SET IsActive = 0 WHERE StudentID = @StudentID";
+                var query = "UPDATE students SET IsActive = 0 WHERE StudentID = @StudentID";
                 using var command = new MySqlCommand(query, connection);
                 command.Parameters.Add(new MySqlParameter("@StudentID", studentId));
 
@@ -732,8 +732,8 @@ namespace Server.Services
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
                 var query = @"
                     SELECT t.*, u.Username 
-                    FROM Teachers t 
-                    INNER JOIN Users u ON t.UserID = u.UserID 
+                    FROM teachers t 
+                    INNER JOIN users u ON t.UserID = u.UserID 
                     WHERE t.UserID = @UserID AND t.IsActive = 1";
                 using var command = new MySqlCommand(query, connection);
                 command.Parameters.Add(new MySqlParameter("@UserID", userId));
@@ -797,8 +797,8 @@ namespace Server.Services
                 using var connection = new MySqlConnection(_dbConnections.GetConnection());
                 var query = @"
                     SELECT t.*, u.Username 
-                    FROM Teachers t 
-                    INNER JOIN Users u ON t.UserID = u.UserID 
+                    FROM teachers t 
+                    INNER JOIN users u ON t.UserID = u.UserID 
                     WHERE t.TeacherID = @TeacherID AND t.IsActive = 1";
                 using var command = new MySqlCommand(query, connection);
                 command.Parameters.Add(new MySqlParameter("@TeacherID", teacherId));

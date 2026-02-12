@@ -77,7 +77,7 @@ namespace Server.Services
 
                 // Create User account first
                 var insertUserQuery = @"
-                    INSERT INTO Users (Username, Password, UserRole, IsActive, DateCreated)
+                    INSERT INTO users (Username, Password, UserRole, IsActive, DateCreated)
                     VALUES (@Username, @Password, @UserRole, 1, NOW())";
 
                 using var insertUserCmd = new MySqlCommand(insertUserQuery, connection);
@@ -90,7 +90,7 @@ namespace Server.Services
 
                 // Create AdminAccount
                 var insertAdminQuery = @"
-                    INSERT INTO AdminAccounts (
+                    INSERT INTO adminaccounts (
                         UserID, AccountType, FullName, Email, PhoneNumber,
                         SchoolID, SchoolName, School_ID, Division, Region, District,
                         DivisionName, IsActive, CreatedBy, DateCreated
@@ -167,9 +167,9 @@ namespace Server.Services
                         u.Username,
                         u.Password as UserPassword,
                         creator.FullName as CreatorName
-                    FROM AdminAccounts aa
-                    INNER JOIN Users u ON aa.UserID = u.UserID
-                    LEFT JOIN AdminAccounts creator ON aa.CreatedBy = creator.AdminAccountID
+                    FROM adminaccounts aa
+                    INNER JOIN users u ON aa.UserID = u.UserID
+                    LEFT JOIN adminaccounts creator ON aa.CreatedBy = creator.AdminAccountID
                     WHERE 1=1";
 
                 if (!string.IsNullOrEmpty(accountType))
@@ -262,9 +262,9 @@ namespace Server.Services
                         u.Username,
                         u.Password as UserPassword,
                         creator.FullName as CreatorName
-                    FROM AdminAccounts aa
-                    INNER JOIN Users u ON aa.UserID = u.UserID
-                    LEFT JOIN AdminAccounts creator ON aa.CreatedBy = creator.AdminAccountID
+                    FROM adminaccounts aa
+                    INNER JOIN users u ON aa.UserID = u.UserID
+                    LEFT JOIN adminaccounts creator ON aa.CreatedBy = creator.AdminAccountID
                     WHERE aa.AdminAccountID = @AdminAccountID";
 
                 using var command = new MySqlCommand(query, connection);
@@ -342,9 +342,9 @@ namespace Server.Services
                         u.Username,
                         u.Password as UserPassword,
                         creator.FullName as CreatorName
-                    FROM AdminAccounts aa
-                    INNER JOIN Users u ON aa.UserID = u.UserID
-                    LEFT JOIN AdminAccounts creator ON aa.CreatedBy = creator.AdminAccountID
+                    FROM adminaccounts aa
+                    INNER JOIN users u ON aa.UserID = u.UserID
+                    LEFT JOIN adminaccounts creator ON aa.CreatedBy = creator.AdminAccountID
                     WHERE aa.UserID = @UserID";
 
                 using var command = new MySqlCommand(query, connection);
@@ -414,7 +414,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var updateQuery = @"
-                    UPDATE AdminAccounts 
+                    UPDATE adminaccounts 
                     SET FullName = COALESCE(@FullName, FullName),
                         Email = @Email,
                         PhoneNumber = @PhoneNumber,
@@ -491,7 +491,7 @@ namespace Server.Services
 
                 // Soft delete - set IsActive to false
                 var updateQuery = @"
-                    UPDATE AdminAccounts 
+                    UPDATE adminaccounts 
                     SET IsActive = 0, LastModified = NOW()
                     WHERE AdminAccountID = @AdminAccountID";
 
@@ -547,9 +547,9 @@ namespace Server.Services
                         u.Username,
                         u.Password as UserPassword,
                         creator.FullName as CreatorName
-                    FROM AdminAccounts aa
-                    INNER JOIN Users u ON aa.UserID = u.UserID
-                    LEFT JOIN AdminAccounts creator ON aa.CreatedBy = creator.AdminAccountID
+                    FROM adminaccounts aa
+                    INNER JOIN users u ON aa.UserID = u.UserID
+                    LEFT JOIN adminaccounts creator ON aa.CreatedBy = creator.AdminAccountID
                     WHERE (aa.Division = @DivisionName OR aa.DivisionName = @DivisionName)
                     AND aa.IsActive = 1
                     ORDER BY aa.DateCreated DESC";
@@ -670,7 +670,7 @@ namespace Server.Services
 
         private static async Task<bool> UsernameExistsAsync(MySqlConnection connection, string username)
         {
-            const string query = "SELECT COUNT(1) FROM Users WHERE Username = @Username";
+            const string query = "SELECT COUNT(1) FROM users WHERE Username = @Username";
             using var command = new MySqlCommand(query, connection);
             command.Parameters.AddWithValue("@Username", username);
             var result = await command.ExecuteScalarAsync();
@@ -705,7 +705,7 @@ namespace Server.Services
                 // Use 'Schools' (capitalized) for consistency with TeacherService
                 var query = @"
                     SELECT SchoolID, SchoolName, Division, Region, District, IsActive
-                    FROM Schools
+                    FROM schools
                     WHERE (TRIM(Division) = TRIM(@DivisionName) 
                        OR TRIM(Division) LIKE CONCAT(TRIM(@DivisionName), ' %')
                        OR TRIM(Division) LIKE CONCAT('% ', TRIM(@DivisionName)))

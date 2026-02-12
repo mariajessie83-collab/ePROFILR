@@ -847,7 +847,7 @@ namespace Server.Services
                 var tempReferenceNumber = $"IR-{DateTime.UtcNow:yyyyMMdd}-TEMP";
 
                 var query = @"
-                    INSERT INTO IncidentReports (
+                    INSERT INTO incidentreports (
                         ComplainantName, ComplainantGrade, ComplainantStrand, ComplainantSection,
                         VictimName, RoomNumber, VictimContact, 
                         IncidentType, OtherIncidentType,
@@ -906,7 +906,7 @@ namespace Server.Services
                 try
                 {
                     var updateQuery = @"
-                        UPDATE IncidentReports 
+                        UPDATE incidentreports 
                         SET Reference_number = @ReferenceNumber 
                         WHERE IncidentID = @IncidentID";
                     
@@ -1008,7 +1008,7 @@ namespace Server.Services
                 try
                 {
                     var updateQuery = @"
-                        UPDATE SimplifiedIncidentReports 
+                        UPDATE simplifiedincidentreports 
                         SET ReferenceNumber = @ReferenceNumber 
                         WHERE IncidentID = @IncidentID";
                     
@@ -1045,8 +1045,8 @@ namespace Server.Services
                     // We check the TOTAL count of Minor offenses for this student
                     var countQuery = @"
                         SELECT COUNT(*) 
-                        FROM SimplifiedIncidentReports s
-                        JOIN ViolationTypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName))
+                        FROM simplifiedincidentreports s
+                        JOIN violationtypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName))
                         WHERE UPPER(TRIM(s.RespondentName)) = UPPER(TRIM(@RespondentName))
                         AND v.ViolationCategory = 'Minor'
                         AND (s.IsActive = 1 OR s.IsActive IS NULL)";
@@ -1060,7 +1060,7 @@ namespace Server.Services
                     {
                         // 2. Check if already escalated (Active)
                         var checkEscalationQuery = @"
-                            SELECT COUNT(*) FROM CaseEscalations 
+                            SELECT COUNT(*) FROM caseescalations 
                             WHERE UPPER(TRIM(StudentName)) = UPPER(TRIM(@StudentName))
                             AND Status NOT IN ('Resolved', 'Closed', 'Withdrawn')
                             AND IsActive = 1";
@@ -1081,7 +1081,7 @@ namespace Server.Services
                             
                             var studentDetailsQuery = @"
                                 SELECT GradeLevel, Section, TrackStrand, SchoolName 
-                                FROM Students 
+                                FROM students 
                                 WHERE UPPER(TRIM(StudentName)) = UPPER(TRIM(@StudentName)) 
                                 LIMIT 1";
 
@@ -1099,8 +1099,8 @@ namespace Server.Services
                             // 4. Get list of minor offenses for CaseDetails
                             var minorDetailsQuery = @"
                                 SELECT IncidentType 
-                                FROM SimplifiedIncidentReports s
-                                JOIN ViolationTypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName))
+                                FROM simplifiedincidentreports s
+                                JOIN violationtypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName))
                                 WHERE UPPER(TRIM(s.RespondentName)) = UPPER(TRIM(@RespondentName))
                                 AND v.ViolationCategory = 'Minor'
                                 AND (s.IsActive = 1 OR s.IsActive IS NULL)
@@ -1121,7 +1121,7 @@ namespace Server.Services
 
                             // 5. Insert Escalation
                             var insertEscQuery = @"
-                                INSERT INTO CaseEscalations 
+                                INSERT INTO caseescalations 
                                 (StudentName, GradeLevel, Section, TrackStrand, SchoolName, MinorCaseCount, CaseDetails, ViolationCategory, EscalatedBy, EscalatedDate, Status, Notes, IsActive)
                                 VALUES 
                                 (@StudentName, @GradeLevel, @Section, @TrackStrand, @SchoolName, @MinorCaseCount, @CaseDetails, 'Major', @EscalatedBy, @EscalatedDate, 'Active', @Notes, 1)";
@@ -1179,7 +1179,7 @@ namespace Server.Services
 
                 var query = @"
                     SELECT COUNT(*) 
-                    FROM IncidentReports 
+                    FROM incidentreports 
                     WHERE ComplainantName = @ComplainantName 
                     AND DATE(DateReported) = DATE(@Date)
                     AND IsActive = 1";
@@ -1217,8 +1217,8 @@ namespace Server.Services
                            ir.IncidentDescription, COALESCE(ir.DateReported, ir.DateCreated) as DateReported, ir.Status, ir.Reference_number,
                            ir.SchoolName, ir.Division, ir.Region, ir.District, ir.EvidencePhotoBase64,
                            COALESCE(vt.ViolationCategory, 'Incident Report') as LevelOfOffense
-                    FROM IncidentReports ir
-                    LEFT JOIN ViolationTypes vt ON (
+                    FROM incidentreports ir
+                    LEFT JOIN violationtypes vt ON (
                         UPPER(TRIM(vt.ViolationName)) = UPPER(TRIM(ir.IncidentType))
                         AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     )
@@ -1279,8 +1279,8 @@ namespace Server.Services
                            ir.IncidentDescription, COALESCE(ir.DateReported, ir.DateCreated) as DateReported, ir.Status, ir.Reference_number,
                            ir.SchoolName, ir.Division, ir.Region, ir.District, ir.EvidencePhotoBase64,
                            COALESCE(vt.ViolationCategory, 'Incident Report') as LevelOfOffense
-                    FROM IncidentReports ir
-                    LEFT JOIN ViolationTypes vt ON (
+                    FROM incidentreports ir
+                    LEFT JOIN violationtypes vt ON (
                         UPPER(TRIM(vt.ViolationName)) = UPPER(TRIM(ir.IncidentType))
                         AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     )
@@ -1354,8 +1354,8 @@ namespace Server.Services
                            COALESCE(ir.DateReported, ir.DateCreated) as DateReported, ir.Status, 
                            ir.Reference_number, ir.SchoolName, ir.Division, ir.Region, ir.District,
                            ir.EvidencePhotoBase64, COALESCE(vt.ViolationCategory, 'Incident Report') as LevelOfOffense
-                    FROM IncidentReports ir
-                    INNER JOIN Students s ON (
+                    FROM incidentreports ir
+                    INNER JOIN students s ON (
                         -- Check if student name matches any respondent in comma-separated list
                         -- Handles both single respondent and multiple comma-separated respondents
                         (UPPER(TRIM(ir.RespondentName)) = UPPER(TRIM(s.StudentName))
@@ -1369,7 +1369,7 @@ namespace Server.Services
                         -- Check if student name matches victim
                         (UPPER(TRIM(ir.VictimName)) = UPPER(TRIM(s.StudentName)))
                     )
-                    LEFT JOIN ViolationTypes vt ON (
+                    LEFT JOIN violationtypes vt ON (
                         UPPER(TRIM(vt.ViolationName)) = UPPER(TRIM(ir.IncidentType))
                         AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     )
@@ -1453,7 +1453,7 @@ namespace Server.Services
                         sir.SchoolName, sir.Division, COALESCE(s.Region, 'Unknown') as Region, COALESCE(s.District, 'Unknown') as District,
                         '' as EvidencePhotoPath, sir.EvidencePhotoBase64,
                         sir.DateReported, sir.Status, sir.CreatedBy, sir.UpdatedBy
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     LEFT JOIN schools s ON TRIM(UPPER(sir.SchoolName)) = TRIM(UPPER(s.SchoolName))
                     WHERE sir.IncidentID = @IncidentID AND (sir.IsActive = 1 OR sir.IsActive IS NULL)";
 
@@ -1550,7 +1550,7 @@ namespace Server.Services
 
                 // First try SimplifiedIncidentReports
                 var querySimplified = @"
-                    UPDATE SimplifiedIncidentReports 
+                    UPDATE simplifiedincidentreports 
                     SET Status = @Status
                     WHERE IncidentID = @IncidentID 
                     AND (IsActive = 1 OR IsActive IS NULL)";
@@ -1566,7 +1566,7 @@ namespace Server.Services
                     _logger.LogInformation("Successfully updated SimplifiedIncidentReport {IncidentID} status to {Status}. Syncing to case records...", incidentId, status);
                     
                     // Sync to SimplifiedStudentProfileCaseRecords
-                    var updateCaseRecordsQuery = "UPDATE SimplifiedStudentProfileCaseRecords SET Status = @Status WHERE IncidentID = @IncidentID";
+                    var updateCaseRecordsQuery = "UPDATE simplifiedstudentprofilecaserecords SET Status = @Status WHERE IncidentID = @IncidentID";
                     using var updateCaseCmd = new MySqlCommand(updateCaseRecordsQuery, connection);
                     updateCaseCmd.Parameters.AddWithValue("@Status", status);
                     updateCaseCmd.Parameters.AddWithValue("@IncidentID", incidentId);
@@ -1627,7 +1627,7 @@ namespace Server.Services
                 _logger.LogInformation("Database connection opened successfully");
 
                 // Step 1: Check if StudentProfileCaseRecords table has any data
-                var checkQuery = "SELECT COUNT(*) FROM StudentProfileCaseRecords WHERE (IsActive = 1 OR IsActive IS NULL)";
+                var checkQuery = "SELECT COUNT(*) FROM studentprofilecaserecords WHERE (IsActive = 1 OR IsActive IS NULL)";
                 using var checkCommand = new MySqlCommand(checkQuery, connection);
                 var totalRecordsObj = await checkCommand.ExecuteScalarAsync();
                 var totalRecords = totalRecordsObj != null ? Convert.ToInt32(totalRecordsObj) : 0;
@@ -1641,7 +1641,7 @@ namespace Server.Services
 
                 // Step 2: Check what LevelOfOffense values exist (without location filters)
                 var levelQuery = @"SELECT DISTINCT UPPER(TRIM(LevelOfOffense)) as Level, COUNT(*) as Count 
-                                  FROM StudentProfileCaseRecords 
+                                  FROM studentprofilecaserecords 
                                   WHERE (IsActive = 1 OR IsActive IS NULL) 
                                   AND LevelOfOffense IS NOT NULL 
                                   AND TRIM(LevelOfOffense) != ''
@@ -1696,8 +1696,8 @@ namespace Server.Services
                                 SELECT 
                                     COALESCE(vt.ViolationCategory, 'Uncategorized') as Level,
                                     COUNT(*) as Count
-                                FROM SimplifiedIncidentReports sir
-                                LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                                FROM simplifiedincidentreports sir
+                                LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                                 WHERE MONTH(sir.DateReported) = @Month 
                                 AND YEAR(sir.DateReported) = @Year
                                 AND (sir.IsActive = 1 OR sir.IsActive IS NULL)
@@ -1714,9 +1714,9 @@ namespace Server.Services
                                 SELECT 
                                     COALESCE(vt.ViolationCategory, 'Uncategorized') as Level,
                                     COUNT(*) as Count
-                                FROM SimplifiedIncidentReports sir
+                                FROM simplifiedincidentreports sir
                                 LEFT JOIN schools s ON TRIM(UPPER(sir.SchoolName)) = TRIM(UPPER(s.SchoolName))
-                                LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                                LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                                 WHERE MONTH(sir.DateReported) = @Month 
                                 AND YEAR(sir.DateReported) = @Year
                                 AND (sir.IsActive = 1 OR sir.IsActive IS NULL)
@@ -1925,8 +1925,8 @@ namespace Server.Services
                            COALESCE(s.Division, 'Koronadal City Division') as Division,
                            COALESCE(s.Region, 'Region XII (SOCCSKSARGEN)') as Region,
                            COALESCE(s.District, 'Koronadal City District') as District
-                    FROM Teachers t
-                    INNER JOIN Users u ON t.UserID = u.UserID
+                    FROM teachers t
+                    INNER JOIN users u ON t.UserID = u.UserID
                     LEFT JOIN schools s ON t.SchoolID = s.SchoolID
                     WHERE u.Username = @Username 
                     AND u.Password = @Password 
@@ -1984,7 +1984,7 @@ namespace Server.Services
                     SELECT s.StudentID, s.UserID, s.StudentName, s.Gender, s.Section, s.GradeLevel, s.Strand,
                            s.SchoolYear, s.ParentName, s.ParentContact, s.TeacherID, s.IsActive, s.DateRegister,
                            s.SchoolID, s.SchoolName, s.School_ID
-                    FROM Students s
+                    FROM students s
                     LEFT JOIN schools sc ON s.SchoolID = sc.SchoolID
                     WHERE s.IsActive = 1
                     AND (sc.SchoolName = @SchoolName OR s.SchoolName = @SchoolName)
@@ -2045,8 +2045,8 @@ namespace Server.Services
                            sir.Status, sir.ReferenceNumber, sir.SchoolName, sir.Division, 
                            sir.EvidencePhotoBase64,
                            COALESCE(vt.ViolationCategory, 'Incident Report') as LevelOfOffense
-                    FROM SimplifiedIncidentReports sir
-                    LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                    FROM simplifiedincidentreports sir
+                    LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     WHERE sir.ReferenceNumber = @ReferenceNumber AND (sir.IsActive = 1 OR sir.IsActive IS NULL)
                     LIMIT 1";
 
@@ -2108,7 +2108,7 @@ namespace Server.Services
                         using var connection = new MySqlConnection(connectionString);
                         await connection.OpenAsync();
                         
-                        var cmd = new MySqlCommand("SELECT TeacherName FROM Teachers WHERE TeacherID = @ID", connection);
+                        var cmd = new MySqlCommand("SELECT TeacherName FROM teachers WHERE TeacherID = @ID", connection);
                         cmd.Parameters.AddWithValue("@ID", request.ReporterID);
                         var result = await cmd.ExecuteScalarAsync();
                         if (result != null) reporterName = result.ToString();
@@ -2177,7 +2177,7 @@ namespace Server.Services
                            sir.RespondentName, sir.AdviserName, sir.IncidentType, sir.Description, 
                            sir.DateReported, sir.SchoolName, sir.Division, sir.Status,
                            'System' as ReporterName
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     WHERE (sir.IsActive = 1 OR sir.IsActive IS NULL)";
 
                 if (reporterId.HasValue)
@@ -2245,7 +2245,7 @@ namespace Server.Services
                         COUNT(*) as TotalReports, 
                         MAX(sir.DateReported) as LatestReportDate,
                         sir.SchoolName
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     WHERE (sir.IsActive = 1 OR sir.IsActive IS NULL)";
 
                 if (!string.IsNullOrEmpty(schoolName))
@@ -2297,7 +2297,7 @@ namespace Server.Services
                            sir.RespondentName, sir.AdviserName, sir.IncidentType, sir.Description, 
                            sir.DateReported, sir.SchoolName, sir.Division, sir.Status, 
                            (COALESCE(sir.IsActive, 1) = 1) as IsActive, sir.ReferenceNumber
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     WHERE sir.ReporterID = @ReporterID AND (sir.IsActive = 1 OR sir.IsActive IS NULL) 
                     ORDER BY sir.DateReported DESC";
                 using var command = new MySqlCommand(query, connection);
@@ -2340,8 +2340,8 @@ namespace Server.Services
 
                 var query = @"
                     SELECT t.TeacherName 
-                    FROM Students s
-                    LEFT JOIN Teachers t ON s.TeacherID = t.TeacherID
+                    FROM students s
+                    LEFT JOIN teachers t ON s.TeacherID = t.TeacherID
                     WHERE (s.StudentName = @StudentName OR s.StudentName LIKE CONCAT('%', @StudentName, '%'))
                       AND s.SchoolName = @SchoolName 
                       AND s.IsActive = 1
@@ -2371,7 +2371,7 @@ namespace Server.Services
 
                 var query = @"
                     SELECT ViolationID, ViolationName, ViolationCategory, HasVictim, IsActive 
-                    FROM ViolationTypes 
+                    FROM violationtypes 
                     WHERE IsActive = 1
                     ORDER BY ViolationCategory, ViolationName";
 
@@ -2419,8 +2419,8 @@ namespace Server.Services
                         SUM(CASE WHEN vt.ViolationCategory = 'Prohibited Acts' THEN 1 ELSE 0 END) as ProhibitedCases,
                         SUM(CASE WHEN sir.Status NOT IN ('Resolved', 'Closed') THEN 1 ELSE 0 END) as ActiveCases,
                         MAX(sir.DateReported) as LatestIncidentDate
-                    FROM SimplifiedIncidentReports sir
-                    LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                    FROM simplifiedincidentreports sir
+                    LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     WHERE UPPER(TRIM(sir.AdviserName)) = UPPER(TRIM(@AdviserName))
                         AND (sir.IsActive = 1 OR sir.IsActive IS NULL)
                         AND sir.RespondentName IS NOT NULL
@@ -2480,8 +2480,8 @@ namespace Server.Services
                         sir.IncidentType,
                         COALESCE(vt.ViolationCategory, 'Minor') AS LevelOfOffense,
                         COALESCE(sir.Status, 'Active') AS Status
-                    FROM SimplifiedIncidentReports sir
-                    LEFT JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
+                    FROM simplifiedincidentreports sir
+                    LEFT JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName)) AND (vt.IsActive = 1 OR vt.IsActive IS NULL)
                     WHERE UPPER(TRIM(sir.AdviserName)) = UPPER(TRIM(@AdviserName))
                         AND (sir.IsActive = 1 OR sir.IsActive IS NULL)
                         AND sir.RespondentName IS NOT NULL
@@ -2566,8 +2566,8 @@ namespace Server.Services
                         s.IncidentType,
                         v.ViolationCategory AS LevelOfOffense,
                         s.Status
-                    FROM SimplifiedIncidentReports s
-                    LEFT JOIN ViolationTypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName)) AND (v.IsActive = 1 OR v.IsActive IS NULL)
+                    FROM simplifiedincidentreports s
+                    LEFT JOIN violationtypes v ON UPPER(TRIM(s.IncidentType)) = UPPER(TRIM(v.ViolationName)) AND (v.IsActive = 1 OR v.IsActive IS NULL)
                     WHERE (s.IsActive = 1 OR s.IsActive IS NULL)
                       AND s.RespondentName IS NOT NULL
                       AND s.RespondentName != ''
@@ -2657,7 +2657,7 @@ namespace Server.Services
                 // 1. Status Counts
                 var statusQuery = $@"
                     SELECT sir.Status, COUNT(*) as Count
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     {joinClause}
                     {whereClause}
                     GROUP BY sir.Status";
@@ -2683,7 +2683,7 @@ namespace Server.Services
                 var behaviorWhere = whereClause + " AND sir.Status != 'Rejected'";
                 var behaviorQuery = $@"
                     SELECT sir.IncidentType, COUNT(*) as Count
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     {joinClause}
                     {behaviorWhere}
                     AND sir.IncidentType IS NOT NULL AND sir.IncidentType != ''
@@ -2708,7 +2708,7 @@ namespace Server.Services
                 // 3. Yearly Stats
                 var yearlyQuery = $@"
                     SELECT YEAR(sir.DateReported) as Year, COUNT(*) as Count
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     {joinClause}
                     {whereClause}
                     GROUP BY YEAR(sir.DateReported)
@@ -2735,7 +2735,7 @@ namespace Server.Services
                 
                 var datesQuery = $@"
                     SELECT sir.DateReported
-                    FROM SimplifiedIncidentReports sir
+                    FROM simplifiedincidentreports sir
                     {joinClause}
                     {whereClause}
                     AND sir.DateReported >= @MonthStart AND sir.DateReported <= @MonthEnd";

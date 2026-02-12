@@ -33,7 +33,7 @@ namespace Server.Services
                 // Check if already escalated
                 var checkQuery = @"
                     SELECT EscalationID 
-                    FROM CaseEscalations 
+                    FROM caseescalations 
                     WHERE StudentName = @StudentName 
                       AND GradeLevel = @GradeLevel 
                       AND Section = @Section 
@@ -55,7 +55,7 @@ namespace Server.Services
 
                 // Create new escalation
                 var insertQuery = @"
-                    INSERT INTO CaseEscalations 
+                    INSERT INTO caseescalations 
                     (StudentName, GradeLevel, Section, TrackStrand, SchoolName, MinorCaseCount, CaseDetails, EscalatedBy, EscalatedDate, Status, Notes, IsActive)
                     VALUES 
                     (@StudentName, @GradeLevel, @Section, @TrackStrand, @SchoolName, @MinorCaseCount, @CaseDetails, @EscalatedBy, @EscalatedDate, @Status, @Notes, 1)";
@@ -108,10 +108,10 @@ namespace Server.Services
                     SELECT ce.EscalationID, ce.StudentName, ce.GradeLevel, ce.Section, ce.TrackStrand, ce.SchoolName, ce.MinorCaseCount, ce.CaseDetails,
                            COALESCE(t.TeacherName, aa.FullName, ce.EscalatedBy) as EscalatedBy, 
                            ce.EscalatedDate, ce.Status, ce.Notes, ce.IsActive
-                    FROM CaseEscalations ce
-                    LEFT JOIN Users u ON ce.EscalatedBy = u.Username
-                    LEFT JOIN Teachers t ON u.UserID = t.UserID
-                    LEFT JOIN AdminAccounts aa ON u.UserID = aa.UserID
+                    FROM caseescalations ce
+                    LEFT JOIN users u ON ce.EscalatedBy = u.Username
+                    LEFT JOIN teachers t ON u.UserID = t.UserID
+                    LEFT JOIN adminaccounts aa ON u.UserID = aa.UserID
                     WHERE ce.IsActive = 1";
 
                 if (!string.IsNullOrEmpty(status))
@@ -187,10 +187,10 @@ namespace Server.Services
                     SELECT ce.EscalationID, ce.StudentName, ce.GradeLevel, ce.Section, ce.TrackStrand, ce.SchoolName, ce.MinorCaseCount, ce.CaseDetails,
                            COALESCE(t.TeacherName, aa.FullName, ce.EscalatedBy) as EscalatedBy, 
                            ce.EscalatedDate, ce.Status, ce.Notes, ce.IsActive
-                    FROM CaseEscalations ce
-                    LEFT JOIN Users u ON ce.EscalatedBy = u.Username
-                    LEFT JOIN Teachers t ON u.UserID = t.UserID
-                    LEFT JOIN AdminAccounts aa ON u.UserID = aa.UserID
+                    FROM caseescalations ce
+                    LEFT JOIN users u ON ce.EscalatedBy = u.Username
+                    LEFT JOIN teachers t ON u.UserID = t.UserID
+                    LEFT JOIN adminaccounts aa ON u.UserID = aa.UserID
                     WHERE ce.StudentName = @StudentName 
                       AND ce.GradeLevel = @GradeLevel 
                       AND ce.Section = @Section 
@@ -251,7 +251,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 // Verify the escalation exists (Ownership check removed as TeacherID column is missing)
-                var checkQuery = "SELECT EscalationID FROM CaseEscalations WHERE EscalationID = @EscalationID";
+                var checkQuery = "SELECT EscalationID FROM caseescalations WHERE EscalationID = @EscalationID";
                 using var checkCommand = new MySqlCommand(checkQuery, connection);
                 checkCommand.Parameters.AddWithValue("@EscalationID", escalationId);
                 
@@ -266,7 +266,7 @@ namespace Server.Services
                 // Assuming providing the correct EscalationID is sufficient auth for now.
 
                 var updateQuery = @"
-                    UPDATE CaseEscalations 
+                    UPDATE caseescalations 
                     SET Status = @Status
                     WHERE EscalationID = @EscalationID";
 
@@ -304,10 +304,10 @@ namespace Server.Services
                     SELECT ce.EscalationID, ce.StudentName, ce.GradeLevel, ce.Section, ce.TrackStrand, ce.SchoolName, ce.MinorCaseCount, ce.CaseDetails,
                            COALESCE(t.TeacherName, aa.FullName, ce.EscalatedBy) as EscalatedBy, 
                            ce.EscalatedDate, ce.Status, ce.Notes, ce.IsActive
-                    FROM CaseEscalations ce
-                    LEFT JOIN Users u ON ce.EscalatedBy = u.Username
-                    LEFT JOIN Teachers t ON u.UserID = t.UserID
-                    LEFT JOIN AdminAccounts aa ON u.UserID = aa.UserID
+                    FROM caseescalations ce
+                    LEFT JOIN users u ON ce.EscalatedBy = u.Username
+                    LEFT JOIN teachers t ON u.UserID = t.UserID
+                    LEFT JOIN adminaccounts aa ON u.UserID = aa.UserID
                     WHERE ce.EscalationID = @EscalationID AND ce.IsActive = 1
                     LIMIT 1";
 
@@ -358,7 +358,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 var query = @"
-                    UPDATE CaseEscalations 
+                    UPDATE caseescalations 
                     SET Status = @Status
                     WHERE EscalationID = @EscalationID";
 
@@ -373,7 +373,7 @@ namespace Server.Services
                     _logger.LogInformation("Successfully updated escalation {EscalationID} status to {Status}. Syncing related records...", escalationId, status);
                     
                     // 1. Sync to CASE RECORDS (Part B)
-                    var updateCaseRecordsQuery = "UPDATE SimplifiedStudentProfileCaseRecords SET Status = @Status WHERE EscalationID = @EscalationID";
+                    var updateCaseRecordsQuery = "UPDATE simplifiedstudentprofilecaserecords SET Status = @Status WHERE EscalationID = @EscalationID";
                     using var updateCaseCmd = new MySqlCommand(updateCaseRecordsQuery, connection);
                     updateCaseCmd.Parameters.AddWithValue("@Status", status);
                     updateCaseCmd.Parameters.AddWithValue("@EscalationID", escalationId);
@@ -383,7 +383,7 @@ namespace Server.Services
                     // 2. Sync to INCIDENT REPORTS
                     // We sync to all minor incident reports for the student/school associated with this escalation
                     // First get the student/school info
-                    var getEscInfoQuery = "SELECT StudentName, SchoolName FROM CaseEscalations WHERE EscalationID = @EscalationID";
+                    var getEscInfoQuery = "SELECT StudentName, SchoolName FROM caseescalations WHERE EscalationID = @EscalationID";
                     using var getEscInfoCmd = new MySqlCommand(getEscInfoQuery, connection);
                     getEscInfoCmd.Parameters.AddWithValue("@EscalationID", escalationId);
                     
@@ -402,8 +402,8 @@ namespace Server.Services
                     {
                         // Update ALL minor incident reports for this student/school that are Pending or Approved
                         var syncIncidentsQuery = @"
-                            UPDATE SimplifiedIncidentReports sir
-                            INNER JOIN ViolationTypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName))
+                            UPDATE simplifiedincidentreports sir
+                            INNER JOIN violationtypes vt ON UPPER(TRIM(sir.IncidentType)) = UPPER(TRIM(vt.ViolationName))
                             SET sir.Status = @Status
                             WHERE sir.RespondentName = @Name 
                             AND sir.SchoolName = @School
