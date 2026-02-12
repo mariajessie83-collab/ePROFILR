@@ -473,13 +473,17 @@ else
     // Tab counts
     private int pendingTabCount => incidentReports.Count(r => 
                     (string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase) || 
-                     string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase)) && 
+                     string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(r.Status, "CALL", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(r.Status, "Calling", StringComparison.OrdinalIgnoreCase)) && 
                     !string.Equals(r.LevelOfOffense, "Minor", StringComparison.OrdinalIgnoreCase));
     private int approvedTabCount => incidentReports.Count(r => 
                     !string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase) && 
                     !string.Equals(r.Status, "Resolved", StringComparison.OrdinalIgnoreCase) && 
                     !string.Equals(r.Status, "Closed", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(r.Status, "CALL", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(r.Status, "Calling", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(r.LevelOfOffense, "Minor", StringComparison.OrdinalIgnoreCase));
     private int resolvedTabCount => incidentReports.Count(r => 
                     (string.Equals(r.Status, "Resolved", StringComparison.OrdinalIgnoreCase) || 
@@ -1324,6 +1328,7 @@ else
             "pending" => 1,
             "reported" => 1,
             "approved" => 2,
+            "call" => 3,
             "calling" => 3,
             "arrived" => 4,
             "parentonhold" => 5,
@@ -1345,6 +1350,7 @@ else
             "parentonhold" => "Parent On Hold",
             "under review" => "Under Review",
             "parent on hold" => "Parent On Hold",
+            "call" => "Calling",
             _ => status
         };
     }
@@ -1357,6 +1363,7 @@ else
         {
             "underreview" => "status-under-review",
             "parentonhold" => "status-parent-on-hold",
+            "call" => "status-calling",
             _ => $"status-{status.ToLower().Replace(" ", "-")}"
         };
     }
@@ -1370,7 +1377,9 @@ else
             {
                 "Pending" => incidentReports.Where(r => 
                     (string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase)) &&
+                     string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(r.Status, "CALL", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(r.Status, "Calling", StringComparison.OrdinalIgnoreCase)) &&
                     !string.Equals(r.LevelOfOffense, "Minor", StringComparison.OrdinalIgnoreCase)).ToList(),
                 
                 "Approved" => incidentReports.Where(r => 
@@ -1378,6 +1387,8 @@ else
                     !string.Equals(r.Status, "Resolved", StringComparison.OrdinalIgnoreCase) && 
                     !string.Equals(r.Status, "Closed", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(r.Status, "Reported", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(r.Status, "CALL", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(r.Status, "Calling", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(r.LevelOfOffense, "Minor", StringComparison.OrdinalIgnoreCase)).ToList(),
                 
                 "Resolved" => incidentReports.Where(r => 

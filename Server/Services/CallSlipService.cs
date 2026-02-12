@@ -326,6 +326,7 @@ namespace Server.Services
                            GeneratedBy, GeneratedDate, IsActive
                     FROM callslips
                     WHERE CallSlipID = @CallSlipID AND IsActive = 1
+                    ORDER BY GeneratedDate DESC
                     LIMIT 1";
 
                 using var command = new MySqlCommand(query, connection);

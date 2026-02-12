@@ -33,20 +33,20 @@ namespace Server.Services
                 _logger.LogInformation("Database connection opened successfully");
 
                 // First, let's check if there are any teachers at all
-                var checkQuery = "SELECT COUNT(*) FROM Teachers";
+                var checkQuery = "SELECT COUNT(*) FROM teachers";
                 using var checkCommand = new MySqlCommand(checkQuery, connection);
                 var totalTeachers = await checkCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total teachers in database: {TotalTeachers}", totalTeachers);
 
                 // Check if there are any POD teachers
-                var podCheckQuery = "SELECT COUNT(*) FROM Teachers WHERE Position = 'POD'";
+                var podCheckQuery = "SELECT COUNT(*) FROM teachers WHERE Position = 'POD'";
                 using var podCheckCommand = new MySqlCommand(podCheckQuery, connection);
                 var podCount = await podCheckCommand.ExecuteScalarAsync();
                 _logger.LogInformation("POD teachers count: {PODCount}", podCount);
 
                 var query = @"
                     SELECT t.TeacherID, t.TeacherName, t.Position, t.SchoolName, t.Division, t.Region, t.District
-                    FROM Teachers t 
+                    FROM teachers t 
                     WHERE t.Position = 'POD' AND t.IsActive = 1
                     ORDER BY t.TeacherName";
 
@@ -93,8 +93,8 @@ namespace Server.Services
                     SELECT st.StudentID, st.StudentName, st.GradeLevel, st.Section,
                            COALESCE(st.SchoolName, '') as SchoolName,
                            COALESCE(st.SchoolID, NULL) as SchoolID
-                    FROM Students st
-                    INNER JOIN Users u ON st.UserID = u.UserID
+                    FROM students st
+                    INNER JOIN users u ON st.UserID = u.UserID
                     WHERE u.Username = @Username AND st.IsActive = 1
                     LIMIT 1";
 
@@ -118,7 +118,7 @@ namespace Server.Services
                     string? strand = null;
                     try
                     {
-                        var strandQuery = "SELECT COALESCE(Strand, TrackStrand) as Strand FROM Students WHERE StudentID = @StudentID";
+                        var strandQuery = "SELECT COALESCE(Strand, TrackStrand) as Strand FROM students WHERE StudentID = @StudentID";
                         using var strandCommand = new MySqlCommand(strandQuery, connection);
                         strandCommand.Parameters.AddWithValue("@StudentID", studentId);
                         var strandResult = await strandCommand.ExecuteScalarAsync();
@@ -165,7 +165,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 // First, check if user is a teacher or student
-                var userRoleQuery = "SELECT UserRole FROM Users WHERE Username = @Username";
+                var userRoleQuery = "SELECT UserRole FROM users WHERE Username = @Username";
                 using var userRoleCommand = new MySqlCommand(userRoleQuery, connection);
                 userRoleCommand.Parameters.AddWithValue("@Username", username);
                 
@@ -180,18 +180,18 @@ namespace Server.Services
                         SELECT st.StudentName, st.Section, st.GradeLevel,
                                CASE 
                                    WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
-                                               WHERE TABLE_NAME = 'Students' AND COLUMN_NAME = 'SchoolName')
+                                               WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'SchoolName')
                                    THEN st.SchoolName
                                    ELSE NULL
                                END as SchoolName,
                                CASE 
                                    WHEN EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
-                                               WHERE TABLE_NAME = 'Students' AND COLUMN_NAME = 'SchoolID')
+                                               WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'SchoolID')
                                    THEN st.SchoolID
                                    ELSE NULL
                                END as SchoolID
-                        FROM Students st
-                        INNER JOIN Users u ON st.UserID = u.UserID
+                        FROM students st
+                        INNER JOIN users u ON st.UserID = u.UserID
                         WHERE u.Username = @Username AND st.IsActive = 1";
 
                     using var studentCommand = new MySqlCommand(studentQuery, connection);
@@ -269,8 +269,8 @@ namespace Server.Services
                                COALESCE(schools.Division, 'Koronadal City Division') as Division,
                                COALESCE(schools.Region, 'Region XII (SOCCSKSARGEN)') as Region,
                                COALESCE(schools.District, 'Koronadal City District') as District
-                        FROM Teachers t 
-                        INNER JOIN Users u ON t.UserID = u.UserID
+                        FROM teachers t 
+                        INNER JOIN users u ON t.UserID = u.UserID
                         LEFT JOIN schools ON t.SchoolID = schools.SchoolID
                         WHERE u.Username = @Username AND t.IsActive = 1";
 
@@ -322,7 +322,7 @@ namespace Server.Services
                 await connection.OpenAsync();
 
                 // First, let's check if we have any teachers at all
-                var countQuery = "SELECT COUNT(*) FROM Teachers WHERE IsActive = 1";
+                var countQuery = "SELECT COUNT(*) FROM teachers WHERE IsActive = 1";
                 using var countCommand = new MySqlCommand(countQuery, connection);
                 var totalTeachers = await countCommand.ExecuteScalarAsync();
                 _logger.LogInformation("Total active teachers in database: {TotalTeachers}", totalTeachers);
@@ -332,7 +332,7 @@ namespace Server.Services
                 var query = @"
                     SELECT t.TeacherID, t.TeacherName, t.Position, 
                            COALESCE(s.SchoolName, t.SchoolName, 'Koronadal National Comprehensive High School') as SchoolName
-                    FROM Teachers t 
+                    FROM teachers t 
                     LEFT JOIN schools s ON t.SchoolID = s.SchoolID
                     WHERE t.IsActive = 1";
 
@@ -426,7 +426,7 @@ namespace Server.Services
                 {
                     _logger.LogWarning("No teachers found with location filters. Checking for ANY active teachers...");
                     
-                    var debugQuery = "SELECT TeacherID, TeacherName, Position, SchoolName FROM Teachers WHERE IsActive = 1";
+                    var debugQuery = "SELECT TeacherID, TeacherName, Position, SchoolName FROM teachers WHERE IsActive = 1";
                     using var debugCommand = new MySqlCommand(debugQuery, connection);
                     using var debugReader = await debugCommand.ExecuteReaderAsync();
                     
@@ -444,7 +444,7 @@ namespace Server.Services
                     if (allTeachers.Count > 0 && !string.IsNullOrEmpty(position))
                     {
                         _logger.LogInformation("Trying fallback query without location filters...");
-                        var fallbackQuery = "SELECT TeacherID, TeacherName, Position FROM Teachers WHERE IsActive = 1 AND Position = @Position";
+                        var fallbackQuery = "SELECT TeacherID, TeacherName, Position FROM teachers WHERE IsActive = 1 AND Position = @Position";
                         using var fallbackCommand = new MySqlCommand(fallbackQuery, connection);
                         fallbackCommand.Parameters.AddWithValue("@Position", position);
                         using var fallbackReader = await fallbackCommand.ExecuteReaderAsync();
@@ -498,7 +498,7 @@ namespace Server.Services
                            COALESCE(sc.Division, 'Koronadal City Division') as Division,
                            COALESCE(sc.Region, 'Region XII (SOCCSKSARGEN)') as Region,
                            COALESCE(sc.District, 'Koronadal City District') as District
-                    FROM Students s 
+                    FROM students s 
                     LEFT JOIN schools sc ON s.SchoolID = sc.SchoolID
                     WHERE s.IsActive = 1";
 
@@ -599,7 +599,7 @@ namespace Server.Services
                 var query = @"
                     SELECT s.StudentID, s.TeacherID, s.SchoolName, sc.SchoolName as ActualSchoolName,
                            s.GradeLevel, s.Section
-                    FROM Students s
+                    FROM students s
                     LEFT JOIN schools sc ON s.SchoolID = sc.SchoolID
                     WHERE UPPER(TRIM(s.StudentName)) = UPPER(TRIM(@StudentName))
                     AND s.IsActive = 1";
@@ -634,7 +634,7 @@ namespace Server.Services
                         // Get teacher name
                         var teacherQuery = @"
                             SELECT TeacherName 
-                            FROM Teachers 
+                            FROM teachers 
                             WHERE TeacherID = @TeacherID 
                             AND Position = 'Adviser' 
                             AND IsActive = 1 
@@ -659,7 +659,7 @@ namespace Server.Services
 
                         var fallbackQuery = @"
                             SELECT TeacherName 
-                            FROM Teachers 
+                            FROM teachers 
                             WHERE IsActive = 1 
                               AND (Position = 'Adviser' OR Position = 'Class Adviser' OR Position = 'Class Adviser ')
                               AND (@GradeLevel IS NULL OR GradeLevel = @GradeLevel)
