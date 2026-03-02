@@ -1593,7 +1593,16 @@ namespace Server.Services
 
                 if (rowsAffected > 0)
                 {
-                    _logger.LogInformation("Successfully updated legacy incidentreports {IncidentID} status to {Status}", incidentId, status);
+                    _logger.LogInformation("Successfully updated legacy incidentreports {IncidentID} status to {Status}. Syncing to case records...", incidentId, status);
+                    
+                    // Sync to SimplifiedStudentProfileCaseRecords
+                    var updateCaseRecordsQuery = "UPDATE simplifiedstudentprofilecaserecords SET Status = @Status WHERE IncidentID = @IncidentID";
+                    using var updateCaseCmd = new MySqlCommand(updateCaseRecordsQuery, connection);
+                    updateCaseCmd.Parameters.AddWithValue("@Status", status);
+                    updateCaseCmd.Parameters.AddWithValue("@IncidentID", incidentId);
+                    var caseRows = await updateCaseCmd.ExecuteNonQueryAsync();
+                    if (caseRows > 0) _logger.LogInformation("Synced Status '{Status}' to {Count} Case Records for Legacy IncidentID {IncidentID}", status, caseRows, incidentId);
+
                     return true;
                 }
 
