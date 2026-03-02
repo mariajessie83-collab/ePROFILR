@@ -2032,44 +2032,44 @@ namespace Server.Services
                     LEFT JOIN schools s ON TRIM(UPPER(COALESCE(si.SchoolName, ir.SchoolName, ce.SchoolName))) = TRIM(UPPER(s.SchoolName))
                     WHERE c.IsActive = 1";
 
-                _logger.LogInformation("Ultimatum Annex A Query - School: {School}, Status: {Status}", schoolName, status);
+                _logger.LogInformation("Annex A Query - School: {School}, Status: {Status}", schoolName, status);
 
                 if (!string.IsNullOrEmpty(respondentName))
                 {
-                    query += " AND (UPPER(c.RespondentName) LIKE UPPER(@RespondentName) OR UPPER(m.RespondentName) LIKE UPPER(@RespondentName))";
+                    query += " AND UPPER(c.RespondentName) LIKE UPPER(@RespondentName)";
                 }
                 
                 if (!string.IsNullOrEmpty(status))
                 {
-                    query += " AND (UPPER(TRIM(COALESCE(c.Status, ''))) = UPPER(TRIM(@Status)) OR UPPER(TRIM(COALESCE(m.Status, ''))) = UPPER(TRIM(@Status)))";
+                    query += " AND UPPER(TRIM(c.Status)) = UPPER(TRIM(@Status))";
                 }
                 
                 if (incidentId.HasValue)
                 {
-                    query += " AND (c.IncidentID = @IncidentID OR m.IncidentID = @IncidentID)";
+                    query += " AND c.IncidentID = @IncidentID";
                 }
                 
                 if (!string.IsNullOrEmpty(schoolName))
                 {
-                    // LENIENT school name filter: match on multiple levels. 
-                    // CRITICAL: We check COALESCE(m.SchoolName, st.SchoolName, c.SchoolName) as the actual filter source
+                    // Lenient school name match across linked incident reports
                     query += @" AND (
-                        UPPER(TRIM(COALESCE(m.SchoolName, st.SchoolName, c.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%')
-                        OR UPPER(TRIM(@SchoolName)) LIKE CONCAT('%', UPPER(TRIM(COALESCE(m.SchoolName, st.SchoolName, c.SchoolName, ''))), '%')
+                        UPPER(TRIM(COALESCE(si.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%')
+                        OR UPPER(TRIM(COALESCE(ir.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%')
+                        OR UPPER(TRIM(COALESCE(ce.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%')
                     )";
                 }
                 
                 if (startDate.HasValue)
                 {
-                    query += " AND (COALESCE(c.DateCreated, m.ReferenceDate) >= @StartDate OR COALESCE(c.DateOfOffense, m.ReferenceDate) >= @StartDate)";
+                    query += " AND (c.DateCreated >= @StartDate OR c.DateOfOffense >= @StartDate)";
                 }
                 
                 if (endDate.HasValue)
                 {
-                    query += " AND (COALESCE(c.DateCreated, m.ReferenceDate) <= @EndDate OR COALESCE(c.DateOfOffense, m.ReferenceDate) <= @EndDate)";
+                    query += " AND (c.DateCreated <= @EndDate OR c.DateOfOffense <= @EndDate)";
                 }
 
-                query += " ORDER BY COALESCE(c.DateCreated, m.ReferenceDate) DESC";
+                query += " ORDER BY c.DateCreated DESC";
 
                 using var command = new MySqlCommand(query, connection);
                 if (!string.IsNullOrEmpty(respondentName)) command.Parameters.AddWithValue("@RespondentName", $"%{respondentName}%");
@@ -2079,7 +2079,7 @@ namespace Server.Services
                 if (startDate.HasValue) command.Parameters.AddWithValue("@StartDate", startDate.Value.Date);
                 if (endDate.HasValue) command.Parameters.AddWithValue("@EndDate", endDate.Value.Date.AddDays(1).AddSeconds(-1));
 
-                _logger.LogInformation("Executing Ultimatum SQL: {SQL}", query);
+                _logger.LogInformation("Executing Annex A SQL: {SQL}", query);
 
                 using var reader = await command.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
