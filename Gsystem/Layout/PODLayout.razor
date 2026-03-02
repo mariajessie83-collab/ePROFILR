@@ -15,9 +15,6 @@
         </div>
         <nav class="pod-nav @(isMenuOpen ? "open" : "")">
             <a class="pod-nav-item" href="/" @onclick="CloseMenu">Back to Main</a>
-            <a class="pod-nav-item" href="/pod-dashboard" @onclick="CloseMenu">Dashboard</a>
-            <a class="pod-nav-item" href="/case-records-dashboard" @onclick="CloseMenu">Case Records</a>
-            <a class="pod-nav-item" href="/incident-report" @onclick="CloseMenu">Incident Reports</a>
             <a class="pod-nav-item" href="/pod/offline-online-rounding" @onclick="CloseMenu">📱 POD Rounding</a>
             <button class="pod-logout-btn" @onclick="Logout">Logout</button>
         </nav>

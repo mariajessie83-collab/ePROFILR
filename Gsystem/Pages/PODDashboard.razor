@@ -799,23 +799,25 @@ else
                     
                     if (record != null && record.RecordID > 0)
                     {
-                        // Update to ParentOnHold status
-                        var payload = new ParentMeetingUpdateRequest { Status = "ParentOnHold" };
+                        // Update to UnderReview status
+                        var payload = new ParentMeetingUpdateRequest { Status = "UnderReview" };
                         var updateResponse = await Http.PutAsJsonAsync($"api/StudentProfileCaseRecord/simplified/{record.RecordID}/parent-meeting", payload);
                         
                         if (updateResponse.IsSuccessStatusCode)
                         {
                             // Also update the incident report status
-                            await UpdateReportStatus(incidentId, "ParentOnHold");
+                            await UpdateReportStatus(incidentId, "UnderReview");
                             await LoadIncidentReports();
                              
                             // Re-check the case record to update the modal
                             if (progressReport != null)
                             {
                                 await CheckCaseRecordExists(progressReport);
+                                // Fetch Part B data so the labels update immediately
+                                await LoadPartBFields(progressReport.IncidentID);
                             }
                             
-                            ShowSnackbar("Parents arrived - status updated to Parent On Hold", true);
+                            ShowSnackbar("Parents arrived - status updated to Under Review", true);
                             return;
                         }
                     }
@@ -850,16 +852,26 @@ else
                     
                     if (record != null && record.RecordID > 0)
                     {
-                        // Update to ParentOnHold status
-                        var payload = new ParentMeetingUpdateRequest { Status = "ParentOnHold" };
+                        // Update to UnderReview status
+                        var payload = new ParentMeetingUpdateRequest { Status = "UnderReview" };
                         var updateResponse = await Http.PutAsJsonAsync($"api/StudentProfileCaseRecord/simplified/{record.RecordID}/parent-meeting", payload);
                         
                         if (updateResponse.IsSuccessStatusCode)
                         {
                             // Also update the escalation status
-                            await UpdateEscalationStatus(escalationId, "ParentOnHold");
+                            await UpdateEscalationStatus(escalationId, "UnderReview");
                             
-                            ShowSnackbar("Parents arrived - status updated to Parent On Hold", true);
+                            // Re-fetch escalation data to sync UI
+                            await LoadEscalatedCases();
+                            
+                            // Re-fetch Part B fields for this escalation
+                            var escalation = escalatedCases.FirstOrDefault(e => e.EscalationID == escalationId);
+                            if (escalation != null)
+                            {
+                                await OpenEscalationModal(escalation);
+                            }
+
+                            ShowSnackbar("Parents arrived - status updated to Under Review", true);
                             return;
                         }
                     }
@@ -869,8 +881,8 @@ else
             {
                 // FALLBACK: If Part B record doesn't exist, we can still update the Escalation status directly.
                 // Our backend EscalationService will now also sync to all related minor incidents!
-                await UpdateEscalationStatus(escalationId, "ParentOnHold");
-                ShowSnackbar("Parents arrived - status updated to Parent On Hold", true);
+                await UpdateEscalationStatus(escalationId, "UnderReview");
+                ShowSnackbar("Parents arrived - status updated to Under Review", true);
                 return;
             }
             ShowSnackbar("Failed to update status", false);
@@ -928,7 +940,7 @@ else
         }
     }
 
-    private async Task SavePartBAndResolve()
+    private async Task SavePartB()
     {
         if (!currentPartBRecordId.HasValue) 
         {
@@ -941,14 +953,13 @@ else
         
         try
         {
-            // Update Part B fields and status to Resolved
+            // Update Part B fields (without changing status to Resolved)
             var payload = new
             {
                 ActionTaken = partBActionTaken,
                 Findings = partBFindings,
                 Agreement = partBAgreement,
-                PenaltyAction = partBPenaltyAction,
-                Status = "Resolved"
+                PenaltyAction = partBPenaltyAction
             };
             
             var updateResponse = await Http.PutAsJsonAsync($"api/StudentProfileCaseRecord/simplified/{currentPartBRecordId.Value}/part-b", payload);
@@ -967,22 +978,18 @@ else
                 currentPartBRecordId = null;
                 
                 ClosePartBModal();
-                ShowSnackbar("Case resolved successfully!", true);
+                ShowSnackbar("Part B details saved successfully!", true);
 
-                // If escalation modal is open, close it since it's resolved
-                if (showEscalationModal)
+                // If escalation modal is open, we refresh it
+                if (showEscalationModal && selectedEscalation != null)
                 {
-                    CloseEscalationModal();
-                }
-                // If progress modal is open, we might want to refresh it or close it
-                if (showProgressModal)
-                {
-                    CloseProgressModal();
+                    // Refresh data for the selected escalation
+                    await LoadEscalatedCases();
                 }
             }
             else
             {
-                ShowSnackbar("Failed to save resolution details.", false);
+                ShowSnackbar("Failed to save Part B details.", false);
             }
         }
         catch (Exception ex)
@@ -1427,13 +1434,12 @@ else
             var endStr = annexAEndDate.ToString("yyyy-MM-dd");
             var schoolParam = !string.IsNullOrEmpty(teacherSchoolName) ? $"&schoolName={Uri.EscapeDataString(teacherSchoolName)}" : "";
 
-            // Use activeTab to filter Annex A download if needed, or pass empty status to get all for the date range
-            // Currently keeping original behavior or passing activeTab as status? 
-            // The requirement was just for the UI tabs. Let's pass empty status to get all within date range, 
-            // OR if the user wants to download Annex A only for the current tab, we map "activeTab" to status.
-            // But "Approved" maps to multiple statuses. Let's send empty status to get EVERYTHING for dhe date range, 
-            // which is usually what Annex A is (a summary).
-            var url = $"api/StudentProfileCaseRecord/annex-a-pdf?status={schoolParam}&startDate={startStr}&endDate={endStr}";
+            // Map active focus to status if it's "Resolved", otherwise let it be empty to include all
+            string statusToFilter = activeTab == "Resolved" ? "Resolved" : "";
+            var statusParam = !string.IsNullOrEmpty(statusToFilter) ? $"&status={Uri.EscapeDataString(statusToFilter)}" : "";
+            
+            var url = $"api/StudentProfileCaseRecord/annex-a-pdf?startDate={startStr}&endDate={endStr}{statusParam}{schoolParam}";
+
             var fileName = $"AnnexA_Report_{DateTime.Now:yyyyMMdd}.pdf";
             
             var response = await Http.GetAsync(url);
@@ -3234,10 +3240,15 @@ else
                 else if (isUnderReview)
                 {
                     @* UnderReview status - show button to open Part B modal *@
-                    <div style="width: 100%; margin-top: 10px;">
+                    <div style="width: 100%; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
                         <button class="btn btn-primary btn-action" style="width: 100%; height: 48px; font-weight: 600; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; background: @(hasPartBData ? "#0284c7" : "#3b82f6"); border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);" @onclick="() => OpenPartBModal()">
                             <span style="font-size: 1.2rem;">📝</span>
                             <span>@(hasPartBData ? "Continue Part B - Case Resolution" : "Make Part B - Case Resolution")</span>
+                        </button>
+
+                        <button class="btn btn-success btn-action" style="width: 100%; height: 48px; font-weight: 600; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #10b981; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);" @onclick='async () => { await UpdateReportStatus(progressReport.IncidentID, "Resolved"); await LoadIncidentReports(); await CheckCaseRecordExists(progressReport); }'>
+                            <i class="fas fa-check-circle btn-icon"></i>
+                            <span>Mark as Resolved</span>
                         </button>
                     </div>
                 }
@@ -3408,7 +3419,7 @@ else
         </div>
         <div class="cs-modal-footer" style="padding: 20px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
             <button class="btn btn-secondary" @onclick="ClosePartBModal" style="padding: 10px 24px; border-radius: 10px; font-weight: 500;">Cancel</button>
-            <button class="btn btn-success" @onclick="SavePartBAndResolve" disabled="@isSavingPartB" style="padding: 10px 24px; border-radius: 10px; font-weight: 600; min-width: 140px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #10b981; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+            <button class="btn btn-success" @onclick="SavePartB" disabled="@isSavingPartB" style="padding: 10px 24px; border-radius: 10px; font-weight: 600; min-width: 140px; display: flex; align-items: center; justify-content: center; gap: 8px; background: #10b981; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
                 @if (isSavingPartB)
                 {
                     <span class="spinner-border spinner-border-sm"></span>

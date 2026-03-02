@@ -2009,7 +2009,7 @@ namespace Server.Services
                 }
                 if (!string.IsNullOrEmpty(schoolName))
                 {
-                    query += " AND s.SchoolName = @SchoolName";
+                    query += " AND i.SchoolName = @SchoolName";
                 }
                 if (startDate.HasValue)
                 {
