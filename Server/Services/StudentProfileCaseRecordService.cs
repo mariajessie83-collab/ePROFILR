@@ -1989,29 +1989,27 @@ namespace Server.Services
 
                 var query = @"
                     SELECT 
-                        COALESCE(c.RecordID, 0) as RecordID,
-                        base.IncidentID,
-                        base.EscalationID,
-                        COALESCE(c.RespondentName, base.RespondentName, '') as RespondentName,
-                        COALESCE(c.DateOfOffense, base.ReferenceDate) as DateOfOffense,
-                        COALESCE(c.ViolationCommitted, base.IncidentType, '') as ViolationCommitted,
-                        COALESCE(c.ViolationCategory, base.ViolationCategory, '') as ViolationCategory,
-                        COALESCE(c.Description, base.Description, '') as Description,
-                        COALESCE(c.EvidencePhotoBase64, base.EvidencePhotoBase64, '') as EvidencePhotoBase64,
+                        m.RecordID, m.IncidentID, m.EscalationID,
+                        COALESCE(c.RespondentName, m.RespondentName) as RespondentName,
+                        COALESCE(c.DateOfOffense, m.ReferenceDate) as DateOfOffense,
+                        COALESCE(c.ViolationCommitted, m.IncidentType) as ViolationCommitted,
+                        COALESCE(c.ViolationCategory, m.SourceCategory) as ViolationCategory,
+                        COALESCE(c.Description, m.Description) as Description,
+                        COALESCE(c.EvidencePhotoBase64, m.EvidencePhotoBase64) as EvidencePhotoBase64,
                         COALESCE(c.StudentSignatureBase64, '') as StudentSignatureBase64,
-                        c.DateOfBirth,
-                        c.Age,
-                        c.Sex,
-                        c.Address,
-                        c.GradeLevel,
-                        c.TrackStrand,
-                        c.Section,
-                        c.AdviserName,
+                        COALESCE(c.DateOfBirth, st.DateOfBirth) as DateOfBirth,
+                        COALESCE(c.Age, TIMESTAMPDIFF(YEAR, st.DateOfBirth, CURDATE())) as Age,
+                        COALESCE(c.Sex, st.Sex) as Sex,
+                        COALESCE(c.Address, st.Address) as Address,
+                        COALESCE(c.GradeLevel, st.GradeLevel) as GradeLevel,
+                        COALESCE(c.TrackStrand, st.TrackStrand) as TrackStrand,
+                        COALESCE(c.Section, st.Section) as Section,
+                        COALESCE(c.AdviserName, st.AdviserName) as AdviserName,
                         c.ActionTaken,
                         c.Findings,
                         c.Agreement,
                         c.PenaltyAction,
-                        COALESCE(c.Status, base.Status) as Status,
+                        COALESCE(c.Status, m.Status) as Status,
                         1 as IsActive,
                         c.ParentContactType,
                         c.ParentContactName,
@@ -2019,87 +2017,91 @@ namespace Server.Services
                         c.FathersName,
                         c.MothersName,
                         c.GuardianName,
-                        COALESCE(base.VictimName, '') as VictimName,
-                        COALESCE(base.ComplainantName, '') as ComplainantName,
-                        COALESCE(base.ComplainantContact, '') as ComplainantContact,
-                        COALESCE(base.SchoolName, c.SchoolName) as SchoolName,
+                        COALESCE(m.VictimName, '') as VictimName,
+                        COALESCE(m.ComplainantName, '') as ComplainantName,
+                        COALESCE(m.ComplainantContact, '') as ComplainantContact,
+                        COALESCE(m.SchoolName, st.SchoolName, c.SchoolName) as SchoolName,
                         COALESCE(s.Region, c.Region) as Region,
                         COALESCE(s.Division, c.Division) as Division,
                         COALESCE(s.District, c.District) as District
                     FROM (
-                        SELECT IncidentID, NULL as EscalationID, RespondentName, Status, DateReported as ReferenceDate, SchoolName, IncidentType, Description, EvidencePhotoBase64, VictimName, FullName as ComplainantName, ComplainantContactNumber as ComplainantContact, 'Major' as ViolationCategory FROM simplifiedincidentreports WHERE (IsActive = 1 OR IsActive IS NULL)
+                        /* Case Records */
+                        SELECT RecordID, IncidentID, EscalationID, RespondentName, Status, DateCreated as ReferenceDate, '' as SchoolName, '' as IncidentType, '' as Description, '' as EvidencePhotoBase64, '' as VictimName, '' as ComplainantName, '' as ComplainantContact, 'Major' as SourceCategory 
+                        FROM simplifiedstudentprofilecaserecords 
+                        WHERE IsActive = 1
+                        
                         UNION ALL
-                        SELECT IncidentID, NULL as EscalationID, RespondentName, Status, COALESCE(DateReported, DateCreated) as ReferenceDate, SchoolName, IncidentType, IncidentDescription as Description, EvidencePhotoBase64, VictimName, ComplainantName, '' as ComplainantContact, 'Major' as ViolationCategory FROM incidentreports WHERE (IsActive = 1 OR IsActive IS NULL)
+                        
+                        /* Unlinked Simplified Reports (Resolved/Closed) */
+                        SELECT 0 as RecordID, IncidentID, NULL as EscalationID, RespondentName, Status, DateReported as ReferenceDate, SchoolName, IncidentType, Description, EvidencePhotoBase64, VictimName, FullName as ComplainantName, ComplainantContactNumber as ComplainantContact, 'Major' as SourceCategory 
+                        FROM simplifiedincidentreports 
+                        WHERE (IsActive = 1 OR IsActive IS NULL) 
+                        AND (Status = 'Resolved' OR Status = 'Closed')
+                        AND IncidentID NOT IN (SELECT COALESCE(IncidentID, 0) FROM simplifiedstudentprofilecaserecords WHERE IncidentID IS NOT NULL)
+
                         UNION ALL
-                        SELECT NULL as IncidentID, EscalationID, StudentName as RespondentName, CAST(Status AS CHAR) as Status, EscalatedDate as ReferenceDate, SchoolName, 'Escalated Case' as IncidentType, CaseDetails as Description, '' as EvidencePhotoBase64, '' as VictimName, EscalatedBy as ComplainantName, '' as ComplainantContact, 'Major' as ViolationCategory FROM caseescalations WHERE IsActive = 1
-                    ) as base
-                    LEFT JOIN simplifiedstudentprofilecaserecords c ON (base.IncidentID = c.IncidentID OR (base.EscalationID = c.EscalationID AND base.IncidentID IS NULL))
-                    LEFT JOIN schools s ON TRIM(UPPER(COALESCE(base.SchoolName, c.SchoolName))) = TRIM(UPPER(s.SchoolName))
+
+                        /* Unlinked Legacy Reports (Resolved/Closed) */
+                        SELECT 0 as RecordID, IncidentID, NULL as EscalationID, RespondentName, Status, COALESCE(DateReported, DateCreated) as ReferenceDate, SchoolName, IncidentType, IncidentDescription as Description, EvidencePhotoBase64, VictimName, ComplainantName, '' as ComplainantContact, 'Major' as SourceCategory 
+                        FROM incidentreports 
+                        WHERE (IsActive = 1 OR IsActive IS NULL)
+                        AND (Status = 'Resolved' OR Status = 'Closed')
+                        AND IncidentID NOT IN (SELECT COALESCE(IncidentID, 0) FROM simplifiedstudentprofilecaserecords WHERE IncidentID IS NOT NULL)
+                    ) as m
+                    LEFT JOIN simplifiedstudentprofilecaserecords c ON m.RecordID = c.RecordID AND m.RecordID > 0
+                    LEFT JOIN students st ON UPPER(TRIM(COALESCE(c.RespondentName, m.RespondentName))) = UPPER(TRIM(st.StudentName))
+                    LEFT JOIN schools s ON TRIM(UPPER(COALESCE(m.SchoolName, st.SchoolName, c.SchoolName))) = TRIM(UPPER(s.SchoolName))
                     WHERE 1=1";
 
-                _logger.LogInformation("Executing Annex A Master Query - School: {School}, Status: {Status}, Range: {Start} - {End}", 
-                    schoolName, status, startDate, endDate);
+                _logger.LogInformation("Ultimatum Annex A Query - School: {School}, Status: {Status}", schoolName, status);
 
                 if (!string.IsNullOrEmpty(respondentName))
                 {
-                    query += " AND UPPER(COALESCE(c.RespondentName, base.RespondentName)) LIKE UPPER(@RespondentName)";
+                    query += " AND (UPPER(c.RespondentName) LIKE UPPER(@RespondentName) OR UPPER(m.RespondentName) LIKE UPPER(@RespondentName))";
                 }
                 
                 if (!string.IsNullOrEmpty(status))
                 {
-                    // Check status across base and case record
-                    query += " AND (UPPER(TRIM(COALESCE(c.Status, ''))) = UPPER(TRIM(@Status)) OR UPPER(TRIM(COALESCE(base.Status, ''))) = UPPER(TRIM(@Status)))";
+                    query += " AND (UPPER(TRIM(COALESCE(c.Status, ''))) = UPPER(TRIM(@Status)) OR UPPER(TRIM(COALESCE(m.Status, ''))) = UPPER(TRIM(@Status)))";
                 }
                 
                 if (incidentId.HasValue)
                 {
-                    query += " AND base.IncidentID = @IncidentID";
+                    query += " AND (c.IncidentID = @IncidentID OR m.IncidentID = @IncidentID)";
                 }
                 
                 if (!string.IsNullOrEmpty(schoolName))
                 {
-                    query += " AND UPPER(TRIM(COALESCE(base.SchoolName, c.SchoolName, ''))) = UPPER(TRIM(@SchoolName))";
+                    // LENIENT school name filter: match on multiple levels
+                    query += @" AND (
+                        UPPER(TRIM(COALESCE(m.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%') 
+                        OR UPPER(TRIM(@SchoolName)) LIKE CONCAT('%', UPPER(TRIM(COALESCE(m.SchoolName, ''))), '%')
+                        OR UPPER(TRIM(COALESCE(st.SchoolName, ''))) LIKE CONCAT('%', UPPER(TRIM(@SchoolName)), '%')
+                        OR UPPER(TRIM(@SchoolName)) LIKE CONCAT('%', UPPER(TRIM(COALESCE(st.SchoolName, ''))), '%')
+                    )";
                 }
                 
                 if (startDate.HasValue)
                 {
-                    query += " AND (COALESCE(c.DateCreated, base.ReferenceDate) >= @StartDate OR COALESCE(c.DateOfOffense, base.ReferenceDate) >= @StartDate)";
+                    query += " AND (COALESCE(c.DateCreated, m.ReferenceDate) >= @StartDate OR COALESCE(c.DateOfOffense, m.ReferenceDate) >= @StartDate)";
                 }
                 
                 if (endDate.HasValue)
                 {
-                    query += " AND (COALESCE(c.DateCreated, base.ReferenceDate) <= @EndDate OR COALESCE(c.DateOfOffense, base.ReferenceDate) <= @EndDate)";
+                    query += " AND (COALESCE(c.DateCreated, m.ReferenceDate) <= @EndDate OR COALESCE(c.DateOfOffense, m.ReferenceDate) <= @EndDate)";
                 }
 
-                query += " ORDER BY COALESCE(c.DateCreated, base.ReferenceDate) DESC";
+                query += " ORDER BY COALESCE(c.DateCreated, m.ReferenceDate) DESC";
 
                 using var command = new MySqlCommand(query, connection);
-                if (!string.IsNullOrEmpty(respondentName))
-                {
-                    command.Parameters.AddWithValue("@RespondentName", $"%{respondentName}%");
-                }
-                if (!string.IsNullOrEmpty(status))
-                {
-                    command.Parameters.AddWithValue("@Status", status.Trim());
-                }
-                if (incidentId.HasValue)
-                {
-                    command.Parameters.AddWithValue("@IncidentID", incidentId.Value);
-                }
-                if (!string.IsNullOrEmpty(schoolName))
-                {
-                    command.Parameters.AddWithValue("@SchoolName", schoolName.Trim());
-                }
-                if (startDate.HasValue)
-                {
-                    command.Parameters.AddWithValue("@StartDate", startDate.Value.Date);
-                }
-                if (endDate.HasValue)
-                {
-                    command.Parameters.AddWithValue("@EndDate", endDate.Value.Date.AddDays(1).AddSeconds(-1));
-                }
+                if (!string.IsNullOrEmpty(respondentName)) command.Parameters.AddWithValue("@RespondentName", $"%{respondentName}%");
+                if (!string.IsNullOrEmpty(status)) command.Parameters.AddWithValue("@Status", status.Trim());
+                if (incidentId.HasValue) command.Parameters.AddWithValue("@IncidentID", incidentId.Value);
+                if (!string.IsNullOrEmpty(schoolName)) command.Parameters.AddWithValue("@SchoolName", schoolName.Trim());
+                if (startDate.HasValue) command.Parameters.AddWithValue("@StartDate", startDate.Value.Date);
+                if (endDate.HasValue) command.Parameters.AddWithValue("@EndDate", endDate.Value.Date.AddDays(1).AddSeconds(-1));
 
-                _logger.LogInformation("Annex A Final SQL: {SQL}", query);
+                _logger.LogInformation("Executing Ultimatum SQL: {SQL}", query);
 
                 using var reader = await command.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
