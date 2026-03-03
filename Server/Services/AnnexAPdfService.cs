@@ -107,7 +107,7 @@ namespace Server.Services
                                 c.Item().Text("Prepared by:").FontSize(10).Italic();
                                 c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
                                 {
-                                    sig.Item().BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("").MinHeight(15);
+                                    sig.Item().MinHeight(15).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
                                     sig.Item().AlignCenter().Text("Signature over Printed Name").FontSize(9);
                                     sig.Item().AlignCenter().Text("Designation").FontSize(9);
                                 });
@@ -120,7 +120,7 @@ namespace Server.Services
                                 c.Item().Text("Approved by:").FontSize(10).Italic();
                                 c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
                                 {
-                                    sig.Item().BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("").MinHeight(15);
+                                    sig.Item().MinHeight(15).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
                                     sig.Item().AlignCenter().Text("School Principal / School Head").FontSize(9);
                                     sig.Item().AlignCenter().Text("Date").FontSize(9);
                                 });
