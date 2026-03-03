@@ -161,7 +161,7 @@ namespace Server.Services
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
                 .PaddingVertical(8)
                 .Border(0.5f)
-                .BackgroundColor(Colors.Grey.Lighten4)
+                .Background(Colors.Grey.Lighten4)
                 .AlignCenter()
                 .AlignMiddle();
         }
