@@ -62,14 +62,14 @@ namespace Server.Services
                         });
                     });
 
-                    page.Content().PaddingTop(15).Table(table =>
+                     page.Content().PaddingTop(15).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>
                         {
                             columns.RelativeColumn(2.5f); // Victim Name
                             columns.RelativeColumn(2.5f); // Respondent Name
-                            columns.ConstantColumn(40);    // Age
-                            columns.ConstantColumn(40);    // Sex
+                            columns.ConstantColumn(35);    // Age
+                            columns.ConstantColumn(35);    // Sex
                             columns.RelativeColumn(3);    // Nature of Complaint
                             columns.RelativeColumn(3);    // Action Taken
                             columns.RelativeColumn(3);    // Recommendation
@@ -77,13 +77,13 @@ namespace Server.Services
 
                         table.Header(header =>
                         {
-                            header.Cell().Element(HeaderStyle).Text("VICTIM NAME");
-                            header.Cell().Element(HeaderStyle).Text("RESPONDENT NAME");
+                            header.Cell().Element(HeaderStyle).Text("VICTIM'S NAME");
+                            header.Cell().Element(HeaderStyle).Text("RESPONDENT'S NAME");
                             header.Cell().Element(HeaderStyle).Text("AGE");
                             header.Cell().Element(HeaderStyle).Text("SEX");
                             header.Cell().Element(HeaderStyle).Text("NATURE OF COMPLAINT");
-                            header.Cell().Element(HeaderStyle).Text("ACTION TAKEN");
-                            header.Cell().Element(HeaderStyle).Text("RECOMMENDATION");
+                            header.Cell().Element(HeaderStyle).Text("ACTION/S TAKEN");
+                            header.Cell().Element(HeaderStyle).Text("RECOMMENDATION/S");
                         });
 
                         foreach (var record in records)
@@ -147,7 +147,6 @@ namespace Server.Services
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
                 .Padding(5)
                 .Border(0.5f)
-                .BackgroundColor(Colors.Grey.Lighten4)
                 .AlignCenter()
                 .AlignMiddle();
         }
