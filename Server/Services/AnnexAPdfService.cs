@@ -24,20 +24,20 @@ namespace Server.Services
                     {
                         headerCol.Item().AlignCenter().Column(col =>
                         {
-                            col.Item().Text("Department of Education").FontSize(10).SemiBold();
-                            col.Item().Text($"{region}").FontSize(10);
-                            col.Item().Text($"{division}").FontSize(10);
-                            col.Item().PaddingBottom(5).Text($"{schoolName}").FontSize(11).Bold();
+                            col.Item().AlignCenter().Text("Department of Education").FontSize(10).SemiBold();
+                            col.Item().AlignCenter().Text($"{region}").FontSize(10);
+                            col.Item().AlignCenter().Text($"{division}").FontSize(10);
+                            col.Item().AlignCenter().PaddingBottom(5).Text($"{schoolName}").FontSize(11).Bold();
                         });
 
                         headerCol.Item().PaddingTop(10).AlignCenter().Column(col =>
                         {
-                            col.Item().Text("ANNEX \"A\"").FontSize(12).Bold();
-                            col.Item().Text("REPORT ON INCIDENTS OF ABUSE, VIOLENCE, EXPLOITATION, DISCRIMINATION, BULLYING OR PEER ABUSE").FontSize(11).Bold();
-                            col.Item().Text("AND OTHER RELATED OFFENSES").FontSize(11).Bold();
+                            col.Item().AlignCenter().Text("ANNEX \"A\"").FontSize(12).Bold();
+                            col.Item().AlignCenter().Text("REPORT ON INCIDENTS OF ABUSE, VIOLENCE, EXPLOITATION, DISCRIMINATION, BULLYING OR PEER ABUSE").FontSize(11).Bold();
+                            col.Item().AlignCenter().Text("AND OTHER RELATED OFFENSES").FontSize(11).Bold();
                         });
 
-                        headerCol.Item().PaddingTop(10).Row(row =>
+                        headerCol.Item().PaddingTop(15).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
@@ -51,7 +51,7 @@ namespace Server.Services
                                     r.RelativeItem().BorderBottom(0.5f).Text(period);
                                 });
                             });
-                            row.ConstantItem(100);
+                            row.ConstantItem(80);
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Row(r => {
@@ -62,7 +62,7 @@ namespace Server.Services
                         });
                     });
 
-                     page.Content().PaddingTop(15).Table(table =>
+                    page.Content().PaddingTop(20).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>
                         {
@@ -98,16 +98,16 @@ namespace Server.Services
                         }
                     });
 
-                    page.Footer().PaddingTop(30).Column(footerCol =>
+                    page.Footer().PaddingTop(40).Column(footerCol =>
                     {
                         footerCol.Item().Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text("Prepared by:").FontSize(10).Italic();
-                                c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
+                                c.Item().PaddingTop(25).PaddingRight(40).Column(sig =>
                                 {
-                                    sig.Item().MinHeight(15).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
+                                    sig.Item().MinHeight(20).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
                                     sig.Item().AlignCenter().Text("Signature over Printed Name").FontSize(9);
                                     sig.Item().AlignCenter().Text("Designation").FontSize(9);
                                 });
@@ -118,16 +118,16 @@ namespace Server.Services
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text("Approved by:").FontSize(10).Italic();
-                                c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
+                                c.Item().PaddingTop(25).PaddingRight(40).Column(sig =>
                                 {
-                                    sig.Item().MinHeight(15).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
+                                    sig.Item().MinHeight(20).BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("");
                                     sig.Item().AlignCenter().Text("School Principal / School Head").FontSize(9);
                                     sig.Item().AlignCenter().Text("Date").FontSize(9);
                                 });
                             });
                         });
 
-                        footerCol.Item().PaddingTop(20).AlignCenter().Text(x =>
+                        footerCol.Item().PaddingTop(30).AlignCenter().Text(x =>
                         {
                             x.Span("Page ");
                             x.CurrentPageNumber();
@@ -145,8 +145,8 @@ namespace Server.Services
         {
             return container
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
-                .Padding(5)
-                .Border(0.5f)
+                .PaddingBottom(5)
+                .BorderBottom(1f)
                 .AlignCenter()
                 .AlignMiddle();
         }
@@ -155,9 +155,9 @@ namespace Server.Services
         {
             return container
                 .DefaultTextStyle(x => x.FontSize(9))
+                .PaddingVertical(6)
                 .PaddingHorizontal(5)
-                .PaddingVertical(5)
-                .Border(0.5f)
+                .BorderBottom(0.2f)
                 .AlignLeft()
                 .AlignMiddle();
         }
