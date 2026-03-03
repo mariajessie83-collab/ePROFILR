@@ -161,10 +161,11 @@ namespace Server.Services
         private IContainer HeaderStyle(IContainer container)
         {
             return container
+                .Border(0.5f)
+                .BorderColor(Colors.Black)
+                .Background(Colors.Grey.Lighten4)
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
                 .PaddingVertical(8)
-                .Border(0.5f)
-                .Background(Colors.Grey.Lighten4)
                 .AlignCenter()
                 .AlignMiddle();
         }
@@ -172,10 +173,11 @@ namespace Server.Services
         private IContainer CellStyle(IContainer container)
         {
             return container
+                .Border(0.5f)
+                .BorderColor(Colors.Black)
                 .DefaultTextStyle(x => x.FontSize(9))
                 .PaddingVertical(8)
                 .PaddingHorizontal(5)
-                .Border(0.5f)
                 .AlignLeft()
                 .AlignMiddle();
         }
