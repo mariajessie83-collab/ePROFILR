@@ -97,6 +97,19 @@ namespace Server.Services
                             table.Cell().Element(CellStyle).Text(record.ActionTaken ?? record.Agreement ?? "N/A");
                             table.Cell().Element(CellStyle).Text(record.PenaltyAction ?? "N/A");
                         }
+
+                        // Add empty rows to reach at least 10 rows for a formal appearance
+                        int remainingRows = Math.Max(0, 10 - records.Count);
+                        for (int i = 0; i < remainingRows; i++)
+                        {
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                            table.Cell().Element(CellStyle).Text("");
+                        }
                     });
 
                     page.Footer().PaddingTop(50).Column(footerCol =>
@@ -147,8 +160,8 @@ namespace Server.Services
             return container
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
                 .PaddingVertical(8)
-                .BorderTop(1.5f)
-                .BorderBottom(1.5f)
+                .Border(0.5f)
+                .BackgroundColor(Colors.Grey.Lighten4)
                 .AlignCenter()
                 .AlignMiddle();
         }
@@ -159,7 +172,7 @@ namespace Server.Services
                 .DefaultTextStyle(x => x.FontSize(9))
                 .PaddingVertical(8)
                 .PaddingHorizontal(5)
-                .BorderBottom(0.5f)
+                .Border(0.5f)
                 .AlignLeft()
                 .AlignMiddle();
         }
