@@ -20,9 +20,12 @@ namespace Server.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(Colors.Black));
 
-                     page.Header().Column(headerCol =>
+                    page.Header().Height(0); // Empty header to prevent title repetition on every page
+
+                    page.Content().PaddingTop(10).Column(content =>
                     {
-                        headerCol.Item().AlignCenter().Column(col =>
+                        // Main Header - Only on Page 1
+                        content.Item().AlignCenter().Column(col =>
                         {
                             col.Item().AlignCenter().Text("REPUBLIC OF THE PHILIPPINES").FontSize(10).SemiBold();
                             col.Item().AlignCenter().Text("DEPARTMENT OF EDUCATION").FontSize(10).SemiBold();
@@ -31,14 +34,14 @@ namespace Server.Services
                             col.Item().AlignCenter().PaddingBottom(5).Text($"{schoolName}").FontSize(11).Bold();
                         });
 
-                        headerCol.Item().PaddingTop(15).AlignCenter().Column(col =>
+                        content.Item().PaddingTop(15).AlignCenter().Column(col =>
                         {
                             col.Item().AlignCenter().Text("ANNEX \"A\"").FontSize(12).Bold();
                             col.Item().AlignCenter().Text("REPORT ON INCIDENTS OF ABUSE, VIOLENCE, EXPLOITATION, DISCRIMINATION, BULLYING OR PEER ABUSE").FontSize(11).Bold();
                             col.Item().AlignCenter().Text("AND OTHER RELATED OFFENSES").FontSize(11).Bold();
                         });
 
-                        headerCol.Item().PaddingTop(20).AlignCenter().Width(450).Row(row =>
+                        content.Item().PaddingTop(20).AlignCenter().Width(550).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
@@ -52,7 +55,7 @@ namespace Server.Services
                                     r.RelativeItem().BorderBottom(0.5f).PaddingLeft(5).Text(period).FontSize(10);
                                 });
                             });
-                            row.ConstantItem(40);
+                            row.ConstantItem(60);
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Row(r => {
@@ -61,60 +64,60 @@ namespace Server.Services
                                 });
                             });
                         });
-                    });
 
-                    page.Content().PaddingTop(25).Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
+                        // Table - Header will repeat on multi-page automatically
+                        content.Item().PaddingTop(25).Table(table =>
                         {
-                            columns.RelativeColumn(2.5f); // Victim Name
-                            columns.RelativeColumn(2.5f); // Respondent Name
-                            columns.ConstantColumn(35);    // Age
-                            columns.ConstantColumn(35);    // Sex
-                            columns.RelativeColumn(3);    // Nature of Complaint
-                            columns.RelativeColumn(3.5f);  // Action Taken
-                            columns.RelativeColumn(3.5f);  // Recommendation
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(2.5f); // Victim Name
+                                columns.RelativeColumn(2.5f); // Respondent Name
+                                columns.ConstantColumn(35);    // Age
+                                columns.ConstantColumn(35);    // Sex
+                                columns.RelativeColumn(3);    // Nature of Complaint
+                                columns.RelativeColumn(3.5f);  // Action Taken
+                                columns.RelativeColumn(3.5f);  // Recommendation
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(HeaderStyle).Text("VICTIM'S NAME");
+                                header.Cell().Element(HeaderStyle).Text("RESPONDENT'S NAME");
+                                header.Cell().Element(HeaderStyle).Text("AGE");
+                                header.Cell().Element(HeaderStyle).Text("SEX");
+                                header.Cell().Element(HeaderStyle).Text("NATURE OF COMPLAINT");
+                                header.Cell().Element(HeaderStyle).Text("ACTION/S TAKEN");
+                                header.Cell().Element(HeaderStyle).Text("RECOMMENDATION/S");
+                            });
+
+                            foreach (var record in records)
+                            {
+                                table.Cell().Element(CellStyle).Text(record.VictimName ?? "N/A");
+                                table.Cell().Element(CellStyle).Text(record.RespondentName ?? "N/A");
+                                table.Cell().Element(CellStyle).AlignCenter().Text(record.Age?.ToString() ?? "-");
+                                table.Cell().Element(CellStyle).AlignCenter().Text(record.Sex ?? "-");
+                                table.Cell().Element(CellStyle).Text(record.ViolationCommitted ?? "N/A");
+                                table.Cell().Element(CellStyle).Text(record.ActionTaken ?? record.Agreement ?? "N/A");
+                                table.Cell().Element(CellStyle).Text(record.PenaltyAction ?? "N/A");
+                            }
+
+                            // Add empty rows for formal appearance (total min 10)
+                            int targetRows = 10;
+                            int remainingRows = Math.Max(0, targetRows - records.Count);
+                            for (int i = 0; i < remainingRows; i++)
+                            {
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                                table.Cell().Element(CellStyle).Text("");
+                            }
                         });
 
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(HeaderStyle).Text("VICTIM'S NAME");
-                            header.Cell().Element(HeaderStyle).Text("RESPONDENT'S NAME");
-                            header.Cell().Element(HeaderStyle).Text("AGE");
-                            header.Cell().Element(HeaderStyle).Text("SEX");
-                            header.Cell().Element(HeaderStyle).Text("NATURE OF COMPLAINT");
-                            header.Cell().Element(HeaderStyle).Text("ACTION/S TAKEN");
-                            header.Cell().Element(HeaderStyle).Text("RECOMMENDATION/S");
-                        });
-
-                        foreach (var record in records)
-                        {
-                            table.Cell().Element(CellStyle).Text(record.VictimName ?? "N/A");
-                            table.Cell().Element(CellStyle).Text(record.RespondentName ?? "N/A");
-                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Age?.ToString() ?? "-");
-                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Sex ?? "-");
-                            table.Cell().Element(CellStyle).Text(record.ViolationCommitted ?? "N/A");
-                            table.Cell().Element(CellStyle).Text(record.ActionTaken ?? record.Agreement ?? "N/A");
-                            table.Cell().Element(CellStyle).Text(record.PenaltyAction ?? "N/A");
-                        }
-
-                        // Add empty rows to reach at least 10 rows for a formal appearance
-                        int remainingRows = Math.Max(0, 10 - records.Count);
-                        for (int i = 0; i < remainingRows; i++)
-                        {
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                            table.Cell().Element(CellStyle).Text("");
-                        }
-                    });
-
-                    page.Footer().PaddingTop(50).Column(footerCol =>
-                    {
-                        footerCol.Item().Row(row =>
+                        // Signatures - Only at the end of content (last page)
+                        content.Item().PaddingTop(40).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
@@ -140,14 +143,14 @@ namespace Server.Services
                                 });
                             });
                         });
+                    });
 
-                        footerCol.Item().PaddingTop(40).AlignCenter().Text(x =>
-                        {
-                            x.Span("Page ");
-                            x.CurrentPageNumber();
-                            x.Span(" of ");
-                            x.TotalPages();
-                        });
+                    page.Footer().PaddingBottom(5).AlignCenter().Text(x =>
+                    {
+                        x.Span("Page ");
+                        x.CurrentPageNumber();
+                        x.Span(" of ");
+                        x.TotalPages();
                     });
                 });
             });
