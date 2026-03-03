@@ -20,126 +20,120 @@ namespace Server.Services
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(Colors.Black));
 
-                    page.Header().Column(headerCol =>
+                     page.Header().Column(headerCol =>
                     {
-                        headerCol.Item().Row(row =>
+                        headerCol.Item().AlignCenter().Column(col =>
                         {
-                            row.RelativeItem().Text("XIV. CHILD PROTECTION POLICY FORMS").FontSize(12).Bold();
-                            row.AutoItem().Text("Annex \"A\"").FontSize(12).Bold();
+                            col.Item().Text("Department of Education").FontSize(10).SemiBold();
+                            col.Item().Text($"{region}").FontSize(10);
+                            col.Item().Text($"{division}").FontSize(10);
+                            col.Item().PaddingBottom(5).Text($"{schoolName}").FontSize(11).Bold();
                         });
-                        
-                        headerCol.Item().PaddingTop(5).AlignCenter().Text("Report of cases of abuse, violence, exploitation, discrimination, bullying or peer abuse and other related offenses").FontSize(11).Bold();
+
+                        headerCol.Item().PaddingTop(10).AlignCenter().Column(col =>
+                        {
+                            col.Item().Text("ANNEX \"A\"").FontSize(12).Bold();
+                            col.Item().Text("REPORT ON INCIDENTS OF ABUSE, VIOLENCE, EXPLOITATION, DISCRIMINATION, BULLYING OR PEER ABUSE").FontSize(11).Bold();
+                            col.Item().Text("AND OTHER RELATED OFFENSES").FontSize(11).Bold();
+                        });
 
                         headerCol.Item().PaddingTop(10).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Row(r => {
-                                    r.AutoItem().Text("School/Division/Region: ");
-                                    r.RelativeItem().BorderBottom(0.5f).Text($"{schoolName} / {division} / {region}");
-                                });
-                                c.Item().Row(r => {
-                                    r.AutoItem().Text("Period Covered: ");
-                                    string period = "";
+                                    r.AutoItem().Text("Period Covered: ").SemiBold();
+                                    string period = "N/A";
                                     if (startDate.HasValue && endDate.HasValue)
                                     {
-                                        if (startDate.Value.Month == endDate.Value.Month && startDate.Value.Year == endDate.Value.Year)
-                                        {
-                                            period = startDate.Value.ToString("MMMM yyyy");
-                                        }
-                                        else
-                                        {
-                                            period = $"{startDate.Value:MM/dd/yyyy} - {endDate.Value:MM/dd/yyyy}";
-                                        }
-                                    }
-                                    else if (startDate.HasValue)
-                                    {
-                                        period = $"From {startDate.Value:MM/dd/yyyy}";
-                                    }
-                                    else if (endDate.HasValue)
-                                    {
-                                        period = $"Until {endDate.Value:MM/dd/yyyy}";
+                                        period = $"{startDate.Value:MMMM dd, yyyy} - {endDate.Value:MMMM dd, yyyy}";
                                     }
                                     r.RelativeItem().BorderBottom(0.5f).Text(period);
                                 });
-                                c.Item().Row(r => {
-                                    r.AutoItem().Text("Person Submitting Report: ");
-                                    r.RelativeItem().BorderBottom(0.5f).Text(""); // Placeholder
-                                });
                             });
-                            row.ConstantItem(40);
+                            row.ConstantItem(100);
                             row.RelativeItem().Column(c =>
                             {
-                                c.Item().PaddingTop(20).Row(r => {
-                                    r.AutoItem().Text("Designation: ");
-                                    r.RelativeItem().BorderBottom(0.5f).Text(""); // Placeholder
-                                });
                                 c.Item().Row(r => {
-                                    r.AutoItem().Text("Date: ");
-                                    r.RelativeItem().BorderBottom(0.5f).Text(DateTime.Now.ToString("MM/dd/yyyy"));
+                                    r.AutoItem().Text("Date Generated: ").SemiBold();
+                                    r.RelativeItem().BorderBottom(0.5f).Text(DateTime.Now.ToString("MMMM dd, yyyy"));
                                 });
                             });
                         });
                     });
 
-                    page.Content().PaddingTop(10).Table(table =>
+                    page.Content().PaddingTop(15).Table(table =>
                     {
-                        // 7 Column definitions
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(2); // Victim Name
-                            columns.RelativeColumn(2); // Respondent Name
-                            columns.ConstantColumn(45); // Respondent Age (Increased from 35)
-                            columns.ConstantColumn(45); // Respondent Sex (Increased from 35)
-                            columns.RelativeColumn(3); // Nature of Complaint (Increased from 2)
-                            columns.RelativeColumn(3); // Action/s Taken (Increased from 2)
-                            columns.RelativeColumn(3); // Recommendation/s (Increased from 2)
+                            columns.RelativeColumn(2.5f); // Victim Name
+                            columns.RelativeColumn(2.5f); // Respondent Name
+                            columns.ConstantColumn(40);    // Age
+                            columns.ConstantColumn(40);    // Sex
+                            columns.RelativeColumn(3);    // Nature of Complaint
+                            columns.RelativeColumn(3);    // Action Taken
+                            columns.RelativeColumn(3);    // Recommendation
                         });
 
-                        // Header rows
                         table.Header(header =>
                         {
-                            // Col 1: Victim
-                            header.Cell().RowSpan(2).Element(HeaderStyle).Text("VICTIM/S\n\nNAME");
-                            
-                            // Col 2-4: Respondent
-                            header.Cell().ColumnSpan(3).Element(HeaderStyle).Text("RESPONDENT/S");
-                            
-                            // Col 5: Nature
-                            header.Cell().RowSpan(2).Element(HeaderStyle).Text("NATURE OF COMPLAINT");
-                            // Col 6: Action
-                            header.Cell().RowSpan(2).Element(HeaderStyle).Text("ACTION/S TAKEN");
-                            // Col 7: Recommendation
-                            header.Cell().RowSpan(2).Element(HeaderStyle).Text("RECOMMENDATION/S");
-
-                            // Row 2 sub-headers for Respondent only
-                            header.Cell().Element(HeaderSubStyle).Text("NAME");
-                            header.Cell().Element(HeaderSubStyle).Text("AGE");
-                            header.Cell().Element(HeaderSubStyle).Text("SEX (M or F)");
+                            header.Cell().Element(HeaderStyle).Text("VICTIM NAME");
+                            header.Cell().Element(HeaderStyle).Text("RESPONDENT NAME");
+                            header.Cell().Element(HeaderStyle).Text("AGE");
+                            header.Cell().Element(HeaderStyle).Text("SEX");
+                            header.Cell().Element(HeaderStyle).Text("NATURE OF COMPLAINT");
+                            header.Cell().Element(HeaderStyle).Text("ACTION TAKEN");
+                            header.Cell().Element(HeaderStyle).Text("RECOMMENDATION");
                         });
 
-                        // Data rows
                         foreach (var record in records)
                         {
-                            // Clean Victim Name: remove trailing (Age, Sex) or similar info if present
-                            string cleanedVictimName = record.VictimName ?? "";
-                            if (cleanedVictimName.Contains("("))
-                            {
-                                int parenIndex = cleanedVictimName.IndexOf("(");
-                                cleanedVictimName = cleanedVictimName.Substring(0, parenIndex).Trim();
-                            }
-                            
-                            table.Cell().Element(CellStyle).Text(cleanedVictimName);
-                            
-                            table.Cell().Element(CellStyle).Text(record.RespondentName ?? "");
-                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Age?.ToString() ?? "");
-                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Sex ?? "");
-                            
-                            table.Cell().Element(CellStyle).Text(record.ViolationCommitted ?? "");
-                            table.Cell().Element(CellStyle).Text(record.ActionTaken ?? record.Agreement ?? "");
-                            table.Cell().Element(CellStyle).Text(record.PenaltyAction ?? "");
+                            table.Cell().Element(CellStyle).Text(record.VictimName ?? "N/A");
+                            table.Cell().Element(CellStyle).Text(record.RespondentName ?? "N/A");
+                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Age?.ToString() ?? "-");
+                            table.Cell().Element(CellStyle).AlignCenter().Text(record.Sex ?? "-");
+                            table.Cell().Element(CellStyle).Text(record.ViolationCommitted ?? "N/A");
+                            table.Cell().Element(CellStyle).Text(record.ActionTaken ?? record.Agreement ?? "N/A");
+                            table.Cell().Element(CellStyle).Text(record.PenaltyAction ?? "N/A");
                         }
+                    });
 
+                    page.Footer().PaddingTop(30).Column(footerCol =>
+                    {
+                        footerCol.Item().Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("Prepared by:").FontSize(10).Italic();
+                                c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
+                                {
+                                    sig.Item().BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("").MinHeight(15);
+                                    sig.Item().AlignCenter().Text("Signature over Printed Name").FontSize(9);
+                                    sig.Item().AlignCenter().Text("Designation").FontSize(9);
+                                });
+                            });
+
+                            row.ConstantItem(100);
+
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("Approved by:").FontSize(10).Italic();
+                                c.Item().PaddingTop(20).PaddingRight(20).Column(sig =>
+                                {
+                                    sig.Item().BorderBottom(0.5f).PaddingBottom(2).AlignCenter().Text("").MinHeight(15);
+                                    sig.Item().AlignCenter().Text("School Principal / School Head").FontSize(9);
+                                    sig.Item().AlignCenter().Text("Date").FontSize(9);
+                                });
+                            });
+                        });
+
+                        footerCol.Item().PaddingTop(20).AlignCenter().Text(x =>
+                        {
+                            x.Span("Page ");
+                            x.CurrentPageNumber();
+                            x.Span(" of ");
+                            x.TotalPages();
+                        });
                     });
                 });
             });
@@ -150,19 +144,10 @@ namespace Server.Services
         private IContainer HeaderStyle(IContainer container)
         {
             return container
-                .DefaultTextStyle(x => x.FontSize(10).Bold())
-                .Padding(3)
-                .Border(0.5f)
-                .AlignCenter()
-                .AlignMiddle();
-        }
-
-        private IContainer HeaderSubStyle(IContainer container)
-        {
-            return container
                 .DefaultTextStyle(x => x.FontSize(9).Bold())
-                .Padding(2)
+                .Padding(5)
                 .Border(0.5f)
+                .BackgroundColor(Colors.Grey.Lighten4)
                 .AlignCenter()
                 .AlignMiddle();
         }
@@ -170,10 +155,9 @@ namespace Server.Services
         private IContainer CellStyle(IContainer container)
         {
             return container
-                .DefaultTextStyle(x => x.FontSize(10))
-                .PaddingVertical(4)
-                .PaddingHorizontal(8)
-                .MinHeight(25)
+                .DefaultTextStyle(x => x.FontSize(9))
+                .PaddingHorizontal(5)
+                .PaddingVertical(5)
                 .Border(0.5f)
                 .AlignLeft()
                 .AlignMiddle();
