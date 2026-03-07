@@ -21,6 +21,9 @@ namespace Gsystem
             
             // Register offline storage service
             builder.Services.AddScoped<OfflineStorageService>();
+
+            // Register Data Cache Service
+            builder.Services.AddScoped<DataCacheService>();
             
             // Register Blazored.LocalStorage
             builder.Services.AddBlazoredLocalStorage();

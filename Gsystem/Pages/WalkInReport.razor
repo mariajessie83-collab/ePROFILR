@@ -475,19 +475,9 @@ else
                     {
                         <h3 class="text-gradient" style="margin-bottom: 20px;">Complainant Information</h3>
                         
-                        <!-- Anonymous Reporting Checkbox -->
-                        <div class="form-group">
-                            <div style="background: #f0f8ff; padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #b3d9ff;">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                                    <input type="checkbox" checked="@isAnonymous" @onchange="OnAnonymousToggled" style="width: 18px; height: 18px; cursor: pointer;" />
-                                    <span style="font-weight: 500; color: #003d82;">Report Anonymously</span>
-                                </label>
-                            </div>
-                        </div>
-                        
                         <div class="form-group">
                             <label>Complainant Full Name <span class="required-asterisk">*</span></label>
-                            <input type="text" class="form-control" placeholder="Enter complainant full name" @bind="incidentReport.ComplainantName" disabled="@isAnonymous" style="text-transform: uppercase;" />
+                            <input type="text" class="form-control" placeholder="Enter complainant full name" @bind="incidentReport.ComplainantName" style="text-transform: uppercase;" />
                             <small class="form-text-guide"><em>Format: Last Name, First Name, Middle Initial (e.g., Dela Cruz, Juan P.)</em></small>
                         </div>
                         
@@ -814,8 +804,6 @@ else
     private List<Studentclass> filteredComplainants = new();
     
     // Anonymous Reporting
-    private bool isAnonymous = false;
-    
     // Victim search functionality
     private string victimSearchText = string.Empty;
     private bool showVictimSuggestions = false;
@@ -903,8 +891,6 @@ else
         await CheckPODSession();
         if (isPODLoggedIn)
         {
-            await LoadViolationTypes();
-            await LoadPODTeachers();
             StartCarouselTimer();
         }
     }
@@ -940,26 +926,6 @@ else
     public void Dispose()
     {
         carouselTimer?.Dispose();
-    }
-
-    private void OnAnonymousToggled(ChangeEventArgs e)
-    {
-        isAnonymous = (bool)(e.Value ?? false);
-        
-        if (isAnonymous)
-        {
-            incidentReport.ComplainantName = "Anonymous";
-            // Contact number remains as is (user required it)
-        }
-        else
-        {
-            if (string.Equals(incidentReport.ComplainantName, "Anonymous", StringComparison.OrdinalIgnoreCase))
-            {
-                incidentReport.ComplainantName = string.Empty;
-            }
-        }
-        
-        StateHasChanged();
     }
 
     private async Task CheckPODSession()

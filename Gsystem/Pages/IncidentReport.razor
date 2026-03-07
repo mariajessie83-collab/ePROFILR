@@ -9,6 +9,7 @@
 @inject IJSRuntime JSRuntime
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject DataCacheService DataCache
 
 <style>
     .suggestions-dropdown {
@@ -292,7 +293,7 @@
                             <option value="">-- Select Division --</option>
                             @foreach (var division in divisions)
                             {
-                                <option value="@division.Division">@division.Division</option>
+                                <option value="@division">@division</option>
                             }
                         </select>
                     </div>
@@ -343,14 +344,8 @@
                 <div class="form-section">
                     <h3>Person Information</h3>
                     <div class="form-group">
-                        <div class="checkbox-container">
-                            <label class="checkbox-label">
-                                <input type="checkbox" @bind="isAnonymous" @oninput="OnAnonymousToggled" />
-                                <span>Report Anonymously</span>
-                            </label>
-                        </div>
                         <label for="fullName">Complainant Full Name <span class="required-asterisk">*</span></label>
-                        <InputText id="fullName" class="form-control" @bind-Value="incidentReport.FullName" placeholder="Enter complainant full name" disabled="@isAnonymous" />
+                        <InputText id="fullName" class="form-control" @bind-Value="incidentReport.FullName" placeholder="Enter complainant full name" />
                         <small class="form-text-guide"><em>Format: Last Name, First Name, Middle Initial (e.g., Dela Cruz, Juan P.)</em></small>
                     </div>
 
@@ -562,7 +557,7 @@
                             </div>
                             <div class="review-content">
                                 <div class="review-item">
-                                    <strong>Full Name:</strong> @(isAnonymous ? "Anonymous" : incidentReport.FullName)
+                                    <strong>Full Name:</strong> @incidentReport.FullName
                                 </div>
                                 <div class="review-item">
                                     <strong>Respondent Name(s):</strong> @string.Join(" / ", respondentNames.Where(n => !string.IsNullOrWhiteSpace(n)))
@@ -729,9 +724,8 @@
     private string? referenceNumber = null;
     
     // Division and School Selection
-    private List<School> allSchools = new();
-    private List<School> divisions = new();
     private List<School> schools = new();
+    private List<string> divisions = new();
     private string selectedDivision = string.Empty;
     private string selectedSchool = string.Empty;
     
@@ -762,48 +756,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDivisions();
+        divisions = DataCache.GetDivisions();
         await LoadViolationTypes();
     }
 
-    private async Task LoadDivisions()
-    {
-        try
-        {
-            var response = await Http.GetAsync("/api/Auth/schools");
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var apiResponse = JsonSerializer.Deserialize<ApiResponse<List<School>>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (apiResponse?.Success == true && apiResponse.Data != null)
-                {
-                    allSchools = apiResponse.Data;
-                    // Get unique divisions
-                    divisions = allSchools
-                        .Where(s => !string.IsNullOrEmpty(s.Division))
-                        .GroupBy(s => s.Division?.Trim())
-                        .Select(g => new School { Division = g.Key, DivisionName = g.Key })
-                        .ToList();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading divisions: {ex.Message}");
-        }
-    }
-
-    private async Task OnDivisionChanged(ChangeEventArgs e)
+    private void OnDivisionChanged(ChangeEventArgs e)
     {
         selectedDivision = e.Value?.ToString() ?? string.Empty;
         selectedSchool = string.Empty;
-        schools.Clear();
         
         if (!string.IsNullOrEmpty(selectedDivision))
         {
-            schools = allSchools
-                .Where(s => s.Division?.Trim() == selectedDivision.Trim())
-                .ToList();
+            schools = DataCache.GetSchoolsByDivision(selectedDivision);
+        }
+        else
+        {
+            schools.Clear();
         }
         
         // Reset school selection
